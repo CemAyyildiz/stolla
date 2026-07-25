@@ -10,7 +10,7 @@ import { contractIds } from "@/lib/stellar";
 import {
   loadCommunityData,
   runCommunityRefresh,
-} from "./community-data";
+} from "./community-data.mjs";
 
 export default function CommunityPage() {
   const { address, signTransaction } = useWallet();

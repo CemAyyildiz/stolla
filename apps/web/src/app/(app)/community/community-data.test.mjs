@@ -3,10 +3,9 @@ import test from "node:test";
 import {
   loadCommunityData,
   runCommunityRefresh,
-  type CollectionData,
-} from "./community-data.ts";
+} from "./community-data.mjs";
 
-const CURRENT_DATA: CollectionData = {
+const CURRENT_DATA = {
   name: "Stolla Community",
   symbol: "STOLLA",
   balance: 2,
@@ -16,8 +15,8 @@ const CURRENT_DATA: CollectionData = {
 function callbacks() {
   const state = {
     starts: 0,
-    data: null as CollectionData | null,
-    error: null as string | null,
+    data: null,
+    error: null,
   };
 
   return {
@@ -27,10 +26,10 @@ function callbacks() {
         state.starts += 1;
         state.error = null;
       },
-      onSuccess(data: CollectionData) {
+      onSuccess(data) {
         state.data = data;
       },
-      onError(message: string) {
+      onError(message) {
         state.error = message;
       },
     },
@@ -85,7 +84,7 @@ test("a failed initial request can be retried through the same refresh path", as
 
 test("a repeated failure preserves an actionable data-load error", async () => {
   const refreshState = callbacks();
-  const load = async (): Promise<CollectionData> => {
+  const load = async () => {
     throw new Error("RPC still unavailable");
   };
 

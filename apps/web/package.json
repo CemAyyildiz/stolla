@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test 'src/app/(app)/community/community-data.test.ts'"
+    "test": "node --test 'src/app/(app)/community/community-data.test.mjs'"
   },
   "dependencies": {
     "@creit.tech/stellar-wallets-kit": "^2.4.0",
