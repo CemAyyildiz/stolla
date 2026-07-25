@@ -78,6 +78,16 @@ Playwright starts the web app on an isolated local port and stops both the
 browser and server when the run completes. The smoke test does not require a
 wallet extension or configured contracts.
 
+> [!IMPORTANT]
+> The mobile navigation test temporarily models the responsive header contract
+> from #2 / PR #109 in the browser because that dependency is not on `main`.
+> The test checks the real computed header styles first and deliberately fails
+> as soon as that upstream contract is present. When #109 is merged, remove the
+> `ISSUE_2_MOBILE_HEADER_CONTRACT` fixture and
+> `installTemporaryIssue2DependencyMock` call, then run the unchanged navigation
+> and overflow assertions against the production header. The shim must not
+> remain after the dependency lands.
+
 ## Contracts
 
 Build and test both Soroban contracts from the repository root:
