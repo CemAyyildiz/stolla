@@ -7,6 +7,10 @@ import {
   createReadOnlyNftClient,
 } from "@/lib/contracts";
 import { contractIds } from "@/lib/stellar";
+import {
+  loadCommunityData,
+  runCommunityRefresh,
+} from "./community-data";
 
 export default function CommunityPage() {
   const { address, signTransaction } = useWallet();
@@ -16,58 +20,71 @@ export default function CommunityPage() {
   const [votes, setVotes] = useState<string | null>(null);
   const [recipient, setRecipient] = useState("");
   const [tokenUri, setTokenUri] = useState("ipfs://");
-  const [status, setStatus] = useState<string | null>(null);
+  const [transactionStatus, setTransactionStatus] = useState<string | null>(
+    null,
+  );
+  const [dataLoadError, setDataLoadError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const contractsConfigured = Boolean(contractIds.nft);
 
   const refresh = useCallback(async () => {
-    if (!contractsConfigured) return;
-    const client = createReadOnlyNftClient();
-    const [collectionName, collectionSymbol] = await Promise.all([
-      client.name(),
-      client.symbol(),
-    ]);
-    setName(collectionName.result ?? "");
-    setSymbol(collectionSymbol.result ?? "");
+    if (!contractsConfigured) return false;
 
-    if (address) {
-      const userClient = createNftClient({ publicKey: address, signTransaction });
-      const [bal, votePower] = await Promise.all([
-        userClient.balance({ account: address }),
-        userClient.get_votes({ account: address }),
-      ]);
-      setBalance(Number(bal.result ?? 0));
-      setVotes(String(votePower.result ?? 0));
-    }
+    return runCommunityRefresh(
+      () =>
+        loadCommunityData({
+          address,
+          collectionClient: createReadOnlyNftClient(),
+          userClient: address
+            ? createNftClient({ publicKey: address, signTransaction })
+            : null,
+        }),
+      {
+        onStart() {
+          setRefreshing(true);
+          setDataLoadError(null);
+        },
+        onSuccess(data) {
+          setName(data.name);
+          setSymbol(data.symbol);
+          setBalance(data.balance);
+          setVotes(data.votes);
+          setRefreshing(false);
+        },
+        onError(message) {
+          setDataLoadError(message);
+          setRefreshing(false);
+        },
+      },
+    );
   }, [address, contractsConfigured, signTransaction]);
 
   useEffect(() => {
-    refresh().catch((error: unknown) => {
-      setStatus(error instanceof Error ? error.message : "Failed to load NFT data");
-    });
+    void refresh();
   }, [refresh]);
 
   async function handleMint() {
     if (!address) {
-      setStatus("Connect your wallet first.");
+      setTransactionStatus("Connect your wallet first.");
       return;
     }
     if (!recipient || !tokenUri) {
-      setStatus("Recipient and IPFS URI are required.");
+      setTransactionStatus("Recipient and IPFS URI are required.");
       return;
     }
 
     setLoading(true);
-    setStatus(null);
+    setTransactionStatus(null);
     try {
       const client = createNftClient({ publicKey: address, signTransaction });
       const tx = await client.mint({ to: recipient, token_uri: tokenUri });
       const result = await tx.signAndSend();
-      setStatus(`Minted token #${result.result} successfully.`);
+      setTransactionStatus(`Minted token #${result.result} successfully.`);
       await refresh();
     } catch (error: unknown) {
-      setStatus(error instanceof Error ? error.message : "Mint failed");
+      setTransactionStatus(error instanceof Error ? error.message : "Mint failed");
     } finally {
       setLoading(false);
     }
@@ -75,12 +92,12 @@ export default function CommunityPage() {
 
   async function handleDelegate() {
     if (!address) {
-      setStatus("Connect your wallet first.");
+      setTransactionStatus("Connect your wallet first.");
       return;
     }
 
     setLoading(true);
-    setStatus(null);
+    setTransactionStatus(null);
     try {
       const client = createNftClient({ publicKey: address, signTransaction });
       const tx = await client.delegate({
@@ -88,10 +105,12 @@ export default function CommunityPage() {
         delegatee: address,
       });
       await tx.signAndSend();
-      setStatus("Delegated voting power to yourself.");
+      setTransactionStatus("Delegated voting power to yourself.");
       await refresh();
     } catch (error: unknown) {
-      setStatus(error instanceof Error ? error.message : "Delegate failed");
+      setTransactionStatus(
+        error instanceof Error ? error.message : "Delegate failed",
+      );
     } finally {
       setLoading(false);
     }
@@ -114,6 +133,36 @@ export default function CommunityPage() {
 
       {contractsConfigured && (
         <div className="mt-6 space-y-6">
+          {dataLoadError && (
+            <section
+              aria-labelledby="community-data-error-title"
+              className="rounded-xl border border-rose-800/70 bg-rose-950/40 p-5"
+              role="alert"
+            >
+              <h2
+                className="font-semibold text-rose-100"
+                id="community-data-error-title"
+              >
+                Community data could not be loaded
+              </h2>
+              <p className="mt-2 text-sm text-rose-200">{dataLoadError}</p>
+              <button
+                type="button"
+                onClick={() => void refresh()}
+                disabled={refreshing}
+                className="mt-4 rounded-lg border border-rose-700 px-4 py-2 text-sm font-medium text-rose-100 hover:bg-rose-900/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300 disabled:opacity-50"
+              >
+                {refreshing ? "Retrying..." : "Retry loading community data"}
+              </button>
+            </section>
+          )}
+
+          {refreshing && (
+            <p className="text-sm text-slate-400" role="status" aria-live="polite">
+              Loading community data...
+            </p>
+          )}
+
           <section className="rounded-xl border border-slate-800 bg-[#151b2b] p-5">
             <h2 className="font-semibold text-slate-100">Collection</h2>
             <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
@@ -177,9 +226,12 @@ export default function CommunityPage() {
         </div>
       )}
 
-      {status && (
-        <p className="mt-4 rounded-lg border border-slate-800 bg-[#151b2b] p-3 text-sm text-slate-200">
-          {status}
+      {transactionStatus && (
+        <p
+          className="mt-4 rounded-lg border border-slate-800 bg-[#151b2b] p-3 text-sm text-slate-200"
+          role="status"
+        >
+          {transactionStatus}
         </p>
       )}
     </div>
