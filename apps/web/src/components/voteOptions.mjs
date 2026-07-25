@@ -17,6 +17,4 @@ export const VOTE_OPTIONS = [
     pendingLabel: "Submitting Abstain vote…",
     symbol: "—",
   },
-] as const;
-
-export type VoteType = (typeof VOTE_OPTIONS)[number]["type"];
+];

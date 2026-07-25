@@ -1,6 +1,6 @@
 "use client";
 
-import { VOTE_OPTIONS, type VoteType } from "./voteOptions";
+import { VOTE_OPTIONS, type VoteType } from "./voteOptions.mjs";
 
 type VoteActionsProps = {
   disabled: boolean;

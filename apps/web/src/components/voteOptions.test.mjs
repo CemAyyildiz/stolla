@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { VOTE_OPTIONS } from "./voteOptions.ts";
+import { VOTE_OPTIONS } from "./voteOptions.mjs";
 
 test("vote controls preserve the contract values and visual order", () => {
   assert.deepEqual(

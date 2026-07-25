@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Buffer } from "buffer";
 import { useWallet } from "@/context/WalletProvider";
 import { VoteActions } from "@/components/VoteActions";
-import type { VoteType } from "@/components/voteOptions";
+import type { VoteType } from "@/components/voteOptions.mjs";
 import { createGovernorClient } from "@/lib/contracts";
 import { ProposalState } from "@/lib/bindings/community-governor/src";
 import { contractIds } from "@/lib/stellar";
