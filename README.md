@@ -58,6 +58,26 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+### 4. Run the mobile navigation smoke test
+
+Install Chromium once, then run the Playwright suite:
+
+```bash
+npx playwright install chromium
+npm run test:e2e
+```
+
+For CI, use the single-worker command:
+
+```bash
+npx playwright install --with-deps chromium
+npm run test:e2e:ci
+```
+
+Playwright starts the web app on an isolated local port and stops both the
+browser and server when the run completes. The smoke test does not require a
+wallet extension or configured contracts.
+
 ## Contracts
 
 Build and test both Soroban contracts from the repository root:
@@ -126,6 +146,8 @@ new commits are pushed to the production branch.
 | `npm run dev` | Start the Next.js development server |
 | `npm run build` | Create a production web build |
 | `npm run lint` | Run frontend linting |
+| `npm run test:e2e` | Run the Playwright mobile navigation smoke test |
+| `npm run test:e2e:ci` | Run Playwright with one CI worker |
 | `npm run build:contracts` | Build the Soroban contracts |
 | `npm run test:contracts` | Run the contract test suite |
 
