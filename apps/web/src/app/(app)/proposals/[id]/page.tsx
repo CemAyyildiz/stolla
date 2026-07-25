@@ -4,6 +4,8 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Buffer } from "buffer";
 import { useWallet } from "@/context/WalletProvider";
+import { VoteActions } from "@/components/VoteActions";
+import type { VoteType } from "@/components/voteOptions";
 import { createGovernorClient } from "@/lib/contracts";
 import { ProposalState } from "@/lib/bindings/community-governor/src";
 import { contractIds } from "@/lib/stellar";
@@ -27,7 +29,7 @@ export default function ProposalDetailPage() {
   const [hasVoted, setHasVoted] = useState<boolean | null>(null);
   const [reason, setReason] = useState("Support");
   const [status, setStatus] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [pendingVote, setPendingVote] = useState<VoteType | null>(null);
 
   const refresh = useCallback(async () => {
     if (!contractIds.governor || !proposalIdHex) return;
@@ -56,13 +58,13 @@ export default function ProposalDetailPage() {
     });
   }, [refresh]);
 
-  async function handleVote(voteType: number) {
+  async function handleVote(voteType: VoteType) {
     if (!address) {
       setStatus("Connect your wallet first.");
       return;
     }
 
-    setLoading(true);
+    setPendingVote(voteType);
     setStatus(null);
     try {
       const client = createGovernorClient({ publicKey: address, signTransaction });
@@ -78,7 +80,7 @@ export default function ProposalDetailPage() {
     } catch (error: unknown) {
       setStatus(error instanceof Error ? error.message : "Vote failed");
     } finally {
-      setLoading(false);
+      setPendingVote(null);
     }
   }
 
@@ -108,36 +110,26 @@ export default function ProposalDetailPage() {
           className="mt-3 w-full rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600"
           placeholder="Reason (optional)"
         />
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => handleVote(1)}
-            disabled={!address || loading}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
-          >
-            For
-          </button>
-          <button
-            type="button"
-            onClick={() => handleVote(0)}
-            disabled={!address || loading}
-            className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-50"
-          >
-            Against
-          </button>
-          <button
-            type="button"
-            onClick={() => handleVote(2)}
-            disabled={!address || loading}
-            className="rounded-lg bg-slate-600 px-4 py-2 text-sm font-medium text-white hover:bg-slate-500 disabled:opacity-50"
-          >
-            Abstain
-          </button>
+        <div className="mt-3">
+          <VoteActions
+            disabled={!address}
+            pendingVote={pendingVote}
+            onVote={handleVote}
+          />
+          {!address && (
+            <p className="mt-2 text-xs text-slate-400">
+              Connect your wallet to enable voting.
+            </p>
+          )}
         </div>
       </section>
 
       {status && (
-        <p className="mt-4 rounded-lg border border-slate-800 bg-[#151b2b] p-3 text-sm text-slate-200">
+        <p
+          aria-live="polite"
+          className="mt-4 rounded-lg border border-slate-800 bg-[#151b2b] p-3 text-sm text-slate-200"
+          role="status"
+        >
           {status}
         </p>
       )}
