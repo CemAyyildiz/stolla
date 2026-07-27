@@ -11,7 +11,8 @@ const navItems = [
 
 export function Header() {
   const pathname = usePathname();
-  const { address, connect, disconnect, isConnecting } = useWallet();
+  const { address, connect, disconnect, isConnecting, connectionError } =
+    useWallet();
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-800/80 bg-[#0b0f19]/90 backdrop-blur-md">
@@ -53,30 +54,44 @@ export function Header() {
           </nav>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          {address ? (
-            <>
-              <span className="hidden truncate text-xs text-slate-500 sm:inline sm:max-w-[180px]">
-                {address}
-              </span>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {address ? (
+              <>
+                <span className="hidden truncate text-xs text-slate-500 sm:inline sm:max-w-[180px]">
+                  {address}
+                </span>
+                <button
+                  type="button"
+                  onClick={disconnect}
+                  className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-300 transition hover:bg-slate-800"
+                >
+                  Disconnect
+                </button>
+              </>
+            ) : (
               <button
                 type="button"
-                onClick={disconnect}
-                className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-300 transition hover:bg-slate-800"
+                onClick={connect}
+                disabled={isConnecting}
+                aria-describedby={
+                  connectionError ? "wallet-connection-error" : undefined
+                }
+                className="rounded-lg bg-indigo-500 px-3 py-2 text-sm font-medium text-white transition hover:bg-indigo-400 disabled:opacity-50 sm:px-4"
               >
-                Disconnect
+                {isConnecting ? "Connecting..." : "Connect Wallet"}
               </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={connect}
-              disabled={isConnecting}
-              className="rounded-lg bg-indigo-500 px-3 py-2 text-sm font-medium text-white transition hover:bg-indigo-400 disabled:opacity-50 sm:px-4"
+            )}
+          </div>
+          {connectionError && !address ? (
+            <p
+              id="wallet-connection-error"
+              role="alert"
+              className="max-w-64 text-right text-xs text-rose-300"
             >
-              {isConnecting ? "Connecting..." : "Connect Wallet"}
-            </button>
-          )}
+              {connectionError.message}
+            </p>
+          ) : null}
         </div>
       </div>
     </header>
