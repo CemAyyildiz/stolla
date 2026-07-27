@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --test src/lib/proposal-loader.test.mjs"
   },
   "dependencies": {
     "@creit.tech/stellar-wallets-kit": "^2.4.0",
