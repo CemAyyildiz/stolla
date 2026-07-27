@@ -14,6 +14,7 @@
   --lp-accent-hover: #a5b4fc;
   --lp-accent-subtle: #1e1b4b;
   --lp-accent-muted: #6366f1;
+  --focus-ring: var(--lp-accent-hover);
   --lp-success-subtle: #052e1c;
   --lp-success-text: #34d399;
   --lp-warning-subtle: #3b2a0a;
@@ -1062,11 +1063,11 @@
   background: var(--lp-bg-subtle);
 }
 
-/* Focus */
-.landing-root button:focus-visible,
-.landing-root a:focus-visible {
-  outline: 2px solid var(--lp-accent-muted);
-  outline-offset: 2px;
+/* Keep edge-to-edge controls visible inside clipped landing cards. */
+.landing-faq-trigger:focus-visible,
+.landing-preview-footer-link:focus-visible,
+.landing-menu-backdrop:focus-visible {
+  outline-offset: -3px;
 }
 
 @media (max-width: 640px) {
