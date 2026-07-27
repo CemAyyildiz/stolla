@@ -16,6 +16,8 @@ export default function CommunityPage() {
   const [votes, setVotes] = useState<string | null>(null);
   const [recipient, setRecipient] = useState("");
   const [tokenUri, setTokenUri] = useState("ipfs://");
+  const [recipientError, setRecipientError] = useState<string | null>(null);
+  const [tokenUriError, setTokenUriError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -54,10 +56,14 @@ export default function CommunityPage() {
       return;
     }
     if (!recipient || !tokenUri) {
-      setStatus("Recipient and IPFS URI are required.");
+      setRecipientError(!recipient ? "Recipient address is required." : null);
+      setTokenUriError(!tokenUri ? "IPFS metadata URI is required." : null);
+      setStatus(null);
       return;
     }
 
+    setRecipientError(null);
+    setTokenUriError(null);
     setLoading(true);
     setStatus(null);
     try {
@@ -147,23 +153,80 @@ export default function CommunityPage() {
           <section className="rounded-xl border border-slate-800 bg-[#151b2b] p-5">
             <h2 className="font-semibold text-slate-100">Mint NFT (owner only)</h2>
             <div className="mt-4 space-y-3">
-              <label className="block text-sm">
-                <span className="text-slate-400">Recipient address</span>
+              <div>
+                <label
+                  htmlFor="recipient-address"
+                  className="block text-sm text-slate-400"
+                >
+                  Recipient address{" "}
+                  <span className="text-slate-500">(required)</span>
+                </label>
                 <input
+                  id="recipient-address"
                   value={recipient}
-                  onChange={(e) => setRecipient(e.target.value)}
+                  onChange={(e) => {
+                    setRecipient(e.target.value);
+                    setRecipientError(null);
+                  }}
+                  required
+                  aria-describedby={`recipient-address-help${
+                    recipientError ? " recipient-address-error" : ""
+                  }`}
+                  aria-invalid={Boolean(recipientError)}
                   className="mt-1 w-full rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600"
                   placeholder="G..."
                 />
-              </label>
-              <label className="block text-sm">
-                <span className="text-slate-400">IPFS metadata URI</span>
+                <p
+                  id="recipient-address-help"
+                  className="mt-1 text-xs text-slate-500"
+                >
+                  Enter the recipient&apos;s Stellar public key, beginning with G.
+                </p>
+                {recipientError && (
+                  <p
+                    id="recipient-address-error"
+                    role="alert"
+                    className="mt-1 text-xs text-rose-300"
+                  >
+                    {recipientError}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label
+                  htmlFor="token-uri"
+                  className="block text-sm text-slate-400"
+                >
+                  IPFS metadata URI{" "}
+                  <span className="text-slate-500">(required)</span>
+                </label>
                 <input
+                  id="token-uri"
                   value={tokenUri}
-                  onChange={(e) => setTokenUri(e.target.value)}
+                  onChange={(e) => {
+                    setTokenUri(e.target.value);
+                    setTokenUriError(null);
+                  }}
+                  required
+                  aria-describedby={`token-uri-help${
+                    tokenUriError ? " token-uri-error" : ""
+                  }`}
+                  aria-invalid={Boolean(tokenUriError)}
                   className="mt-1 w-full rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600"
                 />
-              </label>
+                <p id="token-uri-help" className="mt-1 text-xs text-slate-500">
+                  Use an IPFS URI such as ipfs://collection/member.json.
+                </p>
+                {tokenUriError && (
+                  <p
+                    id="token-uri-error"
+                    role="alert"
+                    className="mt-1 text-xs text-rose-300"
+                  >
+                    {tokenUriError}
+                  </p>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={handleMint}
