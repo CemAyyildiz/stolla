@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Buffer } from "buffer";
 import { useWallet } from "@/context/WalletProvider";
 import {
@@ -26,40 +26,49 @@ const stateLabels: Record<ProposalState, string> = {
 export default function ProposalsPage() {
   const { address, signTransaction } = useWallet();
   const [description, setDescription] = useState("");
-  const [proposalIds, setProposalIds] = useState<string[]>([]);
+  const [proposalIds, setProposalIds] = useState<string[]>(() => getStoredProposalIds());
   const [states, setStates] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const contractsConfigured = Boolean(contractIds.governor);
 
-  const loadProposals = useCallback(async () => {
-    const ids = getStoredProposalIds();
-    setProposalIds(ids);
-    if (!contractsConfigured || ids.length === 0) return;
-
-    const client = createGovernorClient({
-      publicKey: address ?? "",
-      signTransaction,
-    });
-
-    const nextStates: Record<string, string> = {};
-    for (const idHex of ids) {
-      try {
-        const tx = await client.proposal_state({
-          proposal_id: Buffer.from(idHex, "hex"),
-        });
-        nextStates[idHex] = stateLabels[tx.result ?? ProposalState.Pending];
-      } catch {
-        nextStates[idHex] = "Unknown";
-      }
-    }
-    setStates(nextStates);
-  }, [address, contractsConfigured, signTransaction]);
+  const fetchRef = useRef(0);
 
   useEffect(() => {
-    loadProposals().catch(() => undefined);
-  }, [loadProposals]);
+    if (!contractsConfigured || proposalIds.length === 0) return;
+
+    const id = ++fetchRef.current;
+    let cancelled = false;
+
+    const fetchStates = async () => {
+      const client = createGovernorClient({
+        publicKey: address ?? "",
+        signTransaction,
+      });
+
+      const nextStates: Record<string, string> = {};
+      for (const idHex of proposalIds) {
+        if (cancelled || fetchRef.current !== id) return;
+        try {
+          const tx = await client.proposal_state({
+            proposal_id: Buffer.from(idHex, "hex"),
+          });
+          nextStates[idHex] = stateLabels[tx.result ?? ProposalState.Pending];
+        } catch {
+          nextStates[idHex] = "Unknown";
+        }
+      }
+      if (!cancelled && fetchRef.current === id) {
+        setStates(nextStates);
+      }
+    };
+
+    fetchStates();
+    return () => {
+      cancelled = true;
+    };
+  }, [contractsConfigured, proposalIds, address, signTransaction]);
 
   async function handleCreateProposal() {
     if (!address) {
@@ -88,7 +97,7 @@ export default function ProposalsPage() {
       storeProposalId(idHex);
       setDescription("");
       setStatus(`Proposal created: ${idHex.slice(0, 12)}...`);
-      await loadProposals();
+      setProposalIds(getStoredProposalIds());
     } catch (error: unknown) {
       setStatus(error instanceof Error ? error.message : "Proposal failed");
     } finally {

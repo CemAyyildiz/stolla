@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Buffer } from "buffer";
 import { useWallet } from "@/context/WalletProvider";
 import { createGovernorClient } from "@/lib/contracts";
@@ -29,7 +29,46 @@ export default function ProposalDetailPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const refresh = useCallback(async () => {
+  const fetchRef = useRef(0);
+
+  useEffect(() => {
+    if (!contractIds.governor || !proposalIdHex) return;
+
+    const id = ++fetchRef.current;
+    let cancelled = false;
+
+    const fetchData = async () => {
+      const client = createGovernorClient({
+        publicKey: address ?? "",
+        signTransaction,
+      });
+      const proposalId = Buffer.from(proposalIdHex, "hex");
+
+      const [stateTx, votedTx] = await Promise.all([
+        client.proposal_state({ proposal_id: proposalId }),
+        address
+          ? client.has_voted({ proposal_id: proposalId, account: address })
+          : Promise.resolve(null),
+      ]);
+
+      if (cancelled || fetchRef.current !== id) return;
+      setState(stateLabels[stateTx.result ?? ProposalState.Pending]);
+      if (votedTx) {
+        setHasVoted(Boolean(votedTx.result));
+      }
+    };
+
+    fetchData().catch((error: unknown) => {
+      if (!cancelled) {
+        setStatus(error instanceof Error ? error.message : "Failed to load proposal");
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [address, proposalIdHex, signTransaction]);
+
+  async function refresh() {
     if (!contractIds.governor || !proposalIdHex) return;
     const client = createGovernorClient({
       publicKey: address ?? "",
@@ -48,13 +87,7 @@ export default function ProposalDetailPage() {
     if (votedTx) {
       setHasVoted(Boolean(votedTx.result));
     }
-  }, [address, proposalIdHex, signTransaction]);
-
-  useEffect(() => {
-    refresh().catch((error: unknown) => {
-      setStatus(error instanceof Error ? error.message : "Failed to load proposal");
-    });
-  }, [refresh]);
+  }
 
   async function handleVote(voteType: number) {
     if (!address) {

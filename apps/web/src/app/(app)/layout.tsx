@@ -2,6 +2,8 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { WalletProvider } from "@/context/WalletProvider";
 
+export const dynamic = "force-dynamic";
+
 export default function AppLayout({
   children,
 }: Readonly<{
