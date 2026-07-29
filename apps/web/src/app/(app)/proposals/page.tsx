@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Buffer } from "buffer";
 import { useWallet } from "@/context/WalletProvider";
+import { useNetworkGuard } from "@/hooks/useNetworkGuard";
+import { NetworkMismatchNotice } from "@/components/NetworkMismatchNotice";
 import {
   createGovernorClient,
   getStoredProposalIds,
@@ -25,6 +27,7 @@ const stateLabels: Record<ProposalState, string> = {
 
 export default function ProposalsPage() {
   const { address, signTransaction } = useWallet();
+  const comparison = useNetworkGuard();
   const [description, setDescription] = useState("");
   const [proposalIds, setProposalIds] = useState<string[]>([]);
   const [states, setStates] = useState<Record<string, string>>({});
@@ -32,6 +35,7 @@ export default function ProposalsPage() {
   const [loading, setLoading] = useState(false);
 
   const contractsConfigured = Boolean(contractIds.governor);
+  const signingBlocked = comparison.status !== "match";
 
   const loadProposals = useCallback(async () => {
     const ids = getStoredProposalIds();
@@ -103,6 +107,15 @@ export default function ProposalsPage() {
         Create and track DAO proposals. Voting power requires delegated NFTs.
       </p>
 
+      {address && (
+        <div className="mt-6">
+          <NetworkMismatchNotice
+            comparison={comparison}
+            consequence="Proposal creation stays locked until then."
+          />
+        </div>
+      )}
+
       {!contractsConfigured && (
         <p className="mt-6 rounded-lg border border-amber-800/60 bg-amber-950/50 p-4 text-sm text-amber-200">
           Set <code className="font-mono">NEXT_PUBLIC_GOVERNOR_CONTRACT_ID</code>{" "}
@@ -123,7 +136,7 @@ export default function ProposalsPage() {
           <button
             type="button"
             onClick={handleCreateProposal}
-            disabled={!address || loading}
+            disabled={!address || loading || signingBlocked}
             className="mt-3 rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400 disabled:opacity-50"
           >
             {loading ? "Submitting..." : "Create proposal"}

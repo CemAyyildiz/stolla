@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useWallet } from "@/context/WalletProvider";
+import { useNetworkGuard } from "@/hooks/useNetworkGuard";
+import { NetworkMismatchNotice } from "@/components/NetworkMismatchNotice";
 import {
   createNftClient,
   createReadOnlyNftClient,
@@ -10,6 +13,7 @@ import { contractIds } from "@/lib/stellar";
 
 export default function CommunityPage() {
   const { address, signTransaction } = useWallet();
+  const comparison = useNetworkGuard();
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
   const [balance, setBalance] = useState<number | null>(null);
@@ -20,6 +24,7 @@ export default function CommunityPage() {
   const [loading, setLoading] = useState(false);
 
   const contractsConfigured = Boolean(contractIds.nft);
+  const signingBlocked = comparison.status !== "match";
 
   const refresh = useCallback(async () => {
     if (!contractsConfigured) return;
@@ -99,10 +104,30 @@ export default function CommunityPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
-      <h1 className="text-2xl font-bold text-slate-100">Community NFT</h1>
-      <p className="mt-2 text-slate-400">
-        Mint membership NFTs and delegate voting power on testnet.
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-100">Community NFT</h1>
+          <p className="mt-2 text-slate-400">
+            Mint membership NFTs and delegate voting power on{" "}
+            {comparison.expected.label}.
+          </p>
+        </div>
+        <Link
+          href="/community/new"
+          className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:bg-slate-800"
+        >
+          Create a community
+        </Link>
+      </div>
+
+      {address && (
+        <div className="mt-6">
+          <NetworkMismatchNotice
+            comparison={comparison}
+            consequence="Minting and delegation stay locked until then."
+          />
+        </div>
+      )}
 
       {!contractsConfigured && (
         <p className="mt-6 rounded-lg border border-amber-800/60 bg-amber-950/50 p-4 text-sm text-amber-200">
@@ -137,7 +162,7 @@ export default function CommunityPage() {
             <button
               type="button"
               onClick={handleDelegate}
-              disabled={!address || loading}
+              disabled={!address || loading || signingBlocked}
               className="mt-4 rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-50"
             >
               Delegate to self
@@ -167,7 +192,7 @@ export default function CommunityPage() {
               <button
                 type="button"
                 onClick={handleMint}
-                disabled={!address || loading}
+                disabled={!address || loading || signingBlocked}
                 className="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400 disabled:opacity-50"
               >
                 {loading ? "Submitting..." : "Mint NFT"}

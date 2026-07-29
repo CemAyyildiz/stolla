@@ -12,7 +12,7 @@ export function createNftClient({ publicKey, signTransaction }: ClientOptions) {
   const { nft } = requireContractIds();
   return new NftClient({
     contractId: nft,
-    networkPassphrase: config.networkPassphrase,
+    networkPassphrase: config.passphrase,
     rpcUrl: config.rpcUrl,
     publicKey,
     signTransaction,
@@ -26,7 +26,7 @@ export function createGovernorClient({
   const { governor } = requireContractIds();
   return new GovernorClient({
     contractId: governor,
-    networkPassphrase: config.networkPassphrase,
+    networkPassphrase: config.passphrase,
     rpcUrl: config.rpcUrl,
     publicKey,
     signTransaction,
@@ -37,7 +37,7 @@ export function createReadOnlyNftClient() {
   const { nft } = requireContractIds();
   return new NftClient({
     contractId: nft,
-    networkPassphrase: config.networkPassphrase,
+    networkPassphrase: config.passphrase,
     rpcUrl: config.rpcUrl,
   });
 }
@@ -46,7 +46,7 @@ export function createReadOnlyGovernorClient() {
   const { governor } = requireContractIds();
   return new GovernorClient({
     contractId: governor,
-    networkPassphrase: config.networkPassphrase,
+    networkPassphrase: config.passphrase,
     rpcUrl: config.rpcUrl,
   });
 }
