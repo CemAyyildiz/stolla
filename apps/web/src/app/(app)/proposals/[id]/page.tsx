@@ -51,9 +51,14 @@ export default function ProposalDetailPage() {
   }, [address, proposalIdHex, signTransaction]);
 
   useEffect(() => {
-    refresh().catch((error: unknown) => {
-      setStatus(error instanceof Error ? error.message : "Failed to load proposal");
-    });
+    const timeout = window.setTimeout(() => {
+      refresh().catch((error: unknown) => {
+        setStatus(
+          error instanceof Error ? error.message : "Failed to load proposal",
+        );
+      });
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [refresh]);
 
   async function handleVote(voteType: number) {

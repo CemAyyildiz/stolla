@@ -58,7 +58,10 @@ export default function ProposalsPage() {
   }, [address, contractsConfigured, signTransaction]);
 
   useEffect(() => {
-    loadProposals().catch(() => undefined);
+    const timeout = window.setTimeout(() => {
+      loadProposals().catch(() => undefined);
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [loadProposals]);
 
   async function handleCreateProposal() {

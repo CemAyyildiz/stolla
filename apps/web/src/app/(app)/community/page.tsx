@@ -44,9 +44,14 @@ export default function CommunityPage() {
   }, [address, contractsConfigured, signTransaction]);
 
   useEffect(() => {
-    refresh().catch((error: unknown) => {
-      setStatus(error instanceof Error ? error.message : "Failed to load NFT data");
-    });
+    const timeout = window.setTimeout(() => {
+      refresh().catch((error: unknown) => {
+        setStatus(
+          error instanceof Error ? error.message : "Failed to load NFT data",
+        );
+      });
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [refresh]);
 
   async function handleMint() {
