@@ -6,9 +6,13 @@ import { Buffer } from "buffer";
 import { useWallet } from "@/context/WalletProvider";
 import {
   createGovernorClient,
-  getStoredProposalIds,
   storeProposalId,
 } from "@/lib/contracts";
+import {
+  discoverProposals,
+  getLegacyLocalProposalIds,
+  type DiscoveredProposal,
+} from "@/lib/discovery";
 import { ProposalState } from "@/lib/bindings/community-governor/src";
 import { contractIds } from "@/lib/stellar";
 
@@ -26,7 +30,7 @@ const stateLabels: Record<ProposalState, string> = {
 export default function ProposalsPage() {
   const { address, signTransaction } = useWallet();
   const [description, setDescription] = useState("");
-  const [proposalIds, setProposalIds] = useState<string[]>([]);
+  const [proposals, setProposals] = useState<DiscoveredProposal[]>([]);
   const [states, setStates] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -34,9 +38,15 @@ export default function ProposalsPage() {
   const contractsConfigured = Boolean(contractIds.governor);
 
   const loadProposals = useCallback(async () => {
-    const ids = getStoredProposalIds();
-    setProposalIds(ids);
-    if (!contractsConfigured || ids.length === 0) return;
+    // TODO(#45): Replace empty array with public event discovery results.
+    const legacyIds = getLegacyLocalProposalIds();
+    const merged = discoverProposals(
+      /* publicProposals */ [],
+      legacyIds,
+    );
+    setProposals(merged);
+
+    if (!contractsConfigured || merged.length === 0) return;
 
     const client = createGovernorClient({
       publicKey: address ?? "",
@@ -44,14 +54,14 @@ export default function ProposalsPage() {
     });
 
     const nextStates: Record<string, string> = {};
-    for (const idHex of ids) {
+    for (const p of merged) {
       try {
         const tx = await client.proposal_state({
-          proposal_id: Buffer.from(idHex, "hex"),
+          proposal_id: Buffer.from(p.id, "hex"),
         });
-        nextStates[idHex] = stateLabels[tx.result ?? ProposalState.Pending];
+        nextStates[p.id] = stateLabels[tx.result ?? ProposalState.Pending];
       } catch {
-        nextStates[idHex] = "Unknown";
+        nextStates[p.id] = "Unknown";
       }
     }
     setStates(nextStates);
@@ -133,18 +143,30 @@ export default function ProposalsPage() {
 
       <section className="mt-6">
         <h2 className="font-semibold text-slate-100">Your proposals</h2>
-        {proposalIds.length === 0 ? (
+        {proposals.length === 0 ? (
           <p className="mt-2 text-sm text-slate-500">No proposals yet.</p>
         ) : (
           <ul className="mt-3 space-y-2">
-            {proposalIds.map((id) => (
-              <li key={id}>
+            {proposals.map((p) => (
+              <li key={p.id}>
                 <Link
-                  href={`/proposals/${id}`}
-                  className="flex items-center justify-between rounded-lg border border-slate-800 bg-[#151b2b] px-4 py-3 text-sm text-slate-200 hover:bg-slate-800/80"
+                  href={`/proposals/${p.id}`}
+                  className="group flex items-center justify-between rounded-lg border border-slate-800 bg-[#151b2b] px-4 py-3 text-sm text-slate-200 hover:bg-slate-800/80 transition-colors"
                 >
-                  <span className="truncate font-mono">{id}</span>
-                  <span className="ml-3 text-slate-500">{states[id] ?? "..."}</span>
+                  <span className="flex min-w-0 items-center gap-2 truncate">
+                    <span className="truncate font-mono">{p.id}</span>
+                    {p.source === "local-only" && (
+                      <span
+                        className="shrink-0 rounded-full bg-amber-950/70 px-2 py-0.5 text-[10px] font-medium text-amber-300 border border-amber-800/60"
+                        title="This proposal is stored locally and may not yet be visible on the public network."
+                      >
+                        Syncing to network…
+                      </span>
+                    )}
+                  </span>
+                  <span className="ml-3 shrink-0 text-slate-500">
+                    {states[p.id] ?? "..."}
+                  </span>
                 </Link>
               </li>
             ))}
