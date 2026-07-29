@@ -4,9 +4,14 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Buffer } from "buffer";
 import { useWallet } from "@/context/WalletProvider";
-import { createGovernorClient } from "@/lib/contracts";
+import { createGovernorClient, createReadOnlyGovernorClient } from "@/lib/contracts";
 import { ProposalState } from "@/lib/bindings/community-governor/src";
 import { contractIds } from "@/lib/stellar";
+
+function shortenAddress(addr: string): string {
+  if (addr.length <= 12) return addr;
+  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+}
 
 const stateLabels: Record<ProposalState, string> = {
   [ProposalState.Pending]: "Pending",
@@ -25,6 +30,8 @@ export default function ProposalDetailPage() {
   const { address, signTransaction } = useWallet();
   const [state, setState] = useState<string>("—");
   const [hasVoted, setHasVoted] = useState<boolean | null>(null);
+  const [proposer, setProposer] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [reason, setReason] = useState("Support");
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -35,6 +42,7 @@ export default function ProposalDetailPage() {
       publicKey: address ?? "",
       signTransaction,
     });
+    const readOnlyClient = createReadOnlyGovernorClient();
     const proposalId = Buffer.from(proposalIdHex, "hex");
 
     const [stateTx, votedTx] = await Promise.all([
@@ -48,6 +56,12 @@ export default function ProposalDetailPage() {
     if (votedTx) {
       setHasVoted(Boolean(votedTx.result));
     }
+
+    // Fetch proposer independently so a read failure doesn't hide state/voted data
+    readOnlyClient
+      .proposal_proposer({ proposal_id: proposalId })
+      .then((tx) => setProposer(tx.result ?? null))
+      .catch(() => setProposer(null));
   }, [address, proposalIdHex, signTransaction]);
 
   useEffect(() => {
@@ -98,7 +112,40 @@ export default function ProposalDetailPage() {
           <dt className="text-slate-500">You voted</dt>
           <dd>{hasVoted === null ? "—" : hasVoted ? "Yes" : "No"}</dd>
         </div>
+        <div className="sm:col-span-2">
+          <dt className="text-slate-500">Proposer</dt>
+          <dd className="mt-1">
+            {proposer ? (
+              <span className="inline-flex items-center gap-2">
+                <span className="font-mono text-sm text-slate-200" title={proposer}>
+                  {shortenAddress(proposer)}
+                </span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(proposer);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    } catch {
+                      // Clipboard API unavailable — no feedback needed
+                    }
+                  }}
+                  aria-label={`Copy full proposer address ${proposer}`}
+                  className="rounded-md border border-slate-700 bg-slate-800 px-2 py-0.5 text-xs text-slate-400 transition hover:border-slate-600 hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                >
+                  {copied ? "Copied!" : "Copy"}
+                </button>
+              </span>
+            ) : (
+              <span className="text-slate-600">Unknown</span>
+            )}
+          </dd>
+        </div>
       </dl>
+      <div aria-live="polite" className="sr-only">
+        {copied ? "Proposer address copied to clipboard" : null}
+      </div>
 
       <section className="mt-6 rounded-xl border border-slate-800 bg-[#151b2b] p-5">
         <h2 className="font-semibold text-slate-100">Cast vote</h2>
