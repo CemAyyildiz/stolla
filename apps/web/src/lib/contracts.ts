@@ -51,6 +51,14 @@ export function createReadOnlyGovernorClient() {
   });
 }
 
+export function createReadOnlyGovernorClientFor(governorContractId: string) {
+  return new GovernorClient({
+    contractId: governorContractId,
+    networkPassphrase: config.networkPassphrase,
+    rpcUrl: config.rpcUrl,
+  });
+}
+
 const PROPOSAL_STORAGE_KEY = "stolla:proposal-ids";
 
 export function getStoredProposalIds(): string[] {
@@ -69,6 +77,31 @@ export function storeProposalId(idHex: string) {
   if (!existing.includes(idHex)) {
     localStorage.setItem(
       PROPOSAL_STORAGE_KEY,
+      JSON.stringify([idHex, ...existing]),
+    );
+  }
+}
+
+function scopedProposalStorageKey(governorContractId: string): string {
+  return `stolla:proposal-ids:${governorContractId}`;
+}
+
+export function getStoredProposalIdsFor(governorContractId: string): string[] {
+  if (typeof window === "undefined") return [];
+  const raw = localStorage.getItem(scopedProposalStorageKey(governorContractId));
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw) as string[];
+  } catch {
+    return [];
+  }
+}
+
+export function storeProposalIdFor(governorContractId: string, idHex: string) {
+  const existing = getStoredProposalIdsFor(governorContractId);
+  if (!existing.includes(idHex)) {
+    localStorage.setItem(
+      scopedProposalStorageKey(governorContractId),
       JSON.stringify([idHex, ...existing]),
     );
   }

@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useParams } from "next/navigation";
 import { useWallet } from "@/context/WalletProvider";
+import { communityRegistry } from "@/lib/communities/registry";
+import { CommunitySwitcher } from "@/components/community/CommunitySwitcher";
 
 const navItems = [
   { href: "/community", label: "Community" },
@@ -11,6 +13,7 @@ const navItems = [
 
 export function Header() {
   const pathname = usePathname();
+  const params = useParams<{ communityId?: string }>();
   const { address, connect, disconnect, isConnecting } = useWallet();
 
   return (
@@ -51,6 +54,12 @@ export function Header() {
               );
             })}
           </nav>
+          {communityRegistry.length > 0 && (
+            <CommunitySwitcher
+              communities={communityRegistry}
+              activeCommunityId={params.communityId}
+            />
+          )}
         </div>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
