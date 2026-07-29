@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useWallet } from "@/context/WalletProvider";
+import { CommunityCreationWizard } from "@/components/community/CommunityCreationWizard";
 import {
   createNftClient,
   createReadOnlyNftClient,
@@ -103,6 +104,10 @@ export default function CommunityPage() {
       <p className="mt-2 text-slate-400">
         Mint membership NFTs and delegate voting power on testnet.
       </p>
+
+      <div className="mt-6">
+        <CommunityCreationWizard />
+      </div>
 
       {!contractsConfigured && (
         <p className="mt-6 rounded-lg border border-amber-800/60 bg-amber-950/50 p-4 text-sm text-amber-200">
