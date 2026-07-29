@@ -45,6 +45,7 @@ NEXT_PUBLIC_STELLAR_NETWORK=testnet
 NEXT_PUBLIC_STELLAR_RPC_URL=https://soroban-testnet.stellar.org
 NEXT_PUBLIC_NFT_CONTRACT_ID=<community-nft-contract-id>
 NEXT_PUBLIC_GOVERNOR_CONTRACT_ID=<governor-contract-id>
+NEXT_PUBLIC_COMMUNITY_FACTORY_CONTRACT_ID=<community-factory-contract-id>
 ```
 
 You can use an existing deployment or deploy your own contracts using the
@@ -115,6 +116,7 @@ Add these environment variables in the Vercel project settings:
 | `NEXT_PUBLIC_STELLAR_RPC_URL` | `https://soroban-testnet.stellar.org` |
 | `NEXT_PUBLIC_NFT_CONTRACT_ID` | From deploy script output |
 | `NEXT_PUBLIC_GOVERNOR_CONTRACT_ID` | From deploy script output |
+| `NEXT_PUBLIC_COMMUNITY_FACTORY_CONTRACT_ID` | From deploy script output |
 
 After the first production deployment, Vercel will redeploy automatically when
 new commits are pushed to the production branch.
@@ -126,6 +128,7 @@ new commits are pushed to the production branch.
 | `npm run dev` | Start the Next.js development server |
 | `npm run build` | Create a production web build |
 | `npm run lint` | Run frontend linting |
+| `npm run test` | Run the frontend test suite |
 | `npm run build:contracts` | Build the Soroban contracts |
 | `npm run test:contracts` | Run the contract test suite |
 

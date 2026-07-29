@@ -4,6 +4,8 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Buffer } from "buffer";
 import { useWallet } from "@/context/WalletProvider";
+import { useNetworkGuard } from "@/hooks/useNetworkGuard";
+import { NetworkMismatchNotice } from "@/components/NetworkMismatchNotice";
 import { createGovernorClient } from "@/lib/contracts";
 import { ProposalState } from "@/lib/bindings/community-governor/src";
 import { contractIds } from "@/lib/stellar";
@@ -23,6 +25,8 @@ export default function ProposalDetailPage() {
   const params = useParams<{ id: string }>();
   const proposalIdHex = params.id;
   const { address, signTransaction } = useWallet();
+  const comparison = useNetworkGuard();
+  const signingBlocked = comparison.status !== "match";
   const [state, setState] = useState<string>("—");
   const [hasVoted, setHasVoted] = useState<boolean | null>(null);
   const [reason, setReason] = useState("Support");
@@ -100,6 +104,15 @@ export default function ProposalDetailPage() {
         </div>
       </dl>
 
+      {address && (
+        <div className="mt-6">
+          <NetworkMismatchNotice
+            comparison={comparison}
+            consequence="Voting stays locked until then."
+          />
+        </div>
+      )}
+
       <section className="mt-6 rounded-xl border border-slate-800 bg-[#151b2b] p-5">
         <h2 className="font-semibold text-slate-100">Cast vote</h2>
         <input
@@ -112,7 +125,7 @@ export default function ProposalDetailPage() {
           <button
             type="button"
             onClick={() => handleVote(1)}
-            disabled={!address || loading}
+            disabled={!address || loading || signingBlocked}
             className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
           >
             For
@@ -120,7 +133,7 @@ export default function ProposalDetailPage() {
           <button
             type="button"
             onClick={() => handleVote(0)}
-            disabled={!address || loading}
+            disabled={!address || loading || signingBlocked}
             className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-50"
           >
             Against
@@ -128,7 +141,7 @@ export default function ProposalDetailPage() {
           <button
             type="button"
             onClick={() => handleVote(2)}
-            disabled={!address || loading}
+            disabled={!address || loading || signingBlocked}
             className="rounded-lg bg-slate-600 px-4 py-2 text-sm font-medium text-white hover:bg-slate-500 disabled:opacity-50"
           >
             Abstain
