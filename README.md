@@ -129,6 +129,7 @@ new commits are pushed to the production branch.
 | `npm run build` | Create a production web build |
 | `npm run lint` | Run frontend linting |
 | `npm run test` | Run the frontend test suite |
+| `npm run test:e2e` | Run the Playwright flows with a mocked wallet and RPC |
 | `npm run build:contracts` | Build the Soroban contracts |
 | `npm run test:contracts` | Run the contract test suite |
 

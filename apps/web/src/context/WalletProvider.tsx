@@ -12,6 +12,7 @@ import {
 import { StellarWalletsKit } from "@creit.tech/stellar-wallets-kit/sdk";
 import {
   KitEventType,
+  type ModuleInterface,
   type Networks,
 } from "@creit.tech/stellar-wallets-kit/types";
 import { FreighterModule } from "@creit.tech/stellar-wallets-kit/modules/freighter";
@@ -20,6 +21,7 @@ import {
   describeNetwork,
   type DetectedNetwork,
 } from "@/lib/network";
+import { MOCK_WALLET_ENABLED } from "@/lib/e2e";
 import { activeNetwork } from "@/lib/stellar";
 
 /** Freighter reports its network only on request, so the wallet is re-read on a timer. */
@@ -37,15 +39,43 @@ type WalletContextValue = {
 const WalletContext = createContext<WalletContextValue | null>(null);
 
 let kitInitialized = false;
+let kitReady: Promise<void> | null = null;
+
+async function initKit() {
+  const modules: ModuleInterface[] = [new FreighterModule()];
+  let selectedWalletId: string | undefined;
+
+  /**
+   * Both operands are build constants, so a production bundle folds this to
+   * `false` and drops the mocked wallet chunk rather than shipping it
+   * unreachable. Spelled out here on purpose: routing it through a shared
+   * constant defeats the bundler's dead-code elimination.
+   */
+  if (
+    process.env.NODE_ENV !== "production" &&
+    process.env.NEXT_PUBLIC_E2E_WALLET === "mock"
+  ) {
+    const { MockWalletModule, MOCK_WALLET_ID } = await import(
+      "@/testing/mockWalletModule"
+    );
+    modules.push(new MockWalletModule());
+    selectedWalletId = MOCK_WALLET_ID;
+  }
+
+  StellarWalletsKit.init({
+    modules,
+    selectedWalletId,
+    network: activeNetwork.passphrase as Networks,
+  });
+  kitInitialized = true;
+}
 
 function ensureKit() {
-  if (!kitInitialized && typeof window !== "undefined") {
-    StellarWalletsKit.init({
-      modules: [new FreighterModule()],
-      network: activeNetwork.passphrase as Networks,
-    });
-    kitInitialized = true;
-  }
+  kitReady ??= initKit().catch((error: unknown) => {
+    kitReady = null;
+    throw error;
+  });
+  return kitReady;
 }
 
 async function readWalletNetwork(): Promise<DetectedNetwork | null> {
@@ -123,10 +153,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }, [address, syncWalletNetwork]);
 
   const connect = useCallback(async () => {
-    ensureKit();
     setIsConnecting(true);
     try {
-      const { address: walletAddress } = await StellarWalletsKit.authModal();
+      await ensureKit();
+      const { address: walletAddress } = MOCK_WALLET_ENABLED
+        ? await StellarWalletsKit.fetchAddress()
+        : await StellarWalletsKit.authModal();
       setAddress(walletAddress);
     } catch (error) {
       const message =
@@ -140,8 +172,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const disconnect = useCallback(() => {
-    ensureKit();
-    void StellarWalletsKit.disconnect();
+    if (kitInitialized) void StellarWalletsKit.disconnect();
     setAddress(null);
     setDetectedNetwork(null);
   }, []);
@@ -152,7 +183,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
    * passphrase into a signed transaction.
    */
   const signTransaction = useCallback(async (xdr: string) => {
-    ensureKit();
+    await ensureKit();
     const detected = await readWalletNetwork();
     setDetectedNetwork(detected);
     if (detected?.passphrase !== activeNetwork.passphrase) {

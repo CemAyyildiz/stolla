@@ -26,6 +26,27 @@ The landing page uses a **professional light** enterprise SaaS design. It is sep
 - `@stellar/stellar-sdk` + `@creit.tech/stellar-wallets-kit`
 - Contract IDs in `NEXT_PUBLIC_*` env vars — see `lib/stellar.ts`
 - Vitest + Testing Library — `npm run test --workspace=web`
+- Playwright — `npm run test:e2e --workspace=web`
+
+## End-to-end tests
+
+`e2e/` runs the community creation flow against a dev server, at desktop and
+mobile widths. Nothing touches a real wallet or network:
+
+- **Wallet** — `src/testing/mockWalletModule.ts` implements the wallets kit
+  `ModuleInterface` and signs with a fixed key, so signatures are real and bound
+  to the network passphrase the application asked for. Playwright steers it
+  through `window.__stollaMockWallet`.
+- **RPC** — `e2e/fixtures/sorobanRpc.ts` intercepts the JSON-RPC endpoint in the
+  browser and answers with envelopes built by the SDK, so the app runs its
+  normal parsing, assembly and polling paths. The configured RPC host is a
+  `.invalid` domain, so anything that escapes interception fails loudly.
+
+The mock wallet is gated twice and fails closed: the dynamic import is written
+as a literal expression over build constants so production bundles drop the
+chunk entirely, and `next.config.ts` refuses to build for production while
+`NEXT_PUBLIC_E2E_WALLET` is set. Do not route that check through a shared
+constant; it defeats dead-code elimination and the chunk ships again.
 
 ## Networks
 

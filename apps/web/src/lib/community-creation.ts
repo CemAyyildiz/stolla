@@ -32,10 +32,17 @@ export type CommunitySimulation = {
 
 export type SubmissionStatus = "pending" | "confirmed" | "failed";
 
+/** The contract pair the factory registered, read back after confirmation. */
+export type CommunityRegistryEntry = {
+  nftContractId: string;
+  governorContractId: string;
+};
+
 export type CommunitySubmission = {
   networkPassphrase: string;
   transactionHash: string;
   status: SubmissionStatus;
+  registry: CommunityRegistryEntry | null;
   message?: string;
 };
 
@@ -76,7 +83,8 @@ export type CreationAction =
   | { type: "signing-started" }
   | { type: "signing-ended" }
   | { type: "submission-recorded"; submission: CommunitySubmission }
-  | { type: "submission-settled"; status: SubmissionStatus; message?: string };
+  | { type: "submission-settled"; status: SubmissionStatus; message?: string }
+  | { type: "registry-verified"; registry: CommunityRegistryEntry };
 
 export function creationReducer(
   state: CreationState,
@@ -135,7 +143,40 @@ export function creationReducer(
             },
           }
         : state;
+
+    case "registry-verified":
+      return state.submission
+        ? {
+            ...state,
+            submission: { ...state.submission, registry: action.registry },
+          }
+        : state;
   }
+}
+
+export type DeploymentStage =
+  | "draft"
+  | "simulated"
+  | "awaiting-approval"
+  | "submitted"
+  | "confirmed"
+  | "verified"
+  | "failed";
+
+/**
+ * Derived rather than stored, so the progress display can never disagree with
+ * the state that gates the flow.
+ */
+export function deploymentStage(state: CreationState): DeploymentStage {
+  const { submission, simulation, signing } = state;
+
+  if (submission) {
+    if (submission.status === "failed") return "failed";
+    if (submission.status === "pending") return "submitted";
+    return submission.registry ? "verified" : "confirmed";
+  }
+  if (signing) return "awaiting-approval";
+  return simulation ? "simulated" : "draft";
 }
 
 export type CreationBlocker =
