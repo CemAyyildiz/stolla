@@ -4,13 +4,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Buffer } from "buffer";
 import { useWallet } from "@/context/WalletProvider";
-import {
-  createGovernorClient,
-  getStoredProposalIds,
-  storeProposalId,
-} from "@/lib/contracts";
+import { createGovernorClient, storeProposalId } from "@/lib/contracts";
+import { useProposalDiscovery } from "@/hooks/useProposalDiscovery";
 import { ProposalState } from "@/lib/bindings/community-governor/src";
-import { contractIds } from "@/lib/stellar";
 
 const stateLabels: Record<ProposalState, string> = {
   [ProposalState.Pending]: "Pending",
@@ -26,40 +22,44 @@ const stateLabels: Record<ProposalState, string> = {
 export default function ProposalsPage() {
   const { address, signTransaction } = useWallet();
   const [description, setDescription] = useState("");
-  const [proposalIds, setProposalIds] = useState<string[]>([]);
-  const [states, setStates] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loadingCreate, setLoadingCreate] = useState(false);
+  const { proposalIds, loading, error, empty, refresh } = useProposalDiscovery();
+  const [states, setStates] = useState<Record<string, string>>({});
 
-  const contractsConfigured = Boolean(contractIds.governor);
+  const contractsConfigured = Boolean(
+    process.env.NEXT_PUBLIC_GOVERNOR_CONTRACT_ID,
+  );
 
-  const loadProposals = useCallback(async () => {
-    const ids = getStoredProposalIds();
-    setProposalIds(ids);
-    if (!contractsConfigured || ids.length === 0) return;
+  const loadStates = useCallback(async () => {
+    if (!contractsConfigured || proposalIds.length === 0) return;
 
-    const client = createGovernorClient({
-      publicKey: address ?? "",
-      signTransaction,
-    });
+    try {
+      const client = createGovernorClient({
+        publicKey: address ?? "",
+        signTransaction,
+      });
 
-    const nextStates: Record<string, string> = {};
-    for (const idHex of ids) {
-      try {
-        const tx = await client.proposal_state({
-          proposal_id: Buffer.from(idHex, "hex"),
-        });
-        nextStates[idHex] = stateLabels[tx.result ?? ProposalState.Pending];
-      } catch {
-        nextStates[idHex] = "Unknown";
+      const nextStates: Record<string, string> = {};
+      for (const idHex of proposalIds) {
+        try {
+          const tx = await client.proposal_state({
+            proposal_id: Buffer.from(idHex, "hex"),
+          });
+          nextStates[idHex] = stateLabels[tx.result ?? ProposalState.Pending];
+        } catch {
+          nextStates[idHex] = "Unknown";
+        }
       }
+      setStates(nextStates);
+    } catch {
+      undefined;
     }
-    setStates(nextStates);
-  }, [address, contractsConfigured, signTransaction]);
+  }, [address, contractsConfigured, proposalIds, signTransaction]);
 
   useEffect(() => {
-    loadProposals().catch(() => undefined);
-  }, [loadProposals]);
+    loadStates().catch(() => undefined);
+  }, [loadStates]);
 
   async function handleCreateProposal() {
     if (!address) {
@@ -71,7 +71,7 @@ export default function ProposalsPage() {
       return;
     }
 
-    setLoading(true);
+    setLoadingCreate(true);
     setStatus(null);
     try {
       const client = createGovernorClient({ publicKey: address, signTransaction });
@@ -88,11 +88,12 @@ export default function ProposalsPage() {
       storeProposalId(idHex);
       setDescription("");
       setStatus(`Proposal created: ${idHex.slice(0, 12)}...`);
-      await loadProposals();
+      await refresh();
+      await loadStates();
     } catch (error: unknown) {
       setStatus(error instanceof Error ? error.message : "Proposal failed");
     } finally {
-      setLoading(false);
+      setLoadingCreate(false);
     }
   }
 
@@ -123,19 +124,32 @@ export default function ProposalsPage() {
           <button
             type="button"
             onClick={handleCreateProposal}
-            disabled={!address || loading}
+            disabled={!address || loadingCreate}
             className="mt-3 rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400 disabled:opacity-50"
           >
-            {loading ? "Submitting..." : "Create proposal"}
+            {loadingCreate ? "Submitting..." : "Create proposal"}
           </button>
         </section>
       )}
 
       <section className="mt-6">
-        <h2 className="font-semibold text-slate-100">Your proposals</h2>
-        {proposalIds.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-500">No proposals yet.</p>
-        ) : (
+        <h2 className="font-semibold text-slate-100">Proposals</h2>
+        {loading && (
+          <p className="mt-2 text-sm text-slate-500">
+            Loading proposals…
+          </p>
+        )}
+        {error && (
+          <p className="mt-2 text-sm text-red-400">
+            {error}
+          </p>
+        )}
+        {!loading && !error && empty && (
+          <p className="mt-2 text-sm text-slate-500">
+            No proposals yet.
+          </p>
+        )}
+        {!loading && !error && proposalIds.length > 0 && (
           <ul className="mt-3 space-y-2">
             {proposalIds.map((id) => (
               <li key={id}>
