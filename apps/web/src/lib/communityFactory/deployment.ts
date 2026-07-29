@@ -1,4 +1,3 @@
-import type { AssembledTransaction } from "@stellar/stellar-sdk/contract";
 import type {
   CommunityDeploymentResult,
   CommunityFactoryCreateArgs,
@@ -25,10 +24,9 @@ export type SignAndSendResult<T> = {
   status?: string;
 };
 
-export type CommunityDeploymentTransaction = Pick<
-  AssembledTransaction<CommunityDeploymentResult>,
-  "signAndSend"
->;
+export type CommunityDeploymentTransaction = {
+  signAndSend: () => Promise<SignAndSendResult<CommunityDeploymentResult>>;
+};
 
 export type CommunityDeploymentClient = {
   deploy_community: (
