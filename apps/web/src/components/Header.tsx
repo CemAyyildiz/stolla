@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useWallet } from "@/context/WalletProvider";
 
 const navItems = [
+  { href: "/communities", label: "Communities" },
   { href: "/community", label: "Community" },
   { href: "/proposals", label: "Proposals" },
 ];
@@ -34,7 +35,8 @@ export function Header() {
           </Link>
           <nav className="flex gap-1 sm:gap-2">
             {navItems.map((item) => {
-              const isActive = pathname.startsWith(item.href);
+              const isActive =
+                pathname === item.href || pathname.startsWith(`${item.href}/`);
 
               return (
                 <Link
