@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "tsc --project tsconfig.test.json && node --test ../../.tmp/web-tests/**/*.test.js"
   },
   "dependencies": {
     "@creit.tech/stellar-wallets-kit": "^2.4.0",
