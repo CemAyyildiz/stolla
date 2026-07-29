@@ -12,9 +12,11 @@ import {
 import { StellarWalletsKit } from "@creit.tech/stellar-wallets-kit/sdk";
 import { Networks, KitEventType } from "@creit.tech/stellar-wallets-kit/types";
 import { FreighterModule } from "@creit.tech/stellar-wallets-kit/modules/freighter";
+import { config, stellarNetwork } from "@/lib/stellar";
 
 type WalletContextValue = {
   address: string | null;
+  networkPassphrase: string;
   connect: () => Promise<void>;
   disconnect: () => void;
   signTransaction: (xdr: string) => Promise<{ signedTxXdr: string }>;
@@ -29,7 +31,7 @@ function ensureKit() {
   if (!kitInitialized && typeof window !== "undefined") {
     StellarWalletsKit.init({
       modules: [new FreighterModule()],
-      network: Networks.TESTNET,
+      network: stellarNetwork === "mainnet" ? Networks.PUBLIC : Networks.TESTNET,
     });
     kitInitialized = true;
   }
@@ -76,12 +78,19 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const signTransaction = useCallback(async (xdr: string) => {
     ensureKit();
     return StellarWalletsKit.signTransaction(xdr, {
-      networkPassphrase: Networks.TESTNET,
+      networkPassphrase: config.networkPassphrase,
     });
   }, []);
 
   const value = useMemo(
-    () => ({ address, connect, disconnect, signTransaction, isConnecting }),
+    () => ({
+      address,
+      networkPassphrase: config.networkPassphrase,
+      connect,
+      disconnect,
+      signTransaction,
+      isConnecting,
+    }),
     [address, connect, disconnect, signTransaction, isConnecting],
   );
 
