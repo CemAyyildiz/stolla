@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useWallet } from "@/context/WalletProvider";
 import {
   createCommunityFactoryClient,
@@ -28,6 +28,7 @@ const stageLabels: Record<DeploymentStage, string> = {
 
 export function useCommunityDeployment() {
   const { address, networkPassphrase, signTransaction } = useWallet();
+  const activeSubmissionRef = useRef(false);
   const [stage, setStage] = useState<DeploymentStage>("idle");
   const [error, setError] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<DeployCommunityOutcome | null>(null);
@@ -45,8 +46,9 @@ export function useCommunityDeployment() {
 
   const deploy = useCallback(
     async (state: CommunityWizardState) => {
-      if (isSubmitting) return null;
+      if (activeSubmissionRef.current || isSubmitting) return null;
 
+      activeSubmissionRef.current = true;
       setError(null);
       setOutcome(null);
       try {
@@ -72,6 +74,8 @@ export function useCommunityDeployment() {
         setStage("error");
         setError(deploymentError.message);
         return null;
+      } finally {
+        activeSubmissionRef.current = false;
       }
     },
     [address, isSubmitting, networkPassphrase, signTransaction],
