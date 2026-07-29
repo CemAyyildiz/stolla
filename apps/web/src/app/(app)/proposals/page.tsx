@@ -30,6 +30,7 @@ export default function ProposalsPage() {
   const [states, setStates] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const LOAD_MORE_PAGE_SIZE = 10;
 
   const contractsConfigured = Boolean(contractIds.governor);
 
