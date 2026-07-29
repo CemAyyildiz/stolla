@@ -2,6 +2,8 @@ import { Networks } from "@stellar/stellar-sdk";
 
 const network = process.env.NEXT_PUBLIC_STELLAR_NETWORK ?? "testnet";
 
+export const stellarNetwork = network === "mainnet" ? "mainnet" : "testnet";
+
 export const stellarConfig = {
   testnet: {
     rpcUrl:
@@ -20,11 +22,12 @@ export const stellarConfig = {
 } as const;
 
 export const config =
-  network === "mainnet" ? stellarConfig.mainnet : stellarConfig.testnet;
+  stellarNetwork === "mainnet" ? stellarConfig.mainnet : stellarConfig.testnet;
 
 export const contractIds = {
   nft: process.env.NEXT_PUBLIC_NFT_CONTRACT_ID ?? "",
   governor: process.env.NEXT_PUBLIC_GOVERNOR_CONTRACT_ID ?? "",
+  communityFactory: process.env.NEXT_PUBLIC_COMMUNITY_FACTORY_CONTRACT_ID ?? "",
 };
 
 export function requireContractIds(): { nft: string; governor: string } {
@@ -34,4 +37,13 @@ export function requireContractIds(): { nft: string; governor: string } {
     );
   }
   return { nft: contractIds.nft, governor: contractIds.governor };
+}
+
+export function requireCommunityFactoryContractId(): string {
+  if (!contractIds.communityFactory) {
+    throw new Error(
+      "CommunityFactory contract ID is not configured. Set NEXT_PUBLIC_COMMUNITY_FACTORY_CONTRACT_ID.",
+    );
+  }
+  return contractIds.communityFactory;
 }
