@@ -7,6 +7,7 @@ import { useWallet } from "@/context/WalletProvider";
 import { createGovernorClient } from "@/lib/contracts";
 import { ProposalState } from "@/lib/bindings/community-governor/src";
 import { contractIds } from "@/lib/stellar";
+import { truncateMiddle } from "@/lib/truncate";
 
 const stateLabels: Record<ProposalState, string> = {
   [ProposalState.Pending]: "Pending",
@@ -85,9 +86,22 @@ export default function ProposalDetailPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
       <h1 className="text-2xl font-bold text-slate-100">Proposal</h1>
-      <p className="mt-2 break-all font-mono text-sm text-slate-400">
-        {proposalIdHex}
-      </p>
+      <div className="mt-2 flex items-center gap-2">
+        <p
+          className="truncate font-mono text-sm text-slate-400"
+          title={proposalIdHex}
+        >
+          {truncateMiddle(proposalIdHex)}
+        </p>
+        <button
+          type="button"
+          onClick={() => navigator.clipboard.writeText(proposalIdHex)}
+          className="shrink-0 rounded px-2 py-0.5 text-xs text-slate-500 transition hover:bg-slate-800 hover:text-slate-300"
+          title="Copy proposal ID"
+        >
+          Copy
+        </button>
+      </div>
 
       <dl className="mt-6 grid gap-3 rounded-xl border border-slate-800 bg-[#151b2b] p-5 text-sm sm:grid-cols-2">
         <div>

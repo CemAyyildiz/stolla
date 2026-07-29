@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useWallet } from "@/context/WalletProvider";
+import { truncateMiddle } from "@/lib/truncate";
 
 const navItems = [
   { href: "/community", label: "Community" },
@@ -56,8 +57,11 @@ export function Header() {
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           {address ? (
             <>
-              <span className="hidden truncate text-xs text-slate-500 sm:inline sm:max-w-[180px]">
-                {address}
+              <span
+                className="hidden truncate text-xs text-slate-500 sm:inline sm:max-w-[120px] md:max-w-[180px]"
+                title={address}
+              >
+                {truncateMiddle(address)}
               </span>
               <button
                 type="button"

@@ -11,6 +11,7 @@ import {
 } from "@/lib/contracts";
 import { ProposalState } from "@/lib/bindings/community-governor/src";
 import { contractIds } from "@/lib/stellar";
+import { truncateEnd, truncateMiddle } from "@/lib/truncate";
 
 const stateLabels: Record<ProposalState, string> = {
   [ProposalState.Pending]: "Pending",
@@ -87,7 +88,7 @@ export default function ProposalsPage() {
       const idHex = Buffer.from(result.result).toString("hex");
       storeProposalId(idHex);
       setDescription("");
-      setStatus(`Proposal created: ${idHex.slice(0, 12)}...`);
+      setStatus(`Proposal created: ${truncateEnd(idHex, 12)}`);
       await loadProposals();
     } catch (error: unknown) {
       setStatus(error instanceof Error ? error.message : "Proposal failed");
@@ -139,13 +140,27 @@ export default function ProposalsPage() {
           <ul className="mt-3 space-y-2">
             {proposalIds.map((id) => (
               <li key={id}>
-                <Link
-                  href={`/proposals/${id}`}
-                  className="flex items-center justify-between rounded-lg border border-slate-800 bg-[#151b2b] px-4 py-3 text-sm text-slate-200 hover:bg-slate-800/80"
-                >
-                  <span className="truncate font-mono">{id}</span>
-                  <span className="ml-3 text-slate-500">{states[id] ?? "..."}</span>
-                </Link>
+                <div className="flex items-center justify-between rounded-lg border border-slate-800 bg-[#151b2b] px-4 py-3 text-sm text-slate-200 hover:bg-slate-800/80">
+                  <Link
+                    href={`/proposals/${id}`}
+                    className="flex min-w-0 items-center gap-3"
+                  >
+                    <span className="truncate font-mono" title={id}>
+                      {truncateMiddle(id)}
+                    </span>
+                    <span className="shrink-0 text-slate-500">
+                      {states[id] ?? "..."}
+                    </span>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(id)}
+                    className="ml-2 shrink-0 rounded px-2 py-1 text-xs text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"
+                    title="Copy proposal ID"
+                  >
+                    Copy
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
