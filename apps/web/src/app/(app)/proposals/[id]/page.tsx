@@ -6,18 +6,8 @@ import { Buffer } from "buffer";
 import { useWallet } from "@/context/WalletProvider";
 import { createGovernorClient } from "@/lib/contracts";
 import { ProposalState } from "@/lib/bindings/community-governor/src";
+import { PROPOSAL_STATE_LABELS } from "@/lib/proposalState";
 import { contractIds } from "@/lib/stellar";
-
-const stateLabels: Record<ProposalState, string> = {
-  [ProposalState.Pending]: "Pending",
-  [ProposalState.Active]: "Active",
-  [ProposalState.Defeated]: "Defeated",
-  [ProposalState.Canceled]: "Canceled",
-  [ProposalState.Succeeded]: "Succeeded",
-  [ProposalState.Queued]: "Queued",
-  [ProposalState.Expired]: "Expired",
-  [ProposalState.Executed]: "Executed",
-};
 
 export default function ProposalDetailPage() {
   const params = useParams<{ id: string }>();
@@ -44,7 +34,7 @@ export default function ProposalDetailPage() {
         : Promise.resolve(null),
     ]);
 
-    setState(stateLabels[stateTx.result ?? ProposalState.Pending]);
+    setState(PROPOSAL_STATE_LABELS[stateTx.result ?? ProposalState.Pending]);
     if (votedTx) {
       setHasVoted(Boolean(votedTx.result));
     }
