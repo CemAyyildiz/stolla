@@ -6,7 +6,7 @@ import {
   type DeploymentStage,
 } from "./deployment";
 import { CommunityDeploymentError } from "./errors";
-import type { CommunityWizardState } from "./types";
+import type { CommunityDeploymentResult, CommunityWizardState } from "./types";
 
 const state: CommunityWizardState = {
   metadata: {
@@ -28,7 +28,11 @@ function dependencies(overrides: {
   walletNetworkPassphrase?: string | null;
   deployError?: Error;
   signError?: Error;
-  signResponse?: { hash?: string; txHash?: string; result?: unknown };
+  signResponse?: {
+    hash?: string;
+    txHash?: string;
+    result?: CommunityDeploymentResult;
+  };
   stages?: DeploymentStage[];
   hashes?: string[];
 } = {}) {
