@@ -5,7 +5,9 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
   useState,
+  type Ref,
   type ReactNode,
 } from "react";
 import { useWallet } from "@/context/WalletProvider";
@@ -13,10 +15,15 @@ import { useNetworkGuard } from "@/hooks/useNetworkGuard";
 import { NetworkMismatchNotice } from "@/components/NetworkMismatchNotice";
 import {
   CREATION_STEPS,
+  CREATION_DRAFT_STORAGE_KEY,
+  CREATION_SUBMISSION_STORAGE_KEY,
   INITIAL_CREATION_STATE,
   creationReducer,
   deploymentBlocker,
   isDraftComplete,
+  isDraftDirty,
+  readPersistedDraft,
+  readPersistedSubmission,
   simulationBlocker,
   type CommunityDraft,
   type CommunitySimulation,
@@ -101,12 +108,46 @@ export function CreateCommunityWizard({
   const [state, dispatch] = useReducer(creationReducer, INITIAL_CREATION_STATE);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  const hydratedRef = useRef(false);
+  const firstFieldRef = useRef<HTMLInputElement>(null);
 
   const detectedPassphrase = comparison.detected?.passphrase ?? null;
 
   useEffect(() => {
     dispatch({ type: "network-detected", passphrase: detectedPassphrase });
   }, [detectedPassphrase]);
+
+  useEffect(() => {
+    dispatch({
+      type: "state-restored",
+      draftState: readPersistedDraft(sessionStorage),
+      submission: readPersistedSubmission(sessionStorage),
+    });
+    hydratedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    if (isDraftDirty(state.draft)) {
+      sessionStorage.setItem(
+        CREATION_DRAFT_STORAGE_KEY,
+        JSON.stringify({ step: state.step, draft: state.draft }),
+      );
+    } else {
+      sessionStorage.removeItem(CREATION_DRAFT_STORAGE_KEY);
+    }
+  }, [state.draft, state.step]);
+
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    if (state.submission) {
+      sessionStorage.setItem(
+        CREATION_SUBMISSION_STORAGE_KEY,
+        JSON.stringify(state.submission),
+      );
+    }
+  }, [state.submission]);
 
   const port = useMemo<CommunityDeploymentPort>(
     () =>
@@ -183,6 +224,22 @@ export function CreateCommunityWizard({
   const stepIndex = CREATION_STEPS.indexOf(state.step);
   const goToStep = (step: CreationStep) => dispatch({ type: "step-changed", step });
 
+  function restartWizard() {
+    sessionStorage.removeItem(CREATION_DRAFT_STORAGE_KEY);
+    dispatch({ type: "draft-discarded" });
+    setError(null);
+    setConfirmingDiscard(false);
+    requestAnimationFrame(() => firstFieldRef.current?.focus());
+  }
+
+  function handleDiscard() {
+    if (isDraftDirty(state.draft)) {
+      setConfirmingDiscard(true);
+      return;
+    }
+    restartWizard();
+  }
+
   return (
     <div className="space-y-6">
       <ol className="flex flex-wrap gap-2 text-sm">
@@ -211,9 +268,10 @@ export function CreateCommunityWizard({
 
       {state.step === "metadata" && (
         <Panel title="Community metadata">
-          {METADATA_FIELDS.map((field) => (
+          {METADATA_FIELDS.map((field, index) => (
             <TextField
               key={field.key}
+              inputRef={index === 0 ? firstFieldRef : undefined}
               label={field.label}
               placeholder={field.placeholder}
               value={state.draft[field.key]}
@@ -318,6 +376,41 @@ export function CreateCommunityWizard({
         </p>
       )}
 
+      {confirmingDiscard && (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="discard-draft-title"
+          aria-describedby="discard-draft-description"
+          className="rounded-xl border border-rose-900/70 bg-rose-950/30 p-5"
+        >
+          <h2 id="discard-draft-title" className="font-semibold text-slate-100">
+            Discard this draft?
+          </h2>
+          <p id="discard-draft-description" className="mt-2 text-sm text-slate-300">
+            Your unsent community details and validation errors will be removed.
+            Submitted transaction recovery information is kept separately.
+          </p>
+          <div className="mt-4 flex gap-2">
+            <button
+              type="button"
+              autoFocus
+              onClick={() => setConfirmingDiscard(false)}
+              className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200"
+            >
+              Keep editing
+            </button>
+            <button
+              type="button"
+              onClick={restartWizard}
+              className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white"
+            >
+              Discard draft
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between">
         <button
           type="button"
@@ -327,17 +420,26 @@ export function CreateCommunityWizard({
         >
           Back
         </button>
-        <button
-          type="button"
-          onClick={() => goToStep(CREATION_STEPS[stepIndex + 1])}
-          disabled={
-            stepIndex === CREATION_STEPS.length - 1 ||
-            (state.step === "governance" && !isDraftComplete(state.draft))
-          }
-          className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:bg-slate-800 disabled:opacity-50"
-        >
-          Next
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleDiscard}
+            className="rounded-lg border border-rose-900 px-4 py-2 text-sm text-rose-300 transition hover:bg-rose-950/40"
+          >
+            Discard draft
+          </button>
+          <button
+            type="button"
+            onClick={() => goToStep(CREATION_STEPS[stepIndex + 1])}
+            disabled={
+              stepIndex === CREATION_STEPS.length - 1 ||
+              (state.step === "governance" && !isDraftComplete(state.draft))
+            }
+            className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:bg-slate-800 disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -364,17 +466,20 @@ function TextField({
   onChange,
   placeholder,
   inputMode,
+  inputRef,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   inputMode?: "numeric";
+  inputRef?: Ref<HTMLInputElement>;
 }) {
   return (
     <label className="block text-sm">
       <span className="text-slate-400">{label}</span>
       <input
+        ref={inputRef}
         value={value}
         placeholder={placeholder}
         inputMode={inputMode}
