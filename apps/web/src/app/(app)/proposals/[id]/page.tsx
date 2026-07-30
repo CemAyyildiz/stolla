@@ -29,8 +29,8 @@ export default function ProposalDetailPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const refresh = useCallback(async () => {
-    if (!contractIds.governor || !proposalIdHex) return;
+  const fetchProposalState = useCallback(async () => {
+    if (!contractIds.governor || !proposalIdHex) return null;
     const client = createGovernorClient({
       publicKey: address ?? "",
       signTransaction,
@@ -44,17 +44,33 @@ export default function ProposalDetailPage() {
         : Promise.resolve(null),
     ]);
 
-    setState(stateLabels[stateTx.result ?? ProposalState.Pending]);
-    if (votedTx) {
-      setHasVoted(Boolean(votedTx.result));
-    }
+    return {
+      state: stateTx.result ?? ProposalState.Pending,
+      hasVoted: votedTx ? Boolean(votedTx.result) : null,
+    };
   }, [address, proposalIdHex, signTransaction]);
 
   useEffect(() => {
-    refresh().catch((error: unknown) => {
-      setStatus(error instanceof Error ? error.message : "Failed to load proposal");
-    });
-  }, [refresh]);
+    let active = true;
+
+    fetchProposalState()
+      .then((data) => {
+        if (!active || !data) return;
+        setState(stateLabels[data.state]);
+        if (data.hasVoted !== null) {
+          setHasVoted(data.hasVoted);
+        }
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setStatus(error instanceof Error ? error.message : "Failed to load proposal");
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [fetchProposalState]);
 
   async function handleVote(voteType: number) {
     if (!address) {
@@ -74,7 +90,13 @@ export default function ProposalDetailPage() {
       });
       await tx.signAndSend();
       setStatus("Vote submitted.");
-      await refresh();
+      const data = await fetchProposalState();
+      if (data) {
+        setState(stateLabels[data.state]);
+        if (data.hasVoted !== null) {
+          setHasVoted(data.hasVoted);
+        }
+      }
     } catch (error: unknown) {
       setStatus(error instanceof Error ? error.message : "Vote failed");
     } finally {
