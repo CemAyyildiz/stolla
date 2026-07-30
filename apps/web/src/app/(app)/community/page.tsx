@@ -44,7 +44,8 @@ export default function CommunityPage() {
 
   useEffect(() => {
     refresh().catch((error: unknown) => {
-      setStatus(error instanceof Error ? error.message : "Failed to load NFT data");
+      console.error("Failed to load community data:", error);
+      setStatus(error instanceof Error ? error.message : "Failed to load community data");
     });
   }, [refresh]);
 

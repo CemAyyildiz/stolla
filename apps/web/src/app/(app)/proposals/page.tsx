@@ -58,7 +58,10 @@ export default function ProposalsPage() {
   }, [address, contractsConfigured, signTransaction]);
 
   useEffect(() => {
-    loadProposals().catch(() => undefined);
+    loadProposals().catch((err) => {
+      console.error("Failed to load proposals:", err);
+      setStatus("Failed to load proposals.");
+    });
   }, [loadProposals]);
 
   async function handleCreateProposal() {
