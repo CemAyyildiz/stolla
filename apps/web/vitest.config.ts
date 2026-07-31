@@ -3,13 +3,18 @@ import path from "path";
 
 export default defineConfig({
   test: {
-    // Run in Node environment — these are pure TS unit tests, not browser tests.
-    environment: "node",
-    // Glob for test files
-    include: ["src/**/*.test.ts"],
-    // TypeScript path aliases so vitest resolves @/ the same way Next.js does
+    // jsdom environment: supports React component tests (testing-library)
+    // as well as pure TS unit tests (they don't require a browser).
+    environment: "jsdom",
+    globals: true,
+    setupFiles: ["./src/__tests__/setup.ts"],
+    // Covers both *.test.ts (pure unit tests) and *.test.tsx (component tests)
+    include: ["src/**/*.test.{ts,tsx}"],
+  },
+  resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      // TypeScript path aliases so vitest resolves @/ the same way Next.js does
+      "@": path.resolve(__dirname, "src"),
     },
   },
 });
