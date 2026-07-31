@@ -1,12 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { Buffer } from "buffer";
 import { useWallet } from "@/context/WalletProvider";
 import { createGovernorClient } from "@/lib/contracts";
 import { ProposalState } from "@/lib/bindings/community-governor/src";
 import { contractIds } from "@/lib/stellar";
+import { parseProposalId } from "@/lib/proposals";
 import { useTransactionLifecycle } from "@/hooks/useTransactionLifecycle";
 import { TransactionLifecycleDisplay } from "@/components/TransactionLifecycleDisplay";
 
@@ -21,22 +22,34 @@ const stateLabels: Record<ProposalState, string> = {
   [ProposalState.Executed]: "Executed",
 };
 
+type ProposalResult = {
+  id: string;
+  state: string;
+  hasVoted: boolean | null;
+};
+
+const backLinkClassName =
+  "mt-4 inline-block rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400";
+
 export default function ProposalDetailPage() {
   const params = useParams<{ id: string }>();
   const proposalIdHex = params.id;
+  const isValidId = parseProposalId(proposalIdHex) !== null;
   const { address, signTransaction } = useWallet();
-  const [state, setState] = useState<string>("—");
-  const [hasVoted, setHasVoted] = useState<boolean | null>(null);
+  const [result, setResult] = useState<ProposalResult | null>(null);
+  const [loadErrorId, setLoadErrorId] = useState<string | null>(null);
   const [reason, setReason] = useState("Support");
   const [status, setStatus] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    if (!contractIds.governor || !proposalIdHex) return;
+  const loadProposal = useCallback(async () => {
+    const proposalId = parseProposalId(proposalIdHex);
+    if (!proposalId || !contractIds.governor) {
+      throw new Error("Proposal unavailable");
+    }
     const client = createGovernorClient({
       publicKey: address ?? "",
       signTransaction,
     });
-    const proposalId = Buffer.from(proposalIdHex, "hex");
 
     const [stateTx, votedTx] = await Promise.all([
       client.proposal_state({ proposal_id: proposalId }),
@@ -45,28 +58,36 @@ export default function ProposalDetailPage() {
         : Promise.resolve(null),
     ]);
 
-    setState(stateLabels[stateTx.result ?? ProposalState.Pending]);
-    if (votedTx) {
-      setHasVoted(Boolean(votedTx.result));
-    }
+    return {
+      id: proposalIdHex,
+      state: stateLabels[stateTx.result ?? ProposalState.Pending],
+      hasVoted: votedTx ? Boolean(votedTx.result) : null,
+    };
   }, [address, proposalIdHex, signTransaction]);
 
   useEffect(() => {
-    refresh().catch((error: unknown) => {
-      setStatus(error instanceof Error ? error.message : "Failed to load proposal");
-    });
-  }, [refresh]);
+    if (!isValidId) return;
+    loadProposal()
+      .then((data) => {
+        setLoadErrorId(null);
+        setResult(data);
+      })
+      .catch(() => setLoadErrorId(proposalIdHex));
+  }, [isValidId, loadProposal, proposalIdHex]);
 
   // Transaction lifecycle management
   const { state: txLifecycle, execute: executeVote, reset: resetLifecycle } =
     useTransactionLifecycle({
       onConfirmed: async () => {
         // Refresh has_voted, proposal state, and available vote data after confirmation
-        await refresh();
+        const data = await loadProposal();
+        setResult(data);
       },
     });
 
   async function handleVote(voteType: number) {
+    const proposalId = parseProposalId(proposalIdHex);
+    if (!proposalId) return;
     if (!address) {
       setStatus("Connect your wallet first.");
       return;
@@ -78,7 +99,7 @@ export default function ProposalDetailPage() {
     await executeVote(voteType, reason, async () => {
       const client = createGovernorClient({ publicKey: address, signTransaction });
       const tx = await client.cast_vote({
-        proposal_id: Buffer.from(proposalIdHex, "hex"),
+        proposal_id: proposalId,
         vote_type: voteType,
         reason,
         voter: address,
@@ -88,6 +109,11 @@ export default function ProposalDetailPage() {
     });
   }
 
+  const isInvalid = !isValidId;
+  const isNotFound = !isInvalid && loadErrorId === proposalIdHex;
+  const isReady = !isInvalid && !isNotFound && result?.id === proposalIdHex;
+  const isLoading = !isInvalid && !isNotFound && !isReady;
+
   // Disable voting buttons while a transaction is in progress
   const isVotingDisabled =
     !address ||
@@ -95,6 +121,52 @@ export default function ProposalDetailPage() {
     txLifecycle.stage === "wallet_approval" ||
     txLifecycle.stage === "submitting" ||
     txLifecycle.stage === "confirming";
+
+  if (isInvalid) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-10">
+        <h1 className="text-2xl font-bold text-slate-100">
+          Invalid proposal ID
+        </h1>
+        <p className="mt-2 break-all text-slate-400">
+          <code className="font-mono">{proposalIdHex}</code> is not a valid
+          32-byte proposal identifier.
+        </p>
+        <Link href="/proposals" className={backLinkClassName}>
+          Back to proposals
+        </Link>
+      </div>
+    );
+  }
+
+  if (isNotFound) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-10">
+        <h1 className="text-2xl font-bold text-slate-100">
+          Proposal not found
+        </h1>
+        <p className="mt-2 break-all text-slate-400">
+          We couldn&apos;t find a proposal with ID{" "}
+          <code className="font-mono">{proposalIdHex}</code>. It may not exist
+          or isn&apos;t available on this network.
+        </p>
+        <Link href="/proposals" className={backLinkClassName}>
+          Back to proposals
+        </Link>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-10">
+        <h1 className="text-2xl font-bold text-slate-100">Proposal</h1>
+        <p className="mt-2 text-slate-500">Loading proposal…</p>
+      </div>
+    );
+  }
+
+  const proposal = result!;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -106,11 +178,13 @@ export default function ProposalDetailPage() {
       <dl className="mt-6 grid gap-3 rounded-xl border border-slate-800 bg-[#151b2b] p-5 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-slate-500">State</dt>
-          <dd className="font-medium text-slate-100">{state}</dd>
+          <dd className="font-medium text-slate-100">{proposal.state}</dd>
         </div>
         <div>
           <dt className="text-slate-500">You voted</dt>
-          <dd>{hasVoted === null ? "—" : hasVoted ? "Yes" : "No"}</dd>
+          <dd>
+            {proposal.hasVoted === null ? "—" : proposal.hasVoted ? "Yes" : "No"}
+          </dd>
         </div>
       </dl>
 
