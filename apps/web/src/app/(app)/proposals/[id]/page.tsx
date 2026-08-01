@@ -8,6 +8,8 @@ import { createGovernorClient } from "@/lib/contracts";
 import { ProposalState } from "@/lib/bindings/community-governor/src";
 import { contractIds } from "@/lib/stellar";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useTransactionLifecycle } from "@/hooks/useTransactionLifecycle";
+import { TransactionLifecycleDisplay } from "@/components/TransactionLifecycleDisplay";
 
 const stateLabels: Record<ProposalState, string> = {
   [ProposalState.Pending]: "Pending",
@@ -66,15 +68,25 @@ export default function ProposalDetailPage() {
     });
   }, [refresh]);
 
+  // Transaction lifecycle management
+  const { state: txLifecycle, execute: executeVote, reset: resetLifecycle } =
+    useTransactionLifecycle({
+      onConfirmed: async () => {
+        // Refresh has_voted, proposal state, and available vote data after confirmation
+        await refresh();
+      },
+    });
+
   async function handleVote(voteType: number) {
     if (!address) {
       setStatus("Connect your wallet first.");
       return;
     }
 
-    setLoading(true);
     setStatus(null);
-    try {
+    resetLifecycle();
+
+    await executeVote(voteType, reason, async () => {
       const client = createGovernorClient({ publicKey: address, signTransaction });
       const tx = await client.cast_vote({
         proposal_id: Buffer.from(proposalIdHex, "hex"),
@@ -82,15 +94,18 @@ export default function ProposalDetailPage() {
         reason,
         voter: address,
       });
+      // signAndSend handles wallet approval, network submission, and ledger confirmation
       await tx.signAndSend();
-      setStatus("Vote submitted.");
-      await refresh();
-    } catch (error: unknown) {
-      setStatus(error instanceof Error ? error.message : "Vote failed");
-    } finally {
-      setLoading(false);
-    }
+    });
   }
+
+  // Disable voting buttons while a transaction is in progress
+  const isVotingDisabled =
+    !address ||
+    txLifecycle.stage === "simulating" ||
+    txLifecycle.stage === "wallet_approval" ||
+    txLifecycle.stage === "submitting" ||
+    txLifecycle.stage === "confirming";
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -128,36 +143,50 @@ export default function ProposalDetailPage() {
         <input
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          className="mt-3 w-full rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600"
+          disabled={isVotingDisabled}
+          className="mt-3 w-full rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 disabled:opacity-50"
           placeholder="Reason (optional)"
+          aria-label="Vote reason"
         />
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => handleVote(1)}
-            disabled={!address || loading}
+            disabled={isVotingDisabled}
             className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+            aria-label="Vote For"
           >
             For
           </button>
           <button
             type="button"
             onClick={() => handleVote(0)}
-            disabled={!address || loading}
+            disabled={isVotingDisabled}
             className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-50"
+            aria-label="Vote Against"
           >
             Against
           </button>
           <button
             type="button"
             onClick={() => handleVote(2)}
-            disabled={!address || loading}
+            disabled={isVotingDisabled}
             className="rounded-lg bg-slate-600 px-4 py-2 text-sm font-medium text-white hover:bg-slate-500 disabled:opacity-50"
+            aria-label="Vote Abstain"
           >
             Abstain
           </button>
         </div>
       </section>
+
+      {/* Transaction lifecycle display */}
+      <TransactionLifecycleDisplay
+        stage={txLifecycle.stage}
+        voteType={txLifecycle.voteType}
+        reason={txLifecycle.reason}
+        error={txLifecycle.error}
+        isTerminal={txLifecycle.isTerminal}
+      />
 
       {status && (
         <p className="mt-4 rounded-lg border border-slate-800 bg-[#151b2b] p-3 text-sm text-slate-200">
