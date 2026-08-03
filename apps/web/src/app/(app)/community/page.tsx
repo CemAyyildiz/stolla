@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useWallet } from "@/context/WalletProvider";
 import {
   createNftClient,
@@ -19,15 +19,61 @@ export default function CommunityPage() {
   const [tokenUri, setTokenUri] = useState("ipfs://");
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(Boolean(contractIds.nft));
 
   const contractsConfigured = Boolean(contractIds.nft);
 
-  const refresh = useCallback(async () => {
-    if (!contractsConfigured) {
-      setInitialLoading(false);
-      return;
-    }
+  const fetchRef = useRef(0);
+
+  useEffect(() => {
+    if (!contractsConfigured) return;
+
+    const id = ++fetchRef.current;
+    let cancelled = false;
+
+    const fetchData = async () => {
+      try {
+        const client = createReadOnlyNftClient();
+        const [collectionName, collectionSymbol] = await Promise.all([
+          client.name(),
+          client.symbol(),
+        ]);
+        if (cancelled || fetchRef.current !== id) return;
+        setName(collectionName.result ?? "");
+        setSymbol(collectionSymbol.result ?? "");
+
+        if (address) {
+          const userClient = createNftClient({ publicKey: address, signTransaction });
+          const [bal, votePower] = await Promise.all([
+            userClient.balance({ account: address }),
+            userClient.get_votes({ account: address }),
+          ]);
+          if (cancelled || fetchRef.current !== id) return;
+          setBalance(Number(bal.result ?? 0));
+          setVotes(String(votePower.result ?? 0));
+        } else {
+          setBalance(null);
+          setVotes(null);
+        }
+      } finally {
+        if (!cancelled && fetchRef.current === id) {
+          setInitialLoading(false);
+        }
+      }
+    };
+
+    fetchData().catch((error: unknown) => {
+      if (!cancelled) {
+        setStatus(error instanceof Error ? error.message : "Failed to load NFT data");
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [address, contractsConfigured, signTransaction]);
+
+  async function refresh() {
+    if (!contractsConfigured) return;
 
     try {
       const client = createReadOnlyNftClient();
@@ -46,17 +92,14 @@ export default function CommunityPage() {
         ]);
         setBalance(Number(bal.result ?? 0));
         setVotes(String(votePower.result ?? 0));
+      } else {
+        setBalance(null);
+        setVotes(null);
       }
     } finally {
       setInitialLoading(false);
     }
-  }, [address, contractsConfigured, signTransaction]);
-
-  useEffect(() => {
-    refresh().catch((error: unknown) => {
-      setStatus(error instanceof Error ? error.message : "Failed to load NFT data");
-    });
-  }, [refresh]);
+  }
 
   async function handleMint() {
     if (!address) {
