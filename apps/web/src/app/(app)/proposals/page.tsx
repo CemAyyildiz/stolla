@@ -117,7 +117,7 @@ export default function ProposalsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
+    <div className="mx-auto w-full min-w-0 max-w-3xl px-4 py-10">
       <h1 className="text-2xl font-bold text-slate-100">Proposals</h1>
       <p className="mt-2 text-slate-400">
         Create and track DAO proposals. Voting power requires delegated NFTs.
@@ -131,23 +131,32 @@ export default function ProposalsPage() {
       )}
 
       {contractsConfigured && (
-        <section className="mt-6 rounded-xl border border-slate-800 bg-[#151b2b] p-5">
+        <section className="mt-6 min-w-0 rounded-xl border border-slate-800 bg-[#151b2b] p-4 sm:p-5">
           <h2 className="font-semibold text-slate-100">Create proposal</h2>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
-            className="mt-3 w-full rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600"
+            className="mt-3 box-border w-full min-w-0 resize-y rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400"
             placeholder="Describe the community decision..."
           />
           <button
             type="button"
             onClick={handleCreateProposal}
             disabled={!address || loading}
-            className="mt-3 rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400 disabled:opacity-50"
+            className="mt-3 min-h-11 w-full touch-manipulation rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400 disabled:opacity-50 sm:w-auto"
           >
             {loading ? "Submitting..." : "Create proposal"}
           </button>
+          {status && (
+            <p
+              role="status"
+              aria-live="polite"
+              className="mt-3 min-w-0 break-words rounded-lg border border-slate-800 bg-[#0b0f19] p-3 text-sm text-slate-200 [overflow-wrap:anywhere]"
+            >
+              {status}
+            </p>
+          )}
         </section>
       )}
 
@@ -199,12 +208,6 @@ export default function ProposalsPage() {
           </ul>
         )}
       </section>
-
-      {status && (
-        <p className="mt-4 rounded-lg border border-slate-800 bg-[#151b2b] p-3 text-sm text-slate-200">
-          {status}
-        </p>
-      )}
     </div>
   );
 }
