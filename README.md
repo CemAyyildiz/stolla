@@ -126,6 +126,7 @@ new commits are pushed to the production branch.
 | `npm run dev` | Start the Next.js development server |
 | `npm run build` | Create a production web build |
 | `npm run lint` | Run frontend linting |
+| `npm run clean` | Remove Next.js and Turbopack caches |
 | `npm run build:contracts` | Build the Soroban contracts |
 | `npm run test:contracts` | Run the contract test suite |
 
