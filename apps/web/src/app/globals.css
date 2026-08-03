@@ -15,6 +15,7 @@
   --paper-muted: color-mix(in srgb, var(--paper) 68%, transparent);
   --accent: #818cf8;
   --accent-muted: #6366f1;
+  --focus-ring: #a5b4fc;
   --surface: #151b2b;
   --border: #243044;
   --shadow: 4px 4px 0 #000;
@@ -37,4 +38,22 @@ h1,
 h2,
 h3 {
   font-family: var(--font-syne), sans-serif;
+}
+
+:where(
+  a[href],
+  button,
+  input,
+  select,
+  textarea,
+  summary,
+  [tabindex]:not([tabindex="-1"])
+):focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Keep app-navigation rings inside its horizontal scroll container. */
+.app-header-scroll :where(a[href], button):focus-visible {
+  outline-offset: -3px;
 }

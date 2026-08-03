@@ -45,7 +45,7 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-slate-800/80 bg-[#0b0f19]/90 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 sm:flex-nowrap sm:py-4">
-        <div className="flex min-w-0 max-w-full items-center gap-3 overflow-x-auto sm:gap-8">
+        <div className="app-header-scroll flex min-w-0 max-w-full items-center gap-3 overflow-x-auto sm:gap-8">
           <Link
             href="/"
             className="flex shrink-0 items-center gap-2 text-lg font-semibold text-slate-100"
