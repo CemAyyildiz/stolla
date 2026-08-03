@@ -9,12 +9,11 @@ export default function LandingLayout({
 }>) {
   return (
     <div className="landing-root min-h-screen">
-      <a href="#main-content" className="landing-skip-link">
-        Skip to content
-      </a>
       <LandingChrome />
       <LandingHeader />
-      <main id="main-content">{children}</main>
+      <main id="main-content" tabIndex={-1} className="focus:outline-none">
+        {children}
+      </main>
       <LandingFooter />
     </div>
   );
