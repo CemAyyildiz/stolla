@@ -27,6 +27,7 @@ describe("Header", () => {
       disconnect,
       signTransaction: vi.fn(),
       isConnecting: false,
+      connectionError: null,
     } as ReturnType<typeof useWallet>);
 
     render(<Header />);
