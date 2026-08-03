@@ -149,6 +149,10 @@ describe("wallet connection feedback", () => {
         .getByRole("button", { name: "Connecting..." })
         .hasAttribute("disabled"),
     ).toBe(true);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Connecting to wallet…",
+    );
+    expect(screen.getByRole("status")).toHaveAttribute("aria-live", "polite");
     expect(screen.queryByRole("alert")).toBeNull();
 
     finishRetry({ address: "GCONNECTED" });
@@ -156,6 +160,7 @@ describe("wallet connection feedback", () => {
     expect(
       await screen.findByRole("button", { name: "Disconnect" }),
     ).not.toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent("Wallet connected.");
     expect(screen.queryByRole("alert")).toBeNull();
   });
 

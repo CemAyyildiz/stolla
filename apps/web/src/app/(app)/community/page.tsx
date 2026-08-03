@@ -8,6 +8,12 @@ import {
 } from "@/lib/contracts";
 import { contractIds } from "@/lib/stellar";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { LiveStatus } from "@/components/ui/LiveStatus";
+
+type ActionStatus = {
+  message: string;
+  tone: "routine" | "error";
+};
 
 export default function CommunityPage() {
   const { address, signTransaction } = useWallet();
@@ -17,7 +23,7 @@ export default function CommunityPage() {
   const [votes, setVotes] = useState<string | null>(null);
   const [recipient, setRecipient] = useState("");
   const [tokenUri, setTokenUri] = useState("ipfs://");
-  const [status, setStatus] = useState<string | null>(null);
+  const [status, setStatus] = useState<ActionStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(Boolean(contractIds.nft));
 
@@ -64,7 +70,11 @@ export default function CommunityPage() {
 
     fetchData().catch((error: unknown) => {
       if (!cancelled) {
-        setStatus(error instanceof Error ? error.message : "Failed to load NFT data");
+        setStatus({
+          message:
+            error instanceof Error ? error.message : "Failed to load NFT data",
+          tone: "error",
+        });
       }
     });
     return () => {
@@ -97,7 +107,11 @@ export default function CommunityPage() {
         setVotes(null);
       }
     } catch (error: unknown) {
-      setStatus(error instanceof Error ? error.message : "Failed to load NFT data");
+      setStatus({
+        message:
+          error instanceof Error ? error.message : "Failed to load NFT data",
+        tone: "error",
+      });
     } finally {
       setInitialLoading(false);
     }
@@ -105,24 +119,33 @@ export default function CommunityPage() {
 
   async function handleMint() {
     if (!address) {
-      setStatus("Connect your wallet first.");
+      setStatus({ message: "Connect your wallet first.", tone: "error" });
       return;
     }
     if (!recipient || !tokenUri) {
-      setStatus("Recipient and IPFS URI are required.");
+      setStatus({
+        message: "Recipient and IPFS URI are required.",
+        tone: "error",
+      });
       return;
     }
 
     setLoading(true);
-    setStatus(null);
+    setStatus({ message: "Submitting mint transaction…", tone: "routine" });
     try {
       const client = createNftClient({ publicKey: address, signTransaction });
       const tx = await client.mint({ to: recipient, token_uri: tokenUri });
       const result = await tx.signAndSend();
-      setStatus(`Minted token #${result.result} successfully.`);
+      setStatus({
+        message: `Minted token #${result.result} successfully.`,
+        tone: "routine",
+      });
       await refresh();
     } catch (error: unknown) {
-      setStatus(error instanceof Error ? error.message : "Mint failed");
+      setStatus({
+        message: error instanceof Error ? error.message : "Mint failed",
+        tone: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -130,12 +153,15 @@ export default function CommunityPage() {
 
   async function handleDelegate() {
     if (!address) {
-      setStatus("Connect your wallet first.");
+      setStatus({ message: "Connect your wallet first.", tone: "error" });
       return;
     }
 
     setLoading(true);
-    setStatus(null);
+    setStatus({
+      message: "Submitting delegation transaction…",
+      tone: "routine",
+    });
     try {
       const client = createNftClient({ publicKey: address, signTransaction });
       const tx = await client.delegate({
@@ -143,10 +169,16 @@ export default function CommunityPage() {
         delegatee: address,
       });
       await tx.signAndSend();
-      setStatus("Delegated voting power to yourself.");
+      setStatus({
+        message: "Delegated voting power to yourself.",
+        tone: "routine",
+      });
       await refresh();
     } catch (error: unknown) {
-      setStatus(error instanceof Error ? error.message : "Delegate failed");
+      setStatus({
+        message: error instanceof Error ? error.message : "Delegate failed",
+        tone: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -171,6 +203,9 @@ export default function CommunityPage() {
         <div className="mt-6 space-y-6">
           {initialLoading ? (
             <section className="rounded-xl border border-slate-800 bg-[#151b2b] p-5">
+              <LiveStatus className="sr-only">
+                Loading community data…
+              </LiveStatus>
               <h2 className="font-semibold text-slate-100">Collection</h2>
               <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
                 <div>
@@ -286,13 +321,16 @@ export default function CommunityPage() {
       )}
 
       {status && (
-        <p
-          role="status"
-          aria-live="polite"
-          className="mt-4 break-words rounded-lg border border-slate-800 bg-[#151b2b] p-3 text-sm text-slate-200 [overflow-wrap:anywhere]"
+        <LiveStatus
+          tone={status.tone}
+          className={`mt-4 break-words rounded-lg border bg-[#151b2b] p-3 text-sm [overflow-wrap:anywhere] ${
+            status.tone === "error"
+              ? "border-rose-800/70 text-rose-200"
+              : "border-slate-800 text-slate-200"
+          }`}
         >
-          {status}
-        </p>
+          {status.message}
+        </LiveStatus>
       )}
     </div>
   );
