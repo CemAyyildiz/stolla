@@ -139,6 +139,19 @@ Add these environment variables in the Vercel project settings:
 After the first production deployment, Vercel will redeploy automatically when
 new commits are pushed to the production branch.
 
+### Monitor production health
+
+Set the repository Actions variable `PRODUCTION_HEALTH_URL` to the deployed
+health endpoint, for example `https://stolla.example/api/health`. The
+`Production health check` workflow requests it at minutes 17 and 47 of every
+hour (UTC) with a 10-second timeout and read-only repository permissions.
+
+The workflow can also be run manually from the Actions tab. Its optional
+`health_url` input overrides the repository variable for that run, which can be
+used to verify both healthy and intentionally failing endpoints. Network,
+timeout, HTTP-status, and unhealthy-payload failures are reported separately.
+URL credentials, query parameters, and fragments are omitted from logs.
+
 ## Useful commands
 
 | Command | Description |
@@ -148,6 +161,7 @@ new commits are pushed to the production branch.
 | `npm run lint` | Run frontend linting |
 | `npm run clean` | Remove generated Next.js and Turbopack state from the web workspace |
 | `npm run typecheck` | Type-check the web workspace (`tsc --noEmit`) |
+| `npm test` | Run frontend unit and production health-check tests |
 | `npm run test:e2e` | Run the Playwright mobile navigation smoke test |
 | `npm run test:e2e:ci` | Run Playwright with one CI worker |
 | `npm run build:contracts` | Build the Soroban contracts |
