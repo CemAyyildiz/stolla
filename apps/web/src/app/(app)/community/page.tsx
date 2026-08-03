@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useWallet } from "@/context/WalletProvider";
 import {
   createNftClient,
@@ -9,6 +9,10 @@ import {
 import { contractIds } from "@/lib/stellar";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { LiveStatus } from "@/components/ui/LiveStatus";
+import {
+  loadCommunityData,
+  runCommunityRefresh,
+} from "./community-data.mjs";
 
 type ActionStatus = {
   message: string;
@@ -26,98 +30,50 @@ export default function CommunityPage() {
   const [recipientError, setRecipientError] = useState<string | null>(null);
   const [tokenUriError, setTokenUriError] = useState<string | null>(null);
   const [status, setStatus] = useState<ActionStatus | null>(null);
+  const [dataLoadError, setDataLoadError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(Boolean(contractIds.nft));
 
   const contractsConfigured = Boolean(contractIds.nft);
 
-  const fetchRef = useRef(0);
+  const refresh = useCallback(async () => {
+    if (!contractsConfigured) return false;
 
-  useEffect(() => {
-    if (!contractsConfigured) return;
-
-    const id = ++fetchRef.current;
-    let cancelled = false;
-
-    const fetchData = async () => {
-      try {
-        const client = createReadOnlyNftClient();
-        const [collectionName, collectionSymbol] = await Promise.all([
-          client.name(),
-          client.symbol(),
-        ]);
-        if (cancelled || fetchRef.current !== id) return;
-        setName(collectionName.result ?? "");
-        setSymbol(collectionSymbol.result ?? "");
-
-        if (address) {
-          const userClient = createNftClient({ publicKey: address, signTransaction });
-          const [bal, votePower] = await Promise.all([
-            userClient.balance({ account: address }),
-            userClient.get_votes({ account: address }),
-          ]);
-          if (cancelled || fetchRef.current !== id) return;
-          setBalance(Number(bal.result ?? 0));
-          setVotes(String(votePower.result ?? 0));
-        } else {
-          setBalance(null);
-          setVotes(null);
-        }
-      } finally {
-        if (!cancelled && fetchRef.current === id) {
+    return runCommunityRefresh(
+      () =>
+        loadCommunityData({
+          address,
+          collectionClient: createReadOnlyNftClient(),
+          userClient: address
+            ? createNftClient({ publicKey: address, signTransaction })
+            : null,
+        }),
+      {
+        onStart() {
+          setRefreshing(true);
+          setDataLoadError(null);
+        },
+        onSuccess(data) {
+          setName(data.name);
+          setSymbol(data.symbol);
+          setBalance(data.balance);
+          setVotes(data.votes);
           setInitialLoading(false);
-        }
-      }
-    };
-
-    fetchData().catch((error: unknown) => {
-      if (!cancelled) {
-        setStatus({
-          message:
-            error instanceof Error ? error.message : "Failed to load NFT data",
-          tone: "error",
-        });
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
+          setRefreshing(false);
+        },
+        onError(message) {
+          setDataLoadError(message);
+          setInitialLoading(false);
+          setRefreshing(false);
+        },
+      },
+    );
   }, [address, contractsConfigured, signTransaction]);
 
-  async function refresh() {
-    if (!contractsConfigured) return;
-
-    try {
-      const client = createReadOnlyNftClient();
-      const [collectionName, collectionSymbol] = await Promise.all([
-        client.name(),
-        client.symbol(),
-      ]);
-      setName(collectionName.result ?? "");
-      setSymbol(collectionSymbol.result ?? "");
-
-      if (address) {
-        const userClient = createNftClient({ publicKey: address, signTransaction });
-        const [bal, votePower] = await Promise.all([
-          userClient.balance({ account: address }),
-          userClient.get_votes({ account: address }),
-        ]);
-        setBalance(Number(bal.result ?? 0));
-        setVotes(String(votePower.result ?? 0));
-      } else {
-        setBalance(null);
-        setVotes(null);
-      }
-    } catch (error: unknown) {
-      setStatus({
-        message:
-          error instanceof Error ? error.message : "Failed to load NFT data",
-        tone: "error",
-      });
-    } finally {
-      setInitialLoading(false);
-    }
-  }
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
   async function handleMint() {
     if (!address) {
@@ -204,6 +160,36 @@ export default function CommunityPage() {
 
       {contractsConfigured && (
         <div className="mt-6 space-y-6">
+          {dataLoadError && (
+            <section
+              aria-labelledby="community-data-error-title"
+              className="rounded-xl border border-rose-800/70 bg-rose-950/40 p-5"
+              role="alert"
+            >
+              <h2
+                className="font-semibold text-rose-100"
+                id="community-data-error-title"
+              >
+                Community data could not be loaded
+              </h2>
+              <p className="mt-2 text-sm text-rose-200">{dataLoadError}</p>
+              <button
+                type="button"
+                onClick={() => void refresh()}
+                disabled={refreshing}
+                className="mt-4 rounded-lg border border-rose-700 px-4 py-2 text-sm font-medium text-rose-100 hover:bg-rose-900/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300 disabled:opacity-50"
+              >
+                {refreshing ? "Retrying..." : "Retry loading community data"}
+              </button>
+            </section>
+          )}
+
+          {refreshing && (
+            <LiveStatus className="text-sm text-slate-400">
+              Loading community data...
+            </LiveStatus>
+          )}
+
           {initialLoading ? (
             <section className="rounded-xl border border-slate-800 bg-[#151b2b] p-5">
               <LiveStatus className="sr-only">
