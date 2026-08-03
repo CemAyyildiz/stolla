@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useWallet } from "@/context/WalletProvider";
 import { truncateMiddle } from "@/lib/truncate";
+import { LiveStatus } from "@/components/ui/LiveStatus";
 
 const navItems = [
   { href: "/community", label: "Community" },
@@ -165,7 +166,9 @@ export function Header() {
                 onClick={connect}
                 disabled={isConnecting}
                 aria-describedby={
-                  connectionError ? "wallet-connection-error" : undefined
+                  isConnecting || connectionError
+                    ? "wallet-connection-status"
+                    : undefined
                 }
                 className="rounded-lg bg-indigo-500 px-3 py-2 text-sm font-medium text-white transition hover:bg-indigo-400 disabled:opacity-50 sm:px-4"
               >
@@ -173,14 +176,23 @@ export function Header() {
               </button>
             )}
           </div>
-          {connectionError && !address ? (
-            <p
-              id="wallet-connection-error"
-              role="alert"
+          {isConnecting ? (
+            <LiveStatus
+              id="wallet-connection-status"
+              className="max-w-64 text-right text-xs text-slate-400"
+            >
+              Connecting to wallet…
+            </LiveStatus>
+          ) : connectionError && !address ? (
+            <LiveStatus
+              id="wallet-connection-status"
+              tone="error"
               className="max-w-64 text-right text-xs text-rose-300"
             >
               {connectionError.message}
-            </p>
+            </LiveStatus>
+          ) : address ? (
+            <LiveStatus className="sr-only">Wallet connected.</LiveStatus>
           ) : null}
         </div>
       </div>

@@ -14,8 +14,13 @@ import { ProposalState } from "@/lib/bindings/community-governor/src";
 import { contractIds } from "@/lib/stellar";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { truncateEnd, truncateMiddle } from "@/lib/truncate";
+import { LiveStatus } from "@/components/ui/LiveStatus";
 
 type ProposalLoadStatus = "loading" | "empty" | "error" | "populated";
+type ActionStatus = {
+  message: string;
+  tone: "routine" | "error";
+};
 
 const stateLabels: Record<ProposalState, string> = {
   [ProposalState.Pending]: "Pending",
@@ -36,7 +41,7 @@ export default function ProposalsPage() {
   const [failedProposalIds, setFailedProposalIds] = useState<string[]>([]);
   const [proposalLoadStatus, setProposalLoadStatus] =
     useState<ProposalLoadStatus>("loading");
-  const [status, setStatus] = useState<string | null>(null);
+  const [status, setStatus] = useState<ActionStatus | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const contractsConfigured = Boolean(contractIds.governor);
@@ -83,16 +88,19 @@ export default function ProposalsPage() {
 
   async function handleCreateProposal() {
     if (!address) {
-      setStatus("Connect your wallet first.");
+      setStatus({ message: "Connect your wallet first.", tone: "error" });
       return;
     }
     if (!description.trim()) {
-      setStatus("Description is required.");
+      setStatus({ message: "Description is required.", tone: "error" });
       return;
     }
 
     setSubmitting(true);
-    setStatus(null);
+    setStatus({
+      message: "Submitting proposal transaction…",
+      tone: "routine",
+    });
     try {
       const client = createGovernorClient({ publicKey: address, signTransaction });
       const target = address;
@@ -107,10 +115,16 @@ export default function ProposalsPage() {
       const idHex = Buffer.from(result.result).toString("hex");
       storeProposalId(idHex);
       setDescription("");
-      setStatus(`Proposal created: ${truncateEnd(idHex, 12)}`);
+      setStatus({
+        message: `Proposal created: ${truncateEnd(idHex, 12)}`,
+        tone: "routine",
+      });
       await loadProposals();
     } catch (error: unknown) {
-      setStatus(error instanceof Error ? error.message : "Proposal failed");
+      setStatus({
+        message: error instanceof Error ? error.message : "Proposal failed",
+        tone: "error",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -149,20 +163,23 @@ export default function ProposalsPage() {
             {submitting ? "Submitting..." : "Create proposal"}
           </button>
           {status && (
-            <p
-              role="status"
-              aria-live="polite"
-              className="mt-3 min-w-0 break-words rounded-lg border border-slate-800 bg-[#0b0f19] p-3 text-sm text-slate-200 [overflow-wrap:anywhere]"
+            <LiveStatus
+              tone={status.tone}
+              className={`mt-3 min-w-0 break-words rounded-lg border bg-[#0b0f19] p-3 text-sm [overflow-wrap:anywhere] ${
+                status.tone === "error"
+                  ? "border-rose-800/70 text-rose-200"
+                  : "border-slate-800 text-slate-200"
+              }`}
             >
-              {status}
-            </p>
+              {status.message}
+            </LiveStatus>
           )}
         </section>
       )}
 
       <section className="mt-6">
         <h2 className="font-semibold text-slate-100">Your proposals</h2>
-        <div aria-live="polite">
+        <div>
           {proposalLoadStatus === "loading" && (
             <ul className="mt-3 space-y-2">
               {Array.from({ length: Math.max(proposalIds.length || 3, 1) }).map(
@@ -179,9 +196,9 @@ export default function ProposalsPage() {
           )}
 
           {proposalLoadStatus === "loading" && (
-            <span className="sr-only" role="status">
+            <LiveStatus className="sr-only">
               Loading proposal history...
-            </span>
+            </LiveStatus>
           )}
 
           {proposalLoadStatus === "error" && (
@@ -206,13 +223,18 @@ export default function ProposalsPage() {
           )}
 
           {proposalLoadStatus === "empty" && (
-            <p className="mt-3 rounded-lg border border-dashed border-slate-700 bg-slate-900/40 p-4 text-sm text-slate-400">
+            <LiveStatus className="mt-3 rounded-lg border border-dashed border-slate-700 bg-slate-900/40 p-4 text-sm text-slate-400">
               No proposals yet.
-            </p>
+            </LiveStatus>
           )}
 
           {proposalLoadStatus === "populated" && (
             <>
+              {failedProposalIds.length === 0 && (
+                <LiveStatus className="sr-only">
+                  Proposal history loaded.
+                </LiveStatus>
+              )}
               {failedProposalIds.length > 0 && (
                 <div
                   className="mt-3 flex flex-col gap-3 rounded-lg border border-amber-800/70 bg-amber-950/40 p-4 text-sm text-amber-200 sm:flex-row sm:items-center sm:justify-between"

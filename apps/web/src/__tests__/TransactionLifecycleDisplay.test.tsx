@@ -156,7 +156,12 @@ describe("TransactionLifecycleDisplay", () => {
     );
     const statusEl = screen.getByRole("status");
     expect(statusEl).toHaveAttribute("aria-live", "polite");
-    expect(statusEl).toHaveAttribute("aria-label", "Transaction status: Simulating transaction…");
+    expect(statusEl).toHaveTextContent(
+      "Transaction update: Simulating transaction…",
+    );
+    expect(
+      screen.getByLabelText("Transaction status: Simulating transaction…"),
+    ).toBeInTheDocument();
   });
 
   it("shows please wait for active stages", () => {
@@ -237,5 +242,7 @@ describe("TransactionLifecycleDisplay", () => {
     );
     const srOnly = screen.getByText("Wallet rejected the transaction. Your vote was not submitted.");
     expect(srOnly).toHaveClass("sr-only");
+    expect(srOnly).toHaveAttribute("role", "alert");
+    expect(srOnly).toHaveAttribute("aria-live", "assertive");
   });
 });

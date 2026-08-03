@@ -1,6 +1,7 @@
 "use client";
 
 import { type TransactionStage } from "@/hooks/useTransactionLifecycle";
+import { LiveStatus } from "@/components/ui/LiveStatus";
 
 /**
  * Maps each lifecycle stage to a display label.
@@ -33,6 +34,30 @@ const STAGE_COLORS: Record<TransactionStage, string> = {
   submission_failed: "bg-rose-500",
   duplicate_vote: "bg-amber-500",
 };
+
+const FAILURE_STAGES = new Set<TransactionStage>([
+  "wallet_rejected",
+  "simulation_failed",
+  "submission_failed",
+  "duplicate_vote",
+]);
+
+function lifecycleAnnouncement(stage: TransactionStage, error: string | null) {
+  switch (stage) {
+    case "confirmed":
+      return "Vote successfully submitted and confirmed.";
+    case "wallet_rejected":
+      return "Wallet rejected the transaction. Your vote was not submitted.";
+    case "duplicate_vote":
+      return "You have already voted on this proposal.";
+    case "submission_failed":
+      return `Vote submission failed: ${error ?? "unknown error"}. You can retry.`;
+    case "simulation_failed":
+      return `Transaction simulation failed: ${error ?? "unknown error"}.`;
+    default:
+      return `Transaction update: ${STAGE_LABELS[stage]}`;
+  }
+}
 
 /**
  * Icons for each stage.
@@ -141,12 +166,11 @@ export function TransactionLifecycleDisplay({
   const colorClass = STAGE_COLORS[stage];
   const label = STAGE_LABELS[stage];
   const isActive = !isTerminal;
+  const isFailure = FAILURE_STAGES.has(stage);
 
   return (
     <div
       className="mt-4 rounded-xl border border-slate-800 bg-[#151b2b] p-5"
-      role="status"
-      aria-live="polite"
       aria-label={`Transaction status: ${label}`}
     >
       {/* Stage indicator */}
@@ -184,19 +208,14 @@ export function TransactionLifecycleDisplay({
 
       {/* Error display */}
       {error && (
-        <p className="mt-3 text-sm text-rose-400" role="alert">
+        <p className="mt-3 text-sm text-rose-400">
           {error}
         </p>
       )}
 
-      {/* Accessible announcement for screen readers */}
-      <span className="sr-only" aria-live="assertive">
-        {stage === "confirmed" && "Vote successfully submitted and confirmed."}
-        {stage === "wallet_rejected" && "Wallet rejected the transaction. Your vote was not submitted."}
-        {stage === "duplicate_vote" && "You have already voted on this proposal."}
-        {stage === "submission_failed" && `Vote submission failed: ${error ?? "unknown error"}. You can retry.`}
-        {stage === "simulation_failed" && `Transaction simulation failed: ${error ?? "unknown error"}.`}
-      </span>
+      <LiveStatus tone={isFailure ? "error" : "routine"} className="sr-only">
+        {lifecycleAnnouncement(stage, error)}
+      </LiveStatus>
     </div>
   );
 }

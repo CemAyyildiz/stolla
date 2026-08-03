@@ -12,6 +12,7 @@ import { parseProposalId } from "@/lib/proposals";
 import { useTransactionLifecycle } from "@/hooks/useTransactionLifecycle";
 import { TransactionLifecycleDisplay } from "@/components/TransactionLifecycleDisplay";
 import { truncateMiddle } from "@/lib/truncate";
+import { LiveStatus } from "@/components/ui/LiveStatus";
 
 const stateLabels: Record<ProposalState, string> = {
   [ProposalState.Pending]: "Pending",
@@ -140,10 +141,10 @@ export default function ProposalDetailPage() {
         <h1 className="text-2xl font-bold text-slate-100">
           Invalid proposal ID
         </h1>
-        <p className="mt-2 break-all text-slate-400">
+        <LiveStatus tone="error" className="mt-2 break-all text-slate-400">
           <code className="font-mono">{proposalIdHex}</code> is not a valid
           32-byte proposal identifier.
-        </p>
+        </LiveStatus>
         <Link href="/proposals" className={backLinkClassName}>
           Back to proposals
         </Link>
@@ -157,11 +158,11 @@ export default function ProposalDetailPage() {
         <h1 className="text-2xl font-bold text-slate-100">
           Proposal unavailable
         </h1>
-        <p className="mt-2 break-all text-slate-400">
+        <LiveStatus tone="error" className="mt-2 break-all text-slate-400">
           We couldn&apos;t load proposal{" "}
           <code className="font-mono">{proposalIdHex}</code>. It may not exist,
           or the network may be temporarily unavailable.
-        </p>
+        </LiveStatus>
         <Link href="/proposals" className={backLinkClassName}>
           Back to proposals
         </Link>
@@ -172,6 +173,7 @@ export default function ProposalDetailPage() {
   if (isLoading) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-10">
+        <LiveStatus className="sr-only">Loading proposal…</LiveStatus>
         <h1 className="text-2xl font-bold text-slate-100">Proposal</h1>
         <div className="mt-2 flex items-center gap-2">
           <p
@@ -282,9 +284,12 @@ export default function ProposalDetailPage() {
       />
 
       {status && (
-        <p className="mt-4 rounded-lg border border-slate-800 bg-[#151b2b] p-3 text-sm text-slate-200">
+        <LiveStatus
+          tone="error"
+          className="mt-4 rounded-lg border border-rose-800/70 bg-[#151b2b] p-3 text-sm text-rose-200"
+        >
           {status}
-        </p>
+        </LiveStatus>
       )}
     </div>
   );

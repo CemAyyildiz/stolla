@@ -5,11 +5,8 @@ export function Skeleton({
   return (
     <div
       className={`motion-safe:animate-pulse rounded-md bg-slate-800 ${className ?? ""}`}
-      role="status"
-      aria-label="Loading"
+      aria-hidden="true"
       {...props}
-    >
-      <span className="sr-only">Loading...</span>
-    </div>
+    />
   );
 }
