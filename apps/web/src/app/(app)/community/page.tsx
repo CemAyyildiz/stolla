@@ -96,6 +96,8 @@ export default function CommunityPage() {
         setBalance(null);
         setVotes(null);
       }
+    } catch (error: unknown) {
+      setStatus(error instanceof Error ? error.message : "Failed to load NFT data");
     } finally {
       setInitialLoading(false);
     }
