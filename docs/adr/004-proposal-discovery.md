@@ -160,6 +160,7 @@ with RPC remaining the ingestion source.
 
 - #35 Add a retryable RPC error state to the community page
 - #36 Inventory the Governor proposal and vote event surface
+  ([inventory](../governor-event-surface.md))
 - #37 Add a testnet RPC client for querying Governor events
 - #38 Add a regression test for proposal creation events
 - #39 Define and test a typed proposal event decoder
