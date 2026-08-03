@@ -153,14 +153,14 @@ export default function CommunityPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
+    <div className="mx-auto w-full min-w-0 max-w-3xl px-4 py-10">
       <h1 className="text-2xl font-bold text-slate-100">Community NFT</h1>
       <p className="mt-2 text-slate-400">
         Mint membership NFTs and delegate voting power on testnet.
       </p>
 
       {!contractsConfigured && (
-        <p className="mt-6 rounded-lg border border-amber-800/60 bg-amber-950/50 p-4 text-sm text-amber-200">
+        <p className="mt-6 break-words rounded-lg border border-amber-800/60 bg-amber-950/50 p-4 text-sm text-amber-200 [overflow-wrap:anywhere]">
           Contract IDs are not set. Deploy contracts and configure{" "}
           <code className="font-mono">NEXT_PUBLIC_NFT_CONTRACT_ID</code> in{" "}
           <code className="font-mono">.env.local</code>.
@@ -224,31 +224,59 @@ export default function CommunityPage() {
             </section>
           )}
 
-          <section className="rounded-xl border border-slate-800 bg-[#151b2b] p-5">
-            <h2 className="font-semibold text-slate-100">Mint NFT (owner only)</h2>
-            <div className="mt-4 space-y-3">
-              <label className="block text-sm">
-                <span className="text-slate-400">Recipient address</span>
+          <section className="min-w-0 rounded-xl border border-slate-800 bg-[#151b2b] p-4 sm:p-5">
+            <h2 className="break-words font-semibold text-slate-100">
+              Mint NFT (owner only)
+            </h2>
+            <div className="mt-4 min-w-0 space-y-4">
+              <label className="block min-w-0 text-sm">
+                <span className="block break-words text-slate-400">
+                  Recipient address
+                </span>
                 <input
+                  type="text"
                   value={recipient}
                   onChange={(e) => setRecipient(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600"
+                  aria-describedby="recipient-help"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className="mt-1 block min-h-11 w-full min-w-0 max-w-full overflow-x-auto rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400"
                   placeholder="G..."
                 />
+                <span
+                  id="recipient-help"
+                  className="mt-1 block break-words text-xs leading-5 text-slate-500"
+                >
+                  Long addresses scroll within the field.
+                </span>
               </label>
-              <label className="block text-sm">
-                <span className="text-slate-400">IPFS metadata URI</span>
+              <label className="block min-w-0 text-sm">
+                <span className="block break-words text-slate-400">
+                  IPFS metadata URI
+                </span>
                 <input
+                  type="text"
                   value={tokenUri}
                   onChange={(e) => setTokenUri(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600"
+                  aria-describedby="token-uri-help"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className="mt-1 block min-h-11 w-full min-w-0 max-w-full overflow-x-auto rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400"
                 />
+                <span
+                  id="token-uri-help"
+                  className="mt-1 block break-words text-xs leading-5 text-slate-500"
+                >
+                  Long URIs scroll within the field.
+                </span>
               </label>
               <button
                 type="button"
                 onClick={handleMint}
                 disabled={!address || loading}
-                className="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400 disabled:opacity-50"
+                className="min-h-11 w-full touch-manipulation rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400 disabled:opacity-50 sm:w-auto"
               >
                 {loading ? "Submitting..." : "Mint NFT"}
               </button>
@@ -258,7 +286,11 @@ export default function CommunityPage() {
       )}
 
       {status && (
-        <p className="mt-4 rounded-lg border border-slate-800 bg-[#151b2b] p-3 text-sm text-slate-200">
+        <p
+          role="status"
+          aria-live="polite"
+          className="mt-4 break-words rounded-lg border border-slate-800 bg-[#151b2b] p-3 text-sm text-slate-200 [overflow-wrap:anywhere]"
+        >
           {status}
         </p>
       )}
