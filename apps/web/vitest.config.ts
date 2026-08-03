@@ -3,12 +3,14 @@ import path from "path";
 
 export default defineConfig({
   test: {
-    // Use jsdom environment so localStorage and other DOM APIs are available.
     environment: "jsdom",
+    globals: true,
+    setupFiles: ["./src/__tests__/setup.ts"],
+    include: ["src/**/*.test.{ts,tsx}"],
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(__dirname, "src"),
     },
   },
 });
