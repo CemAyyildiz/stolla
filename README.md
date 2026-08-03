@@ -146,11 +146,17 @@ new commits are pushed to the production branch.
 | `npm run dev` | Start the Next.js development server |
 | `npm run build` | Create a production web build |
 | `npm run lint` | Run frontend linting |
+| `npm run clean` | Remove generated Next.js and Turbopack state from the web workspace |
 | `npm run typecheck` | Type-check the web workspace (`tsc --noEmit`) |
 | `npm run test:e2e` | Run the Playwright mobile navigation smoke test |
 | `npm run test:e2e:ci` | Run Playwright with one CI worker |
 | `npm run build:contracts` | Build the Soroban contracts |
 | `npm run test:contracts` | Run the contract test suite |
+
+Run `npm run clean` when stale development state causes Next.js or Turbopack
+manifest/cache errors, then restart the development server. The command only
+removes `apps/web/.next` and `apps/web/.turbo`; it preserves source and
+environment files, dependencies, npm caches, and the root lockfile.
 
 ## End-to-end flow
 

@@ -13,6 +13,7 @@
     "prebuild": "npm run check:workspace",
     "build": "npm run build --workspace=web",
     "lint": "npm run lint --workspace=web",
+    "clean": "node scripts/clean.mjs",
     "typecheck": "npm run typecheck --workspace=web",
     "test": "npm run test --workspace=web",
     "test:e2e": "npm run test:e2e --workspace=web",
