@@ -36,6 +36,7 @@ const stateLabels: Record<ProposalState, string> = {
 export default function ProposalsPage() {
   const { address, signTransaction } = useWallet();
   const [description, setDescription] = useState("");
+  const [descriptionError, setDescriptionError] = useState<string | null>(null);
   const [proposalIds, setProposalIds] = useState<string[]>([]);
   const [states, setStates] = useState<Record<string, string>>({});
   const [failedProposalIds, setFailedProposalIds] = useState<string[]>([]);
@@ -92,10 +93,12 @@ export default function ProposalsPage() {
       return;
     }
     if (!description.trim()) {
-      setStatus({ message: "Description is required.", tone: "error" });
+      setDescriptionError("Proposal description is required.");
+      setStatus(null);
       return;
     }
 
+    setDescriptionError(null);
     setSubmitting(true);
     setStatus({
       message: "Submitting proposal transaction…",
@@ -147,13 +150,44 @@ export default function ProposalsPage() {
       {contractsConfigured && (
         <section className="mt-6 min-w-0 rounded-xl border border-slate-800 bg-[#151b2b] p-4 sm:p-5">
           <h2 className="font-semibold text-slate-100">Create proposal</h2>
+          <label
+            htmlFor="proposal-description"
+            className="mt-3 block text-sm text-slate-400"
+          >
+            Proposal description{" "}
+            <span className="text-slate-500">(required)</span>
+          </label>
           <textarea
+            id="proposal-description"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(e) => {
+              setDescription(e.target.value);
+              setDescriptionError(null);
+            }}
             rows={3}
-            className="mt-3 box-border w-full min-w-0 resize-y rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600"
+            required
+            aria-describedby={`proposal-description-help${
+              descriptionError ? " proposal-description-error" : ""
+            }`}
+            aria-invalid={Boolean(descriptionError)}
+            className="mt-1 box-border w-full min-w-0 resize-y rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600"
             placeholder="Describe the community decision..."
           />
+          <p
+            id="proposal-description-help"
+            className="mt-1 text-xs text-slate-500"
+          >
+            Summarize the decision and intended action recorded with the proposal.
+          </p>
+          {descriptionError && (
+            <p
+              id="proposal-description-error"
+              role="alert"
+              className="mt-1 text-xs text-rose-300"
+            >
+              {descriptionError}
+            </p>
+          )}
           <button
             type="button"
             onClick={handleCreateProposal}

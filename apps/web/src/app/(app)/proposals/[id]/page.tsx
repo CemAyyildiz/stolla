@@ -240,14 +240,24 @@ export default function ProposalDetailPage() {
 
       <section className="mt-6 rounded-xl border border-slate-800 bg-[#151b2b] p-5">
         <h2 className="font-semibold text-slate-100">Cast vote</h2>
+        <label
+          htmlFor="vote-reason"
+          className="mt-3 block text-sm text-slate-400"
+        >
+          Vote reason <span className="text-slate-500">(optional)</span>
+        </label>
         <input
+          id="vote-reason"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           disabled={isVotingDisabled}
-          className="mt-3 w-full rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 disabled:opacity-50"
+          aria-describedby="vote-reason-help"
+          className="mt-1 w-full rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 disabled:opacity-50"
           placeholder="Reason (optional)"
-          aria-label="Vote reason"
         />
+        <p id="vote-reason-help" className="mt-1 text-xs text-slate-500">
+          This reason is recorded with your vote.
+        </p>
         <div className="mt-3">
           <VoteActions
             disabled={isVotingDisabled}
