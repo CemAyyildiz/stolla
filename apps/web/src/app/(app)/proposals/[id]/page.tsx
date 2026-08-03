@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useWallet } from "@/context/WalletProvider";
+import { VoteActions } from "@/components/VoteActions";
+import type { VoteType } from "@/components/voteOptions.mjs";
 import { createGovernorClient } from "@/lib/contracts";
 import { ProposalState } from "@/lib/bindings/community-governor/src";
 import { contractIds } from "@/lib/stellar";
@@ -98,7 +100,7 @@ export default function ProposalDetailPage() {
       },
     });
 
-  async function handleVote(voteType: number) {
+  async function handleVote(voteType: VoteType) {
     const proposalId = parseProposalId(proposalIdHex);
     if (!proposalId) return;
     if (!address) {
@@ -134,6 +136,9 @@ export default function ProposalDetailPage() {
     txLifecycle.stage === "wallet_approval" ||
     txLifecycle.stage === "submitting" ||
     txLifecycle.stage === "confirming";
+  const pendingVote = isVotingDisabled
+    ? (txLifecycle.voteType as VoteType | null)
+    : null;
 
   if (isInvalid) {
     return (
@@ -243,34 +248,17 @@ export default function ProposalDetailPage() {
           placeholder="Reason (optional)"
           aria-label="Vote reason"
         />
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => handleVote(1)}
+        <div className="mt-3">
+          <VoteActions
             disabled={isVotingDisabled}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
-            aria-label="Vote For"
-          >
-            For
-          </button>
-          <button
-            type="button"
-            onClick={() => handleVote(0)}
-            disabled={isVotingDisabled}
-            className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-50"
-            aria-label="Vote Against"
-          >
-            Against
-          </button>
-          <button
-            type="button"
-            onClick={() => handleVote(2)}
-            disabled={isVotingDisabled}
-            className="rounded-lg bg-slate-600 px-4 py-2 text-sm font-medium text-white hover:bg-slate-500 disabled:opacity-50"
-            aria-label="Vote Abstain"
-          >
-            Abstain
-          </button>
+            pendingVote={pendingVote}
+            onVote={handleVote}
+          />
+          {!address && (
+            <p className="mt-2 text-xs text-slate-400">
+              Connect your wallet to enable voting.
+            </p>
+          )}
         </div>
       </section>
 
