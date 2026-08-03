@@ -30,50 +30,64 @@ export default function ProposalDetailPage() {
   const [hasVoted, setHasVoted] = useState<boolean | null>(null);
   const [reason, setReason] = useState("Support");
   const [status, setStatus] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
-  const refresh = useCallback(async () => {
-    if (!contractIds.governor || !proposalIdHex) {
-      setInitialLoading(false);
-      return;
-    }
+  const fetchProposalState = useCallback(async () => {
+    if (!contractIds.governor || !proposalIdHex) return null;
+    const client = createGovernorClient({
+      publicKey: address ?? "",
+      signTransaction,
+    });
+    const proposalId = Buffer.from(proposalIdHex, "hex");
 
-    try {
-      const client = createGovernorClient({
-        publicKey: address ?? "",
-        signTransaction,
-      });
-      const proposalId = Buffer.from(proposalIdHex, "hex");
+    const [stateTx, votedTx] = await Promise.all([
+      client.proposal_state({ proposal_id: proposalId }),
+      address
+        ? client.has_voted({ proposal_id: proposalId, account: address })
+        : Promise.resolve(null),
+    ]);
 
-      const [stateTx, votedTx] = await Promise.all([
-        client.proposal_state({ proposal_id: proposalId }),
-        address
-          ? client.has_voted({ proposal_id: proposalId, account: address })
-          : Promise.resolve(null),
-      ]);
-
-      setState(stateLabels[stateTx.result ?? ProposalState.Pending]);
-      if (votedTx) {
-        setHasVoted(Boolean(votedTx.result));
-      }
-    } finally {
-      setInitialLoading(false);
-    }
+    return {
+      state: stateTx.result ?? ProposalState.Pending,
+      hasVoted: votedTx ? Boolean(votedTx.result) : null,
+    };
   }, [address, proposalIdHex, signTransaction]);
 
   useEffect(() => {
-    refresh().catch((error: unknown) => {
-      setStatus(error instanceof Error ? error.message : "Failed to load proposal");
-    });
-  }, [refresh]);
+    let active = true;
+
+    fetchProposalState()
+      .then((data) => {
+        if (!active || !data) return;
+        setState(stateLabels[data.state]);
+        setHasVoted(data.hasVoted);
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setStatus(error instanceof Error ? error.message : "Failed to load proposal");
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setInitialLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [fetchProposalState]);
 
   // Transaction lifecycle management
   const { state: txLifecycle, execute: executeVote, reset: resetLifecycle } =
     useTransactionLifecycle({
       onConfirmed: async () => {
         // Refresh has_voted, proposal state, and available vote data after confirmation
-        await refresh();
+        const data = await fetchProposalState();
+        if (data) {
+          setState(stateLabels[data.state]);
+          setHasVoted(data.hasVoted);
+        }
       },
     });
 
