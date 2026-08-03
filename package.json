@@ -13,14 +13,14 @@
     "prebuild": "npm run check:workspace",
     "build": "npm run build --workspace=web",
     "lint": "npm run lint --workspace=web",
+    "clean": "node scripts/clean.mjs",
+    "typecheck": "npm run typecheck --workspace=web",
+    "test": "npm run test --workspace=web && node --test scripts/check-production-health.test.mjs",
+    "test:web": "npm run test --workspace=web",
+    "test:e2e": "npm run test:e2e --workspace=web",
+    "test:e2e:ci": "npm run test:e2e:ci --workspace=web",
     "test:contracts": "cd contracts && cargo test",
-    "build:contracts": "cd contracts && CARGO_TARGET_DIR=target stellar contract build"
-  },
-  "dependencies": {
-    "jest": "^30.4.2",
-    "stellar-sdk": "^13.3.0"
-  },
-  "devDependencies": {
-    "jest-environment-jsdom": "^30.4.1"
+    "build:contracts": "cd contracts && CARGO_TARGET_DIR=target stellar contract build",
+    "smoke": "node scripts/smoke-dev-server.mjs"
   }
 }

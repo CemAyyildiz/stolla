@@ -1,13 +1,22 @@
-import { SorobanRpc } from "@stellar/stellar-sdk";
-import retry from "async-retry";
+import { rpc, xdr } from "@stellar/stellar-sdk";
 import { config, contractIds } from "./stellar";
 
-const PROPOSAL_TOPICS = [
+export const PROPOSAL_EVENT_NAMES = [
   "proposal_created",
   "proposal_executed",
   "proposal_cancelled",
   "vote_cast",
-];
+] as const;
+
+const PROPOSAL_EVENT_TOPIC_FILTERS = PROPOSAL_EVENT_NAMES.map((name) => [
+  xdr.ScVal.scvSymbol(name).toXDR("base64"),
+]);
+
+export type ProposalEventsPage = {
+  events: rpc.Api.EventResponse[];
+  latestLedger: number;
+  cursor: string;
+};
 
 /**
  * Queries the Soroban RPC for proposal events.
@@ -19,7 +28,7 @@ const PROPOSAL_TOPICS = [
 export async function getProposalEvents(
   startLedger: number,
   cursor?: string,
-) {
+): Promise<ProposalEventsPage> {
   const { governor } = contractIds;
 
   if (!governor) {
@@ -28,56 +37,44 @@ export async function getProposalEvents(
     );
   }
 
-  const server = new SorobanRpc.Server(config.rpcUrl, {
+  const server = new rpc.Server(config.rpcUrl, {
     allowHttp: config.rpcUrl.startsWith("http://"),
   });
-
-  const response = await retry(
-    async () =>
-      server.getEvents({
-        startLedger,
-        filters: [
-          {
-            type: "contract",
-            contractIds: [governor],
-          },
-          {
-            type: "topic",
-            // The `getEvents` method in the version of the SDK being used does not
-            // support OR filters on topics. It only supports a single list of topic
-            // segments that are AND-ed.
-            //
-            // A wildcard '*' can be used to match any topic segment. To match all
-            // four of the proposal topics, a wildcard is used for the event name.
-            // This means the filter will match ANY event from the governor contract,
-            // and the caller will need to perform a second level of filtering.
-            //
-            // NOTE: If the SDK is updated to support OR filters, this can be
-            // updated to be more specific. For example:
-            //
-            // segments: PROPOSAL_TOPICS.map(topic => [topic])
-            segments: ["*"],
-          },
-        ],
-        cursor,
-        limit: 10,
-      }),
+  const filters = [
     {
-      retries: 3, // Attempt a total of 4 times
+      type: "contract" as const,
+      contractIds: [governor],
+      topics: PROPOSAL_EVENT_TOPIC_FILTERS,
     },
-  );
+  ];
 
-  // The RPC server may return events that are not in our PROPOSAL_TOPICS list
-  // because we are using a wildcard. This filters those out.
-  const filteredEvents =
-    response.events?.filter((event) => {
-      const eventName = event.topic[0].toString();
-      return PROPOSAL_TOPICS.includes(eventName);
-    }) ?? [];
+  try {
+    const response = await server.getEvents(
+      cursor
+        ? ({
+            startLedger,
+            filters,
+            cursor,
+            limit: 10,
+          } as unknown as Parameters<rpc.Server["getEvents"]>[0])
+        : ({
+            startLedger,
+            filters,
+            limit: 10,
+          } as unknown as Parameters<rpc.Server["getEvents"]>[0]),
+    );
 
-  return {
-    events: filteredEvents,
-    latestLedger: response.latestLedger,
-    cursor: response.cursor,
-  };
+    return {
+      events: response.events ?? [],
+      latestLedger: response.latestLedger,
+      cursor: response.cursor,
+    };
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Unknown RPC query failure.";
+
+    throw new Error(
+      `Failed to query governor proposal events: ${message}`,
+    );
+  }
 }

@@ -1,20 +1,34 @@
-import { SorobanRpc } from "@stellar/stellar-sdk";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getProposalEvents } from "./proposal-events";
-import { contractIds, config } from "./stellar";
+import { contractIds } from "./stellar";
 
-// Mock the SorobanRpc.Server
-const mockGetEvents = jest.fn();
-const mockServerInstance = { getEvents: mockGetEvents };
-const mockServerConstructor = jest.fn().mockImplementation(() => mockServerInstance);
+const { mockGetEvents, mockServerConstructor } = vi.hoisted(() => {
+  const getEvents = vi.fn();
+  const serverConstructor = vi.fn(function MockServer() {
+    return { getEvents };
+  });
 
-jest.mock("@stellar/stellar-sdk", () => ({
-  ...jest.requireActual("@stellar/stellar-sdk"),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  SorobanRpc: { Server: (url: any, opts: any) => mockServerConstructor(url, opts) },
-}));
+  return {
+    mockGetEvents: getEvents,
+    mockServerConstructor: serverConstructor,
+  };
+});
 
-// Mock the stellar config
-jest.mock("./stellar", () => ({
+vi.mock("@stellar/stellar-sdk", async () => {
+  const actual = await vi.importActual<typeof import("@stellar/stellar-sdk")>(
+    "@stellar/stellar-sdk",
+  );
+
+  return {
+    ...actual,
+    rpc: {
+      ...actual.rpc,
+      Server: mockServerConstructor,
+    },
+  };
+});
+
+vi.mock("./stellar", () => ({
   config: {
     rpcUrl: "https://test.rpc.url",
   },
@@ -25,43 +39,52 @@ jest.mock("./stellar", () => ({
 
 describe("getProposalEvents", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
-  it("should throw an error if governor contract ID is not configured", async () => {
-    // @ts-ignore
+  it("throws if governor contract ID is not configured", async () => {
     contractIds.governor = "";
     await expect(getProposalEvents(1)).rejects.toThrow(
       "Governor contract ID is not configured. Set NEXT_PUBLIC_GOVERNOR_CONTRACT_ID.",
     );
-    // @ts-ignore
-    contractIds.governor = "C123456789"; // Restore for other tests
+    contractIds.governor = "C123456789";
   });
 
-  it("should call getEvents with the correct parameters", async () => {
-    mockGetEvents.mockResolvedValue({ events: [] });
+  it("calls getEvents with the correct parameters", async () => {
+    mockGetEvents.mockResolvedValue({
+      events: [],
+      latestLedger: 456,
+      cursor: "nextCursor",
+    });
     await getProposalEvents(123, "cursor123");
 
-    expect(mockServerConstructor).toHaveBeenCalledWith("https://test.rpc.url", { "allowHttp": false });
-    expect(mockGetEvents).toHaveBeenCalledWith({
-      startLedger: 123,
-      filters: [
-        {
-          type: "contract",
-          contractIds: ["C123456789"],
-        },
-        {
-          type: "topic",
-          segments: ["*"],
-        },
-      ],
-      cursor: "cursor123",
-      limit: 10,
-    });
+    expect(mockServerConstructor).toHaveBeenCalledWith(
+      "https://test.rpc.url",
+      { allowHttp: false },
+    );
+    expect(mockGetEvents).toHaveBeenCalledWith(
+      expect.objectContaining({
+        startLedger: 123,
+        filters: [
+          {
+            type: "contract",
+            contractIds: ["C123456789"],
+            topics: [
+              ["AAAADwAAABBwcm9wb3NhbF9jcmVhdGVk"],
+              ["AAAADwAAABFwcm9wb3NhbF9leGVjdXRlZAAAAA=="],
+              ["AAAADwAAABJwcm9wb3NhbF9jYW5jZWxsZWQAAA=="],
+              ["AAAADwAAAAl2b3RlX2Nhc3QAAAA="],
+            ],
+          },
+        ],
+        cursor: "cursor123",
+        limit: 10,
+      }),
+    );
     expect(mockGetEvents).toHaveBeenCalledTimes(1);
   });
 
-  it("should return events, latestLedger, and cursor", async () => {
+  it("returns events, latestLedger, and cursor", async () => {
     const mockResponse = {
       events: [
         { topic: ["proposal_created"], data: "data1" },
@@ -80,30 +103,11 @@ describe("getProposalEvents", () => {
     expect(result.cursor).toBe("nextCursor");
   });
 
-  it("should filter out events with topics not in PROPOSAL_TOPICS", async () => {
-    const mockResponse = {
-      events: [
-        { topic: ["proposal_created"], data: "data1" },
-        { topic: ["some_other_event"], data: "data2" },
-        { topic: ["vote_cast"], data: "data3" },
-      ],
-      latestLedger: 789,
-    };
-    mockGetEvents.mockResolvedValue(mockResponse);
-
-    const result = await getProposalEvents(1);
-
-    expect(result.events).toHaveLength(2);
-    expect(result.events.map((e) => e.topic[0])).toEqual([
-      "proposal_created",
-      "vote_cast",
-    ]);
-  });
-
-  it("should handle empty events array from RPC", async () => {
+  it("handles empty events array from RPC", async () => {
     const mockResponse = {
       events: [],
       latestLedger: 101,
+      cursor: "cursor101",
     };
     mockGetEvents.mockResolvedValue(mockResponse);
 
@@ -111,11 +115,13 @@ describe("getProposalEvents", () => {
 
     expect(result.events).toHaveLength(0);
     expect(result.latestLedger).toBe(101);
+    expect(result.cursor).toBe("cursor101");
   });
 
-  it("should handle undefined events array from RPC", async () => {
+  it("handles undefined events array from RPC", async () => {
     const mockResponse = {
       latestLedger: 102,
+      cursor: "cursor102",
     };
     mockGetEvents.mockResolvedValue(mockResponse);
 
@@ -123,5 +129,14 @@ describe("getProposalEvents", () => {
 
     expect(result.events).toHaveLength(0);
     expect(result.latestLedger).toBe(102);
+    expect(result.cursor).toBe("cursor102");
+  });
+
+  it("normalizes RPC failures", async () => {
+    mockGetEvents.mockRejectedValue(new Error("startLedger is invalid"));
+
+    await expect(getProposalEvents(1)).rejects.toThrow(
+      "Failed to query governor proposal events: startLedger is invalid",
+    );
   });
 });
