@@ -5,6 +5,7 @@ inputDocuments:
   - docs/adr/001-nft-voting-model.md
   - docs/adr/002-openzeppelin-compose.md
   - docs/adr/003-ipfs-metadata.md
+  - docs/adr/004-proposal-discovery.md
 workflowType: architecture
 project_name: Stolla
 date: 2026-06-24
@@ -127,5 +128,6 @@ export const config = {
 
 - `CommunityFactory` for permissionless community creation
 - Timelock + on-chain execution
-- Event indexer for proposal history
+- Public proposal discovery from Stellar RPC events
+- Persistent event indexer for long-lived proposal history
 - IPFS upload helper in frontend
