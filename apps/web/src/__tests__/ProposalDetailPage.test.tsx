@@ -197,8 +197,11 @@ describe("ProposalDetailPage", () => {
     expect(deadline).toHaveBeenCalledTimes(1);
     const snapshotArg = snapshot.mock.calls[0][0];
     const deadlineArg = deadline.mock.calls[0][0];
-    expect(Buffer.isBuffer(snapshotArg.proposal_id)).toBe(true);
-    expect(Buffer.isBuffer(deadlineArg.proposal_id)).toBe(true);
+    // Vitest/jsdom can expose Buffer instances that fail Buffer.isBuffer across realms.
+    expect(snapshotArg.proposal_id).toBeInstanceOf(Uint8Array);
+    expect(deadlineArg.proposal_id).toBeInstanceOf(Uint8Array);
+    expect(Buffer.from(snapshotArg.proposal_id).toString("hex")).toBe(VALID_ID);
+    expect(Buffer.from(deadlineArg.proposal_id).toString("hex")).toBe(VALID_ID);
   });
 
   it("keeps proposal state visible when deadline read fails", async () => {
