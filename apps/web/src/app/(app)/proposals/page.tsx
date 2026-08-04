@@ -224,7 +224,9 @@ export default function ProposalsPage() {
 
       <section className="mt-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-semibold text-slate-100">Proposals</h2>
+          <h2 className="font-semibold text-slate-100">
+            Community governance history
+          </h2>
           {proposalIds.length > 0 && (
             <div className="flex items-center gap-2">
               <label
@@ -258,6 +260,12 @@ export default function ProposalsPage() {
             </div>
           )}
         </div>
+        {!address && (
+          <p className="mt-2 text-sm text-slate-500">
+            Proposal history is public. You can review it without connecting a
+            wallet.
+          </p>
+        )}
 
         {loading && (
           <>
@@ -298,7 +306,7 @@ export default function ProposalsPage() {
 
         {!loading && !error && empty && (
           <LiveStatus className="mt-3 rounded-lg border border-dashed border-slate-700 bg-slate-900/40 p-4 text-sm text-slate-400">
-            No proposals yet.
+            No public proposals have been discovered yet.
           </LiveStatus>
         )}
 
