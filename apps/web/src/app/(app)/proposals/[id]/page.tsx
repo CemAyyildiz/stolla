@@ -16,17 +16,9 @@ import { useTransactionLifecycle } from "@/hooks/useTransactionLifecycle";
 import { TransactionLifecycleDisplay } from "@/components/TransactionLifecycleDisplay";
 import { truncateMiddle } from "@/lib/truncate";
 import { LiveStatus } from "@/components/ui/LiveStatus";
+import { fetchVoteTotals, type VoteTotals } from "@/lib/voteAggregation";
+import { fmt, pct } from "@/lib/voteDisplay";
 
-const stateLabels: Record<ProposalState, string> = {
-  [ProposalState.Pending]: "Pending",
-  [ProposalState.Active]: "Active",
-  [ProposalState.Defeated]: "Defeated",
-  [ProposalState.Canceled]: "Canceled",
-  [ProposalState.Succeeded]: "Succeeded",
-  [ProposalState.Queued]: "Queued",
-  [ProposalState.Expired]: "Expired",
-  [ProposalState.Executed]: "Executed",
-};
 
 type ProposalResult = {
   id: string;
@@ -46,6 +38,10 @@ export default function ProposalDetailPage() {
   const [loadErrorId, setLoadErrorId] = useState<string | null>(null);
   const [reason, setReason] = useState("Support");
   const [status, setStatus] = useState<string | null>(null);
+  const [totals, setTotals] = useState<VoteTotals | null>(null);
+  const [quorum, setQuorum] = useState<bigint | null>(null);
+  const [totalsError, setTotalsError] = useState<string | null>(null);
+  const [totalsIncomplete, setTotalsIncomplete] = useState(false);
 
   const loadProposal = useCallback(async () => {
     const proposalId = parseProposalId(proposalIdHex);
@@ -57,12 +53,30 @@ export default function ProposalDetailPage() {
       signTransaction,
     });
 
-    const [stateTx, votedTx] = await Promise.all([
+    const [stateTx, votedTx, snapshotTx, voteResult] = await Promise.all([
       client.proposal_state({ proposal_id: proposalId }),
       address
         ? client.has_voted({ proposal_id: proposalId, account: address })
         : Promise.resolve(null),
+      client.proposal_snapshot({ proposal_id: proposalId }),
+      fetchVoteTotals(proposalIdHex),
     ]);
+
+    setTotals(voteResult.totals);
+    setTotalsIncomplete(voteResult.incomplete);
+    setTotalsError(voteResult.error ?? null);
+
+    try {
+      const snapshotLedger = snapshotTx.result;
+      if (snapshotLedger !== undefined) {
+        const qTx = await client.quorum({ ledger: snapshotLedger });
+        setQuorum(qTx.result ?? null);
+      } else {
+        setQuorum(null);
+      }
+    } catch {
+      setQuorum(null);
+    }
 
     return {
       id: proposalIdHex,
@@ -204,6 +218,8 @@ export default function ProposalDetailPage() {
   }
 
   const proposal = result!;
+  const quorumPct =
+    quorum !== null && totals ? pct(totals.total, quorum) : null;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -238,6 +254,117 @@ export default function ProposalDetailPage() {
           </dd>
         </div>
       </dl>
+
+
+      <section className="mt-6 rounded-xl border border-slate-800 bg-[#151b2b] p-5">
+        <h2 className="font-semibold text-slate-100">Votes</h2>
+        {totals ? (
+          <div className="mt-3 space-y-3">
+            <div className="flex h-6 w-full overflow-hidden rounded-lg bg-slate-800">
+              {totals.total > BigInt(0) ? (
+                <>
+                  <div
+                    className="flex items-center justify-center bg-emerald-600 text-xs font-medium text-white transition-all duration-500"
+                    style={{ width: `${pct(totals.for, totals.total)}%` }}
+                  >
+                    {pct(totals.for, totals.total) > 8 &&
+                      `For ${pct(totals.for, totals.total)}%`}
+                  </div>
+                  <div
+                    className="flex items-center justify-center bg-rose-600 text-xs font-medium text-white transition-all duration-500"
+                    style={{ width: `${pct(totals.against, totals.total)}%` }}
+                  >
+                    {pct(totals.against, totals.total) > 8 &&
+                      `Against ${pct(totals.against, totals.total)}%`}
+                  </div>
+                  <div
+                    className="flex items-center justify-center bg-slate-600 text-xs font-medium text-white transition-all duration-500"
+                    style={{ width: `${pct(totals.abstain, totals.total)}%` }}
+                  >
+                    {pct(totals.abstain, totals.total) > 8 &&
+                      `Abstain ${pct(totals.abstain, totals.total)}%`}
+                  </div>
+                </>
+              ) : (
+                <div className="flex w-full items-center justify-center text-xs text-slate-500">
+                  No votes yet
+                </div>
+              )}
+            </div>
+            <dl className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+              <div className="rounded-lg bg-[#0b0f19] p-2">
+                <dt className="text-slate-500">For</dt>
+                <dd className="font-mono font-semibold text-emerald-400">
+                  {fmt(totals.for)}
+                </dd>
+              </div>
+              <div className="rounded-lg bg-[#0b0f19] p-2">
+                <dt className="text-slate-500">Against</dt>
+                <dd className="font-mono font-semibold text-rose-400">
+                  {fmt(totals.against)}
+                </dd>
+              </div>
+              <div className="rounded-lg bg-[#0b0f19] p-2">
+                <dt className="text-slate-500">Abstain</dt>
+                <dd className="font-mono font-semibold text-slate-400">
+                  {fmt(totals.abstain)}
+                </dd>
+              </div>
+              <div className="rounded-lg bg-[#0b0f19] p-2">
+                <dt className="text-slate-500">Total</dt>
+                <dd className="font-mono font-semibold text-slate-100">
+                  {fmt(totals.total)}
+                </dd>
+              </div>
+            </dl>
+            {totalsIncomplete && (
+              <p className="text-xs text-amber-500">
+                Event history may be incomplete — totals shown are a lower
+                bound.
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-slate-400">
+            Vote totals unavailable{totalsError ? `: ${totalsError}` : ""}
+          </p>
+        )}
+      </section>
+
+      {quorum !== null && (
+        <section className="mt-4 rounded-xl border border-slate-800 bg-[#151b2b] p-5">
+          <h2 className="font-semibold text-slate-100">Quorum</h2>
+          <div className="mt-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-400">
+                {totals ? fmt(totals.total) : "0"} / {fmt(quorum)}
+              </span>
+              <span
+                className={`font-medium ${
+                  quorumPct !== null && quorumPct >= 100
+                    ? "text-emerald-400"
+                    : "text-slate-300"
+                }`}
+              >
+                {quorumPct !== null ? `${quorumPct}%` : "—"}
+              </span>
+            </div>
+            <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-slate-800">
+              <div
+                className={`h-full rounded-full transition-all duration-700 ${
+                  quorumPct !== null && quorumPct >= 100
+                    ? "bg-emerald-500"
+                    : "bg-blue-500"
+                }`}
+                style={{ width: `${quorumPct ?? 0}%` }}
+              />
+            </div>
+            {quorumPct !== null && quorumPct >= 100 && (
+              <p className="mt-1 text-xs text-emerald-400">Quorum reached</p>
+            )}
+          </div>
+        </section>
+      )}
 
       <section className="mt-6 rounded-xl border border-slate-800 bg-[#151b2b] p-5">
         <h2 className="font-semibold text-slate-100">Cast vote</h2>
