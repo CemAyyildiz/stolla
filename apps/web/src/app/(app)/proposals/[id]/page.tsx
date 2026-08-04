@@ -8,6 +8,7 @@ import { VoteActions } from "@/components/VoteActions";
 import type { VoteType } from "@/components/voteOptions.mjs";
 import { createGovernorClient } from "@/lib/contracts";
 import { ProposalState } from "@/lib/bindings/community-governor/src";
+import { PROPOSAL_STATE_LABELS } from "@/lib/proposalState";
 import { contractIds } from "@/lib/stellar";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { parseProposalId } from "@/lib/proposals";
@@ -63,6 +64,10 @@ export default function ProposalDetailPage() {
         : Promise.resolve(null),
     ]);
 
+    setState(PROPOSAL_STATE_LABELS[stateTx.result ?? ProposalState.Pending]);
+    if (votedTx) {
+      setHasVoted(Boolean(votedTx.result));
+    }
     return {
       id: proposalIdHex,
       state: stateLabels[stateTx.result ?? ProposalState.Pending],

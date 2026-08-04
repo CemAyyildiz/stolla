@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Buffer } from "buffer";
 import { useWallet } from "@/context/WalletProvider";
@@ -11,6 +12,7 @@ import {
 } from "@/lib/contracts";
 import { loadProposalList } from "@/lib/proposal-loader";
 import { ProposalState } from "@/lib/bindings/community-governor/src";
+import { PROPOSAL_STATE_LABELS, PROPOSAL_STATE_ORDER } from "@/lib/proposalState";
 import { contractIds } from "@/lib/stellar";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { truncateEnd, truncateMiddle } from "@/lib/truncate";
@@ -22,22 +24,18 @@ type ActionStatus = {
   tone: "routine" | "error";
 };
 
-const stateLabels: Record<ProposalState, string> = {
-  [ProposalState.Pending]: "Pending",
-  [ProposalState.Active]: "Active",
-  [ProposalState.Defeated]: "Defeated",
-  [ProposalState.Canceled]: "Canceled",
-  [ProposalState.Succeeded]: "Succeeded",
-  [ProposalState.Queued]: "Queued",
-  [ProposalState.Expired]: "Expired",
-  [ProposalState.Executed]: "Executed",
-};
+const ALL_FILTER = "all" as const;
+type StateFilter = typeof ALL_FILTER | ProposalState;
 
 export default function ProposalsPage() {
   const { address, signTransaction } = useWallet();
   const [description, setDescription] = useState("");
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
   const [proposalIds, setProposalIds] = useState<string[]>([]);
+  const [states, setStates] = useState<Record<string, ProposalState | "unknown">>({});
+  const [status, setStatus] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [stateFilter, setStateFilter] = useState<StateFilter>(ALL_FILTER);
   const [states, setStates] = useState<Record<string, string>>({});
   const [failedProposalIds, setFailedProposalIds] = useState<string[]>([]);
   const [proposalLoadStatus, setProposalLoadStatus] =
@@ -69,6 +67,16 @@ export default function ProposalsPage() {
         : undefined,
     });
 
+    const nextStates: Record<string, ProposalState | "unknown"> = {};
+    for (const idHex of ids) {
+      try {
+        const tx = await client.proposal_state({
+          proposal_id: Buffer.from(idHex, "hex"),
+        });
+        nextStates[idHex] = tx.result ?? ProposalState.Pending;
+      } catch {
+        nextStates[idHex] = "unknown";
+      }
     if (fetchRef.current === requestId) {
       setProposalIds(result.proposalIds);
       setStates(result.states);
@@ -76,6 +84,28 @@ export default function ProposalsPage() {
       setProposalLoadStatus(result.status);
     }
   }, [address, contractsConfigured, signTransaction]);
+
+  const availableStates = useMemo(
+    () =>
+      PROPOSAL_STATE_ORDER.filter((state) =>
+        Object.values(states).includes(state),
+      ),
+    [states],
+  );
+
+  const filteredIds = useMemo(
+    () =>
+      stateFilter === ALL_FILTER
+        ? proposalIds
+        : proposalIds.filter((id) => states[id] === stateFilter),
+    [proposalIds, states, stateFilter],
+  );
+
+  useEffect(() => {
+    if (stateFilter !== ALL_FILTER && !availableStates.includes(stateFilter)) {
+      setStateFilter(ALL_FILTER);
+    }
+  }, [availableStates, stateFilter]);
 
   useEffect(() => {
     const loadTimer = window.setTimeout(() => {
@@ -212,6 +242,69 @@ export default function ProposalsPage() {
       )}
 
       <section className="mt-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-semibold text-slate-100">Your proposals</h2>
+          {proposalIds.length > 0 && (
+            <div className="flex items-center gap-2">
+              <label
+                htmlFor="proposal-state-filter"
+                className="text-sm text-slate-500"
+              >
+                Filter by state
+              </label>
+              <select
+                id="proposal-state-filter"
+                aria-label="Filter proposals by state"
+                value={stateFilter === ALL_FILTER ? ALL_FILTER : String(stateFilter)}
+                onChange={(e) =>
+                  setStateFilter(
+                    e.target.value === ALL_FILTER
+                      ? ALL_FILTER
+                      : (Number(e.target.value) as ProposalState),
+                  )
+                }
+                className="rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-1.5 text-sm text-slate-100"
+              >
+                <option value={ALL_FILTER}>All</option>
+                {availableStates.map((state) => (
+                  <option key={state} value={state}>
+                    {PROPOSAL_STATE_LABELS[state]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+        {proposalIds.length === 0 ? (
+          <p className="mt-2 text-sm text-slate-500">No proposals yet.</p>
+        ) : filteredIds.length === 0 ? (
+          <p className="mt-2 text-sm text-slate-500">
+            No proposals match the selected filter.
+          </p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {filteredIds.map((id) => {
+              const state = states[id];
+              const label =
+                state === undefined
+                  ? "..."
+                  : state === "unknown"
+                    ? "Unknown"
+                    : PROPOSAL_STATE_LABELS[state];
+              return (
+                <li key={id}>
+                  <Link
+                    href={`/proposals/${id}`}
+                    className="flex items-center justify-between rounded-lg border border-slate-800 bg-[#151b2b] px-4 py-3 text-sm text-slate-200 hover:bg-slate-800/80"
+                  >
+                    <span className="truncate font-mono">{id}</span>
+                    <span className="ml-3 text-slate-500">{label}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
         <h2 className="font-semibold text-slate-100">Your proposals</h2>
         <div>
           {proposalLoadStatus === "loading" && (
