@@ -4,6 +4,7 @@ import { ProposalState } from "@/lib/bindings/community-governor/src";
 
 vi.mock("@/hooks/useProposalDiscovery", () => ({
   useProposalDiscovery: vi.fn(() => ({
+    proposals: [{ id: "a".repeat(64), description: "Public proposal" }],
     proposalIds: ["a".repeat(64)],
     loading: false,
     error: null,

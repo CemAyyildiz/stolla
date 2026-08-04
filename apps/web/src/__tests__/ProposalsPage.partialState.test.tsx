@@ -46,6 +46,10 @@ describe("ProposalsPage partial state failures", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     discovery.useProposalDiscovery.mockReturnValue({
+      proposals: [
+        { id: SUCCESS_ID, description: "Success proposal" },
+        { id: FAILED_ID, description: null },
+      ],
       proposalIds: [SUCCESS_ID, FAILED_ID],
       loading: false,
       error: null,

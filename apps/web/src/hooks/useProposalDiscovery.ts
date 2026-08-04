@@ -3,11 +3,43 @@
 import { useCallback, useEffect, useState } from "react";
 import { xdr } from "@stellar/stellar-sdk";
 import { Server as RpcServer } from "@stellar/stellar-sdk/rpc";
+import type { Api } from "@stellar/stellar-sdk/rpc";
 import { config } from "@/lib/stellar";
 import { requireContractIds } from "@/lib/stellar";
+import { decodeProposalEvent } from "@/lib/proposalEvents";
+
+export type DiscoveredProposal = {
+  id: string;
+  /** Proposal description from the created event, or null when unavailable. */
+  description: string | null;
+};
+
+function extractDescription(event: Api.EventResponse): string | null {
+  const decoded = decodeProposalEvent({
+    type: event.type,
+    contractId: event.contractId,
+    topic: event.topic,
+    value: event.value,
+  });
+  if (decoded.ok && decoded.event.kind === "proposal_created") {
+    return decoded.event.description;
+  }
+
+  try {
+    if (event.value.switch().name !== "scvVec") return null;
+    const fields = event.value.vec();
+    const descriptionVal = fields?.[5];
+    if (!descriptionVal || descriptionVal.switch().name !== "scvString") {
+      return null;
+    }
+    return descriptionVal.str() as string;
+  } catch {
+    return null;
+  }
+}
 
 export function useProposalDiscovery() {
-  const [proposalIds, setProposalIds] = useState<string[]>([]);
+  const [proposals, setProposals] = useState<DiscoveredProposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [empty, setEmpty] = useState(false);
@@ -25,7 +57,7 @@ export function useProposalDiscovery() {
     setEmpty(false);
 
     try {
-      const ids: string[] = [];
+      const discovered: DiscoveredProposal[] = [];
       let cursor: string | undefined = undefined;
 
       for (;;) {
@@ -70,18 +102,20 @@ export function useProposalDiscovery() {
           const proposalIdScVal = event.topic[1];
           if (proposalIdScVal.switch().name !== "scvBytes") continue;
           const proposalIdBytes = proposalIdScVal.bytes();
-          if (proposalIdBytes) {
-            ids.push(Buffer.from(proposalIdBytes).toString("hex"));
-          }
+          if (!proposalIdBytes) continue;
+          discovered.push({
+            id: Buffer.from(proposalIdBytes).toString("hex"),
+            description: extractDescription(event),
+          });
         }
 
         if (!response.events.length || !response.cursor) break;
         cursor = response.cursor;
       }
 
-      ids.reverse();
-      setProposalIds(ids);
-      setEmpty(ids.length === 0);
+      discovered.reverse();
+      setProposals(discovered);
+      setEmpty(discovered.length === 0);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Discovery failed");
     } finally {
@@ -93,5 +127,14 @@ export function useProposalDiscovery() {
     discover().catch(() => undefined);
   }, [discover]);
 
-  return { proposalIds, loading, error, empty, refresh: discover };
+  const proposalIds = proposals.map((proposal) => proposal.id);
+
+  return {
+    proposals,
+    proposalIds,
+    loading,
+    error,
+    empty,
+    refresh: discover,
+  };
 }

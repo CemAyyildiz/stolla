@@ -16,14 +16,19 @@ export type ProposalSummaryCardProps = {
    */
   summary: Pick<ProposalSummary, "proposalId"> &
     Partial<
-      Pick<
-        ProposalSummary,
-        "description" | "proposer" | "voteSnapshot" | "voteEnd"
-      >
-    >;
+      Pick<ProposalSummary, "proposer" | "voteSnapshot" | "voteEnd">
+    > & {
+      /** Null means discovery could not provide a description. */
+      description?: string | null;
+    };
   stateStatus: ProposalSummaryCardStateStatus;
   /** Human-readable state label when `stateStatus` is `ready`. */
   stateLabel?: string;
+  /**
+   * When true, render the proposal description (or an explicit unavailable
+   * fallback). Description text is plain — never nested interactive controls.
+   */
+  showDescription?: boolean;
   onRetryState?: () => void;
   isRetryingState?: boolean;
   onCopyId?: () => void;
@@ -51,6 +56,28 @@ function OptionalMeta({
   );
 }
 
+function DescriptionText({
+  description,
+}: {
+  description: string | null | undefined;
+}) {
+  const trimmed = description?.trim() ?? "";
+  const hasDescription = trimmed.length > 0;
+
+  return (
+    <p
+      className={`mt-1 min-w-0 text-xs [overflow-wrap:anywhere] ${
+        hasDescription
+          ? "line-clamp-2 break-words text-slate-400"
+          : "text-slate-600"
+      }`}
+      title={hasDescription ? trimmed : undefined}
+    >
+      {hasDescription ? trimmed : "Description unavailable"}
+    </p>
+  );
+}
+
 /**
  * Reusable proposal list card backed by {@link ProposalSummary}.
  */
@@ -58,6 +85,7 @@ export function ProposalSummaryCard({
   summary,
   stateStatus,
   stateLabel,
+  showDescription = false,
   onRetryState,
   isRetryingState = false,
   onCopyId,
@@ -91,8 +119,8 @@ export function ProposalSummaryCard({
             {stateText}
           </span>
         </span>
-        {"description" in summary && (
-          <OptionalMeta label="Description" value={summary.description} />
+        {showDescription && (
+          <DescriptionText description={summary.description} />
         )}
         {"proposer" in summary && (
           <OptionalMeta label="Proposer" value={summary.proposer} />

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Buffer } from "buffer";
 import { useWallet } from "@/context/WalletProvider";
@@ -40,8 +39,17 @@ export default function ProposalsPage() {
   const [retryingIds, setRetryingIds] = useState<string[]>([]);
   const [visibleCount, setVisibleCount] = useState(LOAD_MORE_PAGE_SIZE);
 
-  const { proposalIds, loading, error, empty, refresh } = useProposalDiscovery();
+  const { proposals, proposalIds, loading, error, empty, refresh } =
+    useProposalDiscovery();
   const contractsConfigured = Boolean(contractIds.governor);
+
+  const descriptionsById = useMemo(() => {
+    const map: Record<string, string | null> = {};
+    for (const proposal of proposals) {
+      map[proposal.id] = proposal.description;
+    }
+    return map;
+  }, [proposals]);
 
   const loadStates = useCallback(async () => {
     if (!contractsConfigured || proposalIds.length === 0) {
@@ -393,7 +401,11 @@ export default function ProposalsPage() {
                 return (
                   <li key={id}>
                     <ProposalSummaryCard
-                      summary={{ proposalId: id }}
+                      summary={{
+                        proposalId: id,
+                        description: descriptionsById[id] ?? null,
+                      }}
+                      showDescription
                       stateStatus={stateStatus}
                       stateLabel={stateLabel}
                       onRetryState={
