@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   useParams: vi.fn(),
   useWallet: vi.fn(),
   createGovernorClient: vi.fn(),
+  createReadOnlyGovernorClient: vi.fn(),
+  fetchVoteTotals: vi.fn(),
   useTransactionLifecycle: vi.fn(),
 }));
 
@@ -13,6 +15,10 @@ vi.mock("next/navigation", () => ({ useParams: mocks.useParams }));
 vi.mock("@/context/WalletProvider", () => ({ useWallet: mocks.useWallet }));
 vi.mock("@/lib/contracts", () => ({
   createGovernorClient: mocks.createGovernorClient,
+  createReadOnlyGovernorClient: mocks.createReadOnlyGovernorClient,
+}));
+vi.mock("@/lib/voteAggregation", () => ({
+  fetchVoteTotals: mocks.fetchVoteTotals,
 }));
 vi.mock("@/hooks/useTransactionLifecycle", () => ({
   useTransactionLifecycle: mocks.useTransactionLifecycle,
@@ -64,11 +70,45 @@ function mockLifecycle() {
   });
 }
 
+function mockVoteTotals() {
+  mocks.fetchVoteTotals.mockResolvedValue({
+    totals: {
+      for: BigInt(0),
+      against: BigInt(0),
+      abstain: BigInt(0),
+      total: BigInt(0),
+    },
+    incomplete: false,
+  });
+}
+
+function mockReadOnly(overrides: Record<string, unknown> = {}) {
+  mocks.createReadOnlyGovernorClient.mockReturnValue({
+    proposal_proposer: vi.fn().mockResolvedValue({ result: "GPROPOSER" }),
+    proposal_deadline: vi.fn().mockResolvedValue({ result: 2_000_000 }),
+    ...overrides,
+  });
+}
+
+function mockGovernor(overrides: Record<string, unknown> = {}) {
+  mocks.createGovernorClient.mockReturnValue({
+    proposal_state: vi.fn().mockResolvedValue({ result: ProposalState.Active }),
+    has_voted: vi.fn().mockResolvedValue({ result: false }),
+    proposal_snapshot: vi.fn().mockResolvedValue({ result: 1_500_000 }),
+    quorum: vi.fn().mockResolvedValue({ result: BigInt(100) }),
+    ...overrides,
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockWallet();
   mockLifecycle();
+  mockVoteTotals();
+  mockReadOnly();
+  mockGovernor();
 });
+
 
 describe("ProposalDetailPage", () => {
   it("rejects non-hexadecimal IDs before any RPC request", async () => {
@@ -112,7 +152,7 @@ describe("ProposalDetailPage", () => {
 
   it("renders an unavailable state for well-formed unknown IDs", async () => {
     mocks.useParams.mockReturnValue({ id: VALID_ID });
-    mocks.createGovernorClient.mockReturnValue({
+    mockGovernor({
       proposal_state: vi.fn().mockRejectedValue(new Error("Contract error")),
     });
 
@@ -131,9 +171,6 @@ describe("ProposalDetailPage", () => {
 
   it("renders vote controls for a valid known proposal", async () => {
     mocks.useParams.mockReturnValue({ id: VALID_ID });
-    mocks.createGovernorClient.mockReturnValue({
-      proposal_state: vi.fn().mockResolvedValue({ result: ProposalState.Active }),
-    });
 
     render(<ProposalDetailPage />);
 
@@ -143,6 +180,41 @@ describe("ProposalDetailPage", () => {
     await waitFor(() =>
       expect(screen.getByText("Active")).toBeInTheDocument(),
     );
+  });
+
+  it("shows snapshot and deadline ledger numbers for a valid proposal", async () => {
+    mocks.useParams.mockReturnValue({ id: VALID_ID });
+    const snapshot = vi.fn().mockResolvedValue({ result: 1_500_000 });
+    const deadline = vi.fn().mockResolvedValue({ result: 2_000_000 });
+    mockGovernor({ proposal_snapshot: snapshot });
+    mockReadOnly({ proposal_deadline: deadline });
+
+    render(<ProposalDetailPage />);
+
+    expect(await screen.findByText("1500000")).toBeInTheDocument();
+    expect(screen.getByText("2000000")).toBeInTheDocument();
+    expect(snapshot).toHaveBeenCalledTimes(1);
+    expect(deadline).toHaveBeenCalledTimes(1);
+    const snapshotArg = snapshot.mock.calls[0][0];
+    const deadlineArg = deadline.mock.calls[0][0];
+    // Vitest/jsdom can expose Buffer instances that fail Buffer.isBuffer across realms.
+    expect(snapshotArg.proposal_id).toBeInstanceOf(Uint8Array);
+    expect(deadlineArg.proposal_id).toBeInstanceOf(Uint8Array);
+    expect(Buffer.from(snapshotArg.proposal_id).toString("hex")).toBe(VALID_ID);
+    expect(Buffer.from(deadlineArg.proposal_id).toString("hex")).toBe(VALID_ID);
+  });
+
+  it("keeps proposal state visible when deadline read fails", async () => {
+    mocks.useParams.mockReturnValue({ id: VALID_ID });
+    mockReadOnly({
+      proposal_deadline: vi.fn().mockRejectedValue(new Error("deadline boom")),
+    });
+
+    render(<ProposalDetailPage />);
+
+    expect(await screen.findByText("Active")).toBeInTheDocument();
+    expect(await screen.findByText("Unavailable")).toBeInTheDocument();
+    expect(screen.getByText("1500000")).toBeInTheDocument();
   });
 
   it("ignores a stale response after navigating to another proposal", async () => {
@@ -157,7 +229,7 @@ describe("ProposalDetailPage", () => {
       .mockReturnValueOnce(secondResponse.promise);
 
     mocks.useParams.mockImplementation(() => ({ id: currentId }));
-    mocks.createGovernorClient.mockReturnValue({
+    mockGovernor({
       proposal_state: proposalState,
     });
 
