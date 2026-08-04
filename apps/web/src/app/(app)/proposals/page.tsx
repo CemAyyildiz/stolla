@@ -22,6 +22,7 @@ type ActionStatus = {
 };
 
 const ALL_FILTER = "all" as const;
+const LOAD_MORE_PAGE_SIZE = 10;
 type StateFilter = typeof ALL_FILTER | ProposalState;
 
 export default function ProposalsPage() {
@@ -35,6 +36,7 @@ export default function ProposalsPage() {
     {},
   );
   const [failedProposalIds, setFailedProposalIds] = useState<string[]>([]);
+  const [visibleCount, setVisibleCount] = useState(LOAD_MORE_PAGE_SIZE);
 
   const { proposalIds, loading, error, empty, refresh } = useProposalDiscovery();
   const contractsConfigured = Boolean(contractIds.governor);
@@ -90,11 +92,18 @@ export default function ProposalsPage() {
     [proposalIds, states, stateFilter],
   );
 
+  const visibleIds = useMemo(
+    () => filteredIds.slice(0, visibleCount),
+    [filteredIds, visibleCount],
+  );
+  const canLoadMore = visibleCount < filteredIds.length;
+
   useEffect(() => {
     if (stateFilter !== ALL_FILTER && !availableStates.includes(stateFilter)) {
       setStateFilter(ALL_FILTER);
     }
   }, [availableStates, stateFilter]);
+
 
   async function handleCreateProposal() {
     if (!address) {
@@ -241,13 +250,14 @@ export default function ProposalsPage() {
                 value={
                   stateFilter === ALL_FILTER ? ALL_FILTER : String(stateFilter)
                 }
-                onChange={(e) =>
+                onChange={(e) => {
                   setStateFilter(
                     e.target.value === ALL_FILTER
                       ? ALL_FILTER
                       : (Number(e.target.value) as ProposalState),
-                  )
-                }
+                  );
+                  setVisibleCount(LOAD_MORE_PAGE_SIZE);
+                }}
                 className="rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-1.5 text-sm text-slate-100"
               >
                 <option value={ALL_FILTER}>All</option>
@@ -316,7 +326,7 @@ export default function ProposalsPage() {
           </p>
         )}
 
-        {!loading && !error && filteredIds.length > 0 && (
+        {!loading && !error && visibleIds.length > 0 && (
           <>
             {failedProposalIds.length > 0 && (
               <div
@@ -337,7 +347,7 @@ export default function ProposalsPage() {
               </div>
             )}
             <ul className="mt-3 space-y-2">
-              {filteredIds.map((id) => {
+              {visibleIds.map((id) => {
                 const state = states[id];
                 const stateFailed = failedProposalIds.includes(id);
                 const label =
@@ -380,6 +390,17 @@ export default function ProposalsPage() {
                 );
               })}
             </ul>
+            {canLoadMore && (
+              <button
+                type="button"
+                onClick={() =>
+                  setVisibleCount((count) => count + LOAD_MORE_PAGE_SIZE)
+                }
+                className="mt-4 min-h-11 w-full touch-manipulation rounded-lg border border-slate-700 bg-[#151b2b] px-4 py-2 text-sm font-medium text-slate-100 hover:bg-slate-800/80 sm:w-auto"
+              >
+                Load more
+              </button>
+            )}
           </>
         )}
       </section>
