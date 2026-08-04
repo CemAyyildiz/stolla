@@ -7,7 +7,6 @@ import { Buffer } from "buffer";
 import { useWallet } from "@/context/WalletProvider";
 import {
   createGovernorClient,
-  getStoredProposalIds,
   storeProposalId,
 } from "@/lib/contracts";
 import { loadProposalList } from "@/lib/proposal-loader";
