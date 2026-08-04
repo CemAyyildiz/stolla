@@ -1,5 +1,9 @@
 import { rpc, xdr } from "@stellar/stellar-sdk";
-import { config, contractIds } from "./stellar";
+import {
+  config,
+  contractIds,
+  requireGovernorStartLedger,
+} from "./stellar";
 
 export const PROPOSAL_EVENT_NAMES = [
   "proposal_created",
@@ -21,15 +25,16 @@ export type ProposalEventsPage = {
 /**
  * Queries the Soroban RPC for proposal events.
  *
- * @param startLedger - The starting ledger number to search from.
+ * Uses `NEXT_PUBLIC_GOVERNOR_START_LEDGER` as the lower ledger boundary.
+ *
  * @param cursor - Optional cursor for pagination.
  * @returns A page of proposal events, the latest ledger, and a response cursor.
  */
 export async function getProposalEvents(
-  startLedger: number,
   cursor?: string,
 ): Promise<ProposalEventsPage> {
   const { governor } = contractIds;
+  const startLedger = requireGovernorStartLedger();
 
   if (!governor) {
     throw new Error(
