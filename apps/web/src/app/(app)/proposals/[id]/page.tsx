@@ -6,7 +6,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useWallet } from "@/context/WalletProvider";
 import { VoteActions } from "@/components/VoteActions";
 import type { VoteType } from "@/components/voteOptions.mjs";
-import { createGovernorClient } from "@/lib/contracts";
+import {
+  createGovernorClient,
+  createReadOnlyGovernorClient,
+} from "@/lib/contracts";
 import { ProposalState } from "@/lib/bindings/community-governor/src";
 import { PROPOSAL_STATE_LABELS } from "@/lib/proposalState";
 import { contractIds } from "@/lib/stellar";
@@ -16,6 +19,11 @@ import { useTransactionLifecycle } from "@/hooks/useTransactionLifecycle";
 import { TransactionLifecycleDisplay } from "@/components/TransactionLifecycleDisplay";
 import { truncateMiddle } from "@/lib/truncate";
 import { LiveStatus } from "@/components/ui/LiveStatus";
+
+function shortenAddress(addr: string): string {
+  if (addr.length <= 12) return addr;
+  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+}
 import { fetchVoteTotals, type VoteTotals } from "@/lib/voteAggregation";
 import { fmt, pct } from "@/lib/voteDisplay";
 
@@ -38,6 +46,8 @@ export default function ProposalDetailPage() {
   const [loadErrorId, setLoadErrorId] = useState<string | null>(null);
   const [reason, setReason] = useState("Support");
   const [status, setStatus] = useState<string | null>(null);
+  const [proposer, setProposer] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [totals, setTotals] = useState<VoteTotals | null>(null);
   const [quorum, setQuorum] = useState<bigint | null>(null);
   const [totalsError, setTotalsError] = useState<string | null>(null);
@@ -77,6 +87,12 @@ export default function ProposalDetailPage() {
     } catch {
       setQuorum(null);
     }
+
+    // Fetch proposer independently so a read failure does not hide state/voted data.
+    createReadOnlyGovernorClient()
+      .proposal_proposer({ proposal_id: proposalId })
+      .then((tx) => setProposer(tx.result ?? null))
+      .catch(() => setProposer(null));
 
     return {
       id: proposalIdHex,
