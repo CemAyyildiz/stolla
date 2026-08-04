@@ -64,13 +64,9 @@ export default function ProposalDetailPage() {
         : Promise.resolve(null),
     ]);
 
-    setState(PROPOSAL_STATE_LABELS[stateTx.result ?? ProposalState.Pending]);
-    if (votedTx) {
-      setHasVoted(Boolean(votedTx.result));
-    }
     return {
       id: proposalIdHex,
-      state: stateLabels[stateTx.result ?? ProposalState.Pending],
+      state: PROPOSAL_STATE_LABELS[stateTx.result ?? ProposalState.Pending],
       hasVoted: votedTx ? Boolean(votedTx.result) : null,
     };
   }, [address, proposalIdHex, signTransaction]);
