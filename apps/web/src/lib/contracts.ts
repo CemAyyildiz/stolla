@@ -57,11 +57,14 @@ export function getStoredProposalIds(): string[] {
   if (typeof window === "undefined") return [];
   const raw = localStorage.getItem(PROPOSAL_STORAGE_KEY);
   if (!raw) return [];
-  try {
-    return JSON.parse(raw) as string[];
-  } catch {
-    return [];
+  const proposalIds: unknown = JSON.parse(raw);
+  if (
+    !Array.isArray(proposalIds) ||
+    !proposalIds.every((proposalId) => typeof proposalId === "string")
+  ) {
+    throw new Error("Stored proposal history is invalid.");
   }
+  return proposalIds;
 }
 
 export function storeProposalId(idHex: string) {
