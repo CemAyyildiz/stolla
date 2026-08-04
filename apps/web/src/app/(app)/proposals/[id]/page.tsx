@@ -52,6 +52,14 @@ export default function ProposalDetailPage() {
   const [quorum, setQuorum] = useState<bigint | null>(null);
   const [totalsError, setTotalsError] = useState<string | null>(null);
   const [totalsIncomplete, setTotalsIncomplete] = useState(false);
+  const [snapshotLedger, setSnapshotLedger] = useState<number | null>(null);
+  const [deadlineLedger, setDeadlineLedger] = useState<number | null>(null);
+  const [snapshotStatus, setSnapshotStatus] = useState<
+    "loading" | "ready" | "unavailable"
+  >("loading");
+  const [deadlineStatus, setDeadlineStatus] = useState<
+    "loading" | "ready" | "unavailable"
+  >("loading");
 
   const loadProposal = useCallback(async () => {
     const proposalId = parseProposalId(proposalIdHex);
@@ -62,13 +70,17 @@ export default function ProposalDetailPage() {
       publicKey: address ?? "",
       signTransaction,
     });
+    const readOnlyClient = createReadOnlyGovernorClient();
+
+    setSnapshotStatus("loading");
+    setDeadlineStatus("loading");
 
     const [stateTx, votedTx, snapshotTx, voteResult] = await Promise.all([
       client.proposal_state({ proposal_id: proposalId }),
       address
         ? client.has_voted({ proposal_id: proposalId, account: address })
         : Promise.resolve(null),
-      client.proposal_snapshot({ proposal_id: proposalId }),
+      client.proposal_snapshot({ proposal_id: proposalId }).catch(() => null),
       fetchVoteTotals(proposalIdHex),
     ]);
 
@@ -76,20 +88,40 @@ export default function ProposalDetailPage() {
     setTotalsIncomplete(voteResult.incomplete);
     setTotalsError(voteResult.error ?? null);
 
-    try {
-      const snapshotLedger = snapshotTx.result;
-      if (snapshotLedger !== undefined) {
-        const qTx = await client.quorum({ ledger: snapshotLedger });
+    const snapshotValue = snapshotTx?.result;
+    if (snapshotValue !== undefined && snapshotValue !== null) {
+      setSnapshotLedger(snapshotValue);
+      setSnapshotStatus("ready");
+      try {
+        const qTx = await client.quorum({ ledger: snapshotValue });
         setQuorum(qTx.result ?? null);
-      } else {
+      } catch {
         setQuorum(null);
       }
-    } catch {
+    } else {
+      setSnapshotLedger(null);
+      setSnapshotStatus("unavailable");
       setQuorum(null);
     }
 
-    // Fetch proposer independently so a read failure does not hide state/voted data.
-    createReadOnlyGovernorClient()
+    // Independent reads — one failure must not hide other proposal information.
+    readOnlyClient
+      .proposal_deadline({ proposal_id: proposalId })
+      .then((tx) => {
+        if (tx.result === undefined || tx.result === null) {
+          setDeadlineLedger(null);
+          setDeadlineStatus("unavailable");
+          return;
+        }
+        setDeadlineLedger(tx.result);
+        setDeadlineStatus("ready");
+      })
+      .catch(() => {
+        setDeadlineLedger(null);
+        setDeadlineStatus("unavailable");
+      });
+
+    readOnlyClient
       .proposal_proposer({ proposal_id: proposalId })
       .then((tx) => setProposer(tx.result ?? null))
       .catch(() => setProposer(null));
@@ -269,7 +301,63 @@ export default function ProposalDetailPage() {
             {proposal.hasVoted === null ? "—" : proposal.hasVoted ? "Yes" : "No"}
           </dd>
         </div>
+        <div>
+          <dt className="text-slate-500">Voting start ledger (snapshot)</dt>
+          <dd className="font-mono text-slate-200">
+            {snapshotStatus === "loading"
+              ? "…"
+              : snapshotStatus === "ready" && snapshotLedger !== null
+                ? String(snapshotLedger)
+                : "Unavailable"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-slate-500">Voting end ledger (deadline)</dt>
+          <dd className="font-mono text-slate-200">
+            {deadlineStatus === "loading"
+              ? "…"
+              : deadlineStatus === "ready" && deadlineLedger !== null
+                ? String(deadlineLedger)
+                : "Unavailable"}
+          </dd>
+        </div>
+        <div className="sm:col-span-2">
+          <dt className="text-slate-500">Proposer</dt>
+          <dd className="mt-1">
+            {proposer ? (
+              <span className="inline-flex items-center gap-2">
+                <span
+                  className="font-mono text-sm text-slate-200"
+                  title={proposer}
+                >
+                  {shortenAddress(proposer)}
+                </span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(proposer);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    } catch {
+                      // Clipboard API unavailable
+                    }
+                  }}
+                  aria-label={`Copy full proposer address ${proposer}`}
+                  className="rounded-md border border-slate-700 bg-slate-800 px-2 py-0.5 text-xs text-slate-400 transition hover:border-slate-600 hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                >
+                  {copied ? "Copied!" : "Copy"}
+                </button>
+              </span>
+            ) : (
+              <span className="text-slate-600">Unknown</span>
+            )}
+          </dd>
+        </div>
       </dl>
+      <div aria-live="polite" className="sr-only">
+        {copied ? "Proposer address copied to clipboard" : null}
+      </div>
 
 
       <section className="mt-6 rounded-xl border border-slate-800 bg-[#151b2b] p-5">
