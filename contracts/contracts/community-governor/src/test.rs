@@ -1,11 +1,12 @@
 #![cfg(test)]
 
 use soroban_sdk::{
-    testutils::{Address as _, Ledger as _},
-    vec, Address, Env, String, Symbol, Val, Vec,
+    testutils::{Address as _, Events as _, Ledger as _},
+    vec, Address, Env, Event, String, Symbol, Val, Vec,
 };
+extern crate std;
 use stellar_governance::{
-    governor::{GovernorClient, ProposalState},
+    governor::{GovernorClient, ProposalCreated, ProposalState},
     votes::VotesClient,
 };
 
@@ -27,7 +28,7 @@ fn simple_proposal(e: &Env) -> (Vec<Address>, Vec<Symbol>, Vec<Vec<Val>>, String
     (targets, functions, args, description)
 }
 
-fn setup_governance(e: &Env) -> (Address, GovernorClient<'_>, VotesClient<'_>) {
+fn setup_governance(e: &Env) -> (Address, GovernorClient<'_>, VotesClient<'_>, Address) {
     e.mock_all_auths();
 
     let owner = Address::generate(e);
@@ -63,6 +64,7 @@ fn setup_governance(e: &Env) -> (Address, GovernorClient<'_>, VotesClient<'_>) {
         voter,
         GovernorClient::new(e, &governor_id),
         votes,
+        governor_id,
     )
 }
 
@@ -73,7 +75,7 @@ fn propose_and_cast_vote_succeeds() {
         li.sequence_number = 100;
     });
 
-    let (voter, governor, votes) = setup_governance(&e);
+    let (voter, governor, votes, _) = setup_governance(&e);
     assert_eq!(votes.get_votes(&voter), 1);
 
     e.ledger().with_mut(|li| {
@@ -98,4 +100,42 @@ fn propose_and_cast_vote_succeeds() {
         governor.proposal_state(&proposal_id),
         ProposalState::Succeeded
     );
+}
+
+#[test]
+fn propose_emits_proposal_created_event() {
+    let e = Env::default();
+    e.ledger().with_mut(|li| {
+        li.sequence_number = 100;
+    });
+
+    let (voter, governor, _votes, governor_id) = setup_governance(&e);
+
+    e.ledger().with_mut(|li| {
+        li.sequence_number += 1;
+    });
+
+    let (targets, functions, calldata, description) = simple_proposal(&e);
+    let proposal_id = governor.propose(&targets, &functions, &calldata, &description, &voter);
+
+    let vote_snapshot = 101 + VOTING_DELAY;
+    let vote_end = vote_snapshot + VOTING_PERIOD;
+
+    let expected = ProposalCreated {
+        proposal_id: proposal_id.clone(),
+        proposer: voter.clone(),
+        targets: targets.clone(),
+        functions: functions.clone(),
+        args: calldata.clone(),
+        vote_snapshot,
+        vote_end,
+        description: description.clone(),
+    };
+
+    assert_eq!(
+        e.events().all(),
+        std::vec![expected.to_xdr(&e, &governor_id)],
+    );
+
+    assert_eq!(proposal_id, expected.proposal_id);
 }
