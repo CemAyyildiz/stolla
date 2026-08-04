@@ -36,6 +36,7 @@ export default function ProposalsPage() {
     {},
   );
   const [failedProposalIds, setFailedProposalIds] = useState<string[]>([]);
+  const [retryingIds, setRetryingIds] = useState<string[]>([]);
   const [visibleCount, setVisibleCount] = useState(LOAD_MORE_PAGE_SIZE);
 
   const { proposalIds, loading, error, empty, refresh } = useProposalDiscovery();
@@ -71,6 +72,43 @@ export default function ProposalsPage() {
     setStates(nextStates);
     setFailedProposalIds(failedIds);
   }, [address, contractsConfigured, proposalIds, signTransaction]);
+
+  const retryProposalState = useCallback(
+    async (idHex: string) => {
+      if (!contractsConfigured) return;
+
+      setRetryingIds((current) =>
+        current.includes(idHex) ? current : [...current, idHex],
+      );
+
+      try {
+        const client = createGovernorClient({
+          publicKey: address ?? "",
+          signTransaction,
+        });
+        const tx = await client.proposal_state({
+          proposal_id: Buffer.from(idHex, "hex"),
+        });
+        setStates((current) => ({
+          ...current,
+          [idHex]: tx.result ?? ProposalState.Pending,
+        }));
+        setFailedProposalIds((current) =>
+          current.filter((failedId) => failedId !== idHex),
+        );
+      } catch {
+        setStates((current) => ({ ...current, [idHex]: "unknown" }));
+        setFailedProposalIds((current) =>
+          current.includes(idHex) ? current : [...current, idHex],
+        );
+      } finally {
+        setRetryingIds((current) =>
+          current.filter((retryingId) => retryingId !== idHex),
+        );
+      }
+    },
+    [address, contractsConfigured, signTransaction],
+  );
 
   useEffect(() => {
     void loadStates();
@@ -329,27 +367,19 @@ export default function ProposalsPage() {
         {!loading && !error && visibleIds.length > 0 && (
           <>
             {failedProposalIds.length > 0 && (
-              <div
-                className="mt-3 flex flex-col gap-3 rounded-lg border border-amber-800/70 bg-amber-950/40 p-4 text-sm text-amber-200 sm:flex-row sm:items-center sm:justify-between"
+              <p
+                className="mt-3 rounded-lg border border-amber-800/70 bg-amber-950/40 p-4 text-sm text-amber-200"
                 role="status"
               >
-                <p>
-                  Some proposal states could not be loaded. Available proposals
-                  are shown below.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => void loadStates()}
-                  className="min-h-11 shrink-0 touch-manipulation self-start rounded-lg border border-amber-600 px-3 py-2 font-medium hover:bg-amber-900/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:self-auto"
-                >
-                  Retry loading proposals
-                </button>
-              </div>
+                Some proposal states could not be loaded. Successful entries
+                remain listed; retry state on an affected entry.
+              </p>
             )}
             <ul className="mt-3 space-y-2">
               {visibleIds.map((id) => {
                 const state = states[id];
                 const stateFailed = failedProposalIds.includes(id);
+                const isRetrying = retryingIds.includes(id);
                 const label =
                   state === undefined
                     ? "..."
@@ -358,10 +388,10 @@ export default function ProposalsPage() {
                       : PROPOSAL_STATE_LABELS[state];
                 return (
                   <li key={id}>
-                    <div className="flex items-center justify-between rounded-lg border border-slate-800 bg-[#151b2b] px-4 py-3 text-sm text-slate-200 hover:bg-slate-800/80">
+                    <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-800 bg-[#151b2b] px-4 py-3 text-sm text-slate-200 hover:bg-slate-800/80">
                       <Link
                         href={`/proposals/${id}`}
-                        className="flex min-w-0 items-center gap-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400"
+                        className="flex min-w-0 flex-1 items-center gap-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400"
                       >
                         <span className="truncate font-mono" title={id}>
                           {truncateMiddle(id)}
@@ -376,15 +406,28 @@ export default function ProposalsPage() {
                           {stateFailed ? "Unavailable" : label}
                         </span>
                       </Link>
-                      <button
-                        type="button"
-                        onClick={() => void navigator.clipboard.writeText(id)}
-                        className="ml-2 shrink-0 rounded px-2 py-1 text-xs text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"
-                        title="Copy proposal ID"
-                        aria-label={`Copy proposal ID ${id}`}
-                      >
-                        Copy
-                      </button>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {stateFailed && (
+                          <button
+                            type="button"
+                            onClick={() => void retryProposalState(id)}
+                            disabled={isRetrying}
+                            className="rounded px-2 py-1 text-xs font-medium text-amber-200 transition hover:bg-amber-900/50 disabled:opacity-50"
+                            aria-label={`Retry loading state for proposal ${id}`}
+                          >
+                            {isRetrying ? "Retrying…" : "Retry state"}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => void navigator.clipboard.writeText(id)}
+                          className="rounded px-2 py-1 text-xs text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"
+                          title="Copy proposal ID"
+                          aria-label={`Copy proposal ID ${id}`}
+                        >
+                          Copy
+                        </button>
+                      </div>
                     </div>
                   </li>
                 );
