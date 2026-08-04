@@ -13,7 +13,8 @@ import {
 } from "@/lib/proposalState";
 import { contractIds } from "@/lib/stellar";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { truncateEnd, truncateMiddle } from "@/lib/truncate";
+import { ProposalSummaryCard } from "@/components/ProposalSummaryCard";
+import { truncateEnd } from "@/lib/truncate";
 import { LiveStatus } from "@/components/ui/LiveStatus";
 
 type ActionStatus = {
@@ -380,55 +381,29 @@ export default function ProposalsPage() {
                 const state = states[id];
                 const stateFailed = failedProposalIds.includes(id);
                 const isRetrying = retryingIds.includes(id);
-                const label =
-                  state === undefined
-                    ? "..."
-                    : state === "unknown"
-                      ? "Unknown"
-                      : PROPOSAL_STATE_LABELS[state];
+                const stateStatus = stateFailed
+                  ? "unavailable"
+                  : state === undefined
+                    ? "loading"
+                    : "ready";
+                const stateLabel =
+                  state === undefined || state === "unknown"
+                    ? undefined
+                    : PROPOSAL_STATE_LABELS[state];
                 return (
                   <li key={id}>
-                    <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-800 bg-[#151b2b] px-4 py-3 text-sm text-slate-200 hover:bg-slate-800/80">
-                      <Link
-                        href={`/proposals/${id}`}
-                        className="flex min-w-0 flex-1 items-center gap-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400"
-                      >
-                        <span className="truncate font-mono" title={id}>
-                          {truncateMiddle(id)}
-                        </span>
-                        <span
-                          className={
-                            stateFailed
-                              ? "shrink-0 text-amber-300"
-                              : "shrink-0 text-slate-500"
-                          }
-                        >
-                          {stateFailed ? "Unavailable" : label}
-                        </span>
-                      </Link>
-                      <div className="flex shrink-0 items-center gap-1">
-                        {stateFailed && (
-                          <button
-                            type="button"
-                            onClick={() => void retryProposalState(id)}
-                            disabled={isRetrying}
-                            className="rounded px-2 py-1 text-xs font-medium text-amber-200 transition hover:bg-amber-900/50 disabled:opacity-50"
-                            aria-label={`Retry loading state for proposal ${id}`}
-                          >
-                            {isRetrying ? "Retrying…" : "Retry state"}
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => void navigator.clipboard.writeText(id)}
-                          className="rounded px-2 py-1 text-xs text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"
-                          title="Copy proposal ID"
-                          aria-label={`Copy proposal ID ${id}`}
-                        >
-                          Copy
-                        </button>
-                      </div>
-                    </div>
+                    <ProposalSummaryCard
+                      summary={{ proposalId: id }}
+                      stateStatus={stateStatus}
+                      stateLabel={stateLabel}
+                      onRetryState={
+                        stateFailed
+                          ? () => void retryProposalState(id)
+                          : undefined
+                      }
+                      isRetryingState={isRetrying}
+                      onCopyId={() => void navigator.clipboard.writeText(id)}
+                    />
                   </li>
                 );
               })}
