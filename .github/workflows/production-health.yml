@@ -1,0 +1,36 @@
+name: Production health check
+
+on:
+  schedule:
+    # Every 30 minutes, at minutes that avoid the top-of-hour Actions load spike.
+    - cron: "17,47 * * * *"
+  workflow_dispatch:
+    inputs:
+      health_url:
+        description: Optional health endpoint override for this run
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-health-check
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check production endpoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+          package-manager-cache: false
+      - name: Request production health endpoint
+        env:
+          HEALTH_URL: ${{ inputs.health_url || vars.PRODUCTION_HEALTH_URL }}
+          HEALTH_TIMEOUT_MS: "10000"
+        run: node scripts/check-production-health.mjs

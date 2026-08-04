@@ -1,78 +1,118 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Buffer } from "buffer";
 import { useWallet } from "@/context/WalletProvider";
 import { createGovernorClient, storeProposalId } from "@/lib/contracts";
 import { useProposalDiscovery } from "@/hooks/useProposalDiscovery";
 import { ProposalState } from "@/lib/bindings/community-governor/src";
+import {
+  PROPOSAL_STATE_LABELS,
+  PROPOSAL_STATE_ORDER,
+} from "@/lib/proposalState";
+import { contractIds } from "@/lib/stellar";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { truncateEnd, truncateMiddle } from "@/lib/truncate";
+import { LiveStatus } from "@/components/ui/LiveStatus";
 
-const stateLabels: Record<ProposalState, string> = {
-  [ProposalState.Pending]: "Pending",
-  [ProposalState.Active]: "Active",
-  [ProposalState.Defeated]: "Defeated",
-  [ProposalState.Canceled]: "Canceled",
-  [ProposalState.Succeeded]: "Succeeded",
-  [ProposalState.Queued]: "Queued",
-  [ProposalState.Expired]: "Expired",
-  [ProposalState.Executed]: "Executed",
+type ActionStatus = {
+  message: string;
+  tone: "routine" | "error";
 };
+
+const ALL_FILTER = "all" as const;
+type StateFilter = typeof ALL_FILTER | ProposalState;
 
 export default function ProposalsPage() {
   const { address, signTransaction } = useWallet();
   const [description, setDescription] = useState("");
-  const [status, setStatus] = useState<string | null>(null);
-  const [loadingCreate, setLoadingCreate] = useState(false);
-  const { proposalIds, loading, error, empty, refresh } = useProposalDiscovery();
-  const [states, setStates] = useState<Record<string, string>>({});
-
-  const contractsConfigured = Boolean(
-    process.env.NEXT_PUBLIC_GOVERNOR_CONTRACT_ID,
+  const [descriptionError, setDescriptionError] = useState<string | null>(null);
+  const [status, setStatus] = useState<ActionStatus | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [stateFilter, setStateFilter] = useState<StateFilter>(ALL_FILTER);
+  const [states, setStates] = useState<Record<string, ProposalState | "unknown">>(
+    {},
   );
+  const [failedProposalIds, setFailedProposalIds] = useState<string[]>([]);
+
+  const { proposalIds, loading, error, empty, refresh } = useProposalDiscovery();
+  const contractsConfigured = Boolean(contractIds.governor);
 
   const loadStates = useCallback(async () => {
-    if (!contractsConfigured || proposalIds.length === 0) return;
-
-    try {
-      const client = createGovernorClient({
-        publicKey: address ?? "",
-        signTransaction,
-      });
-
-      const nextStates: Record<string, string> = {};
-      for (const idHex of proposalIds) {
-        try {
-          const tx = await client.proposal_state({
-            proposal_id: Buffer.from(idHex, "hex"),
-          });
-          nextStates[idHex] = stateLabels[tx.result ?? ProposalState.Pending];
-        } catch {
-          nextStates[idHex] = "Unknown";
-        }
-      }
-      setStates(nextStates);
-    } catch {
-      undefined;
+    if (!contractsConfigured || proposalIds.length === 0) {
+      setStates({});
+      setFailedProposalIds([]);
+      return;
     }
+
+    let client: ReturnType<typeof createGovernorClient> | undefined;
+    const nextStates: Record<string, ProposalState | "unknown"> = {};
+    const failedIds: string[] = [];
+
+    for (const idHex of proposalIds) {
+      try {
+        client ??= createGovernorClient({
+          publicKey: address ?? "",
+          signTransaction,
+        });
+        const tx = await client.proposal_state({
+          proposal_id: Buffer.from(idHex, "hex"),
+        });
+        nextStates[idHex] = tx.result ?? ProposalState.Pending;
+      } catch {
+        nextStates[idHex] = "unknown";
+        failedIds.push(idHex);
+      }
+    }
+
+    setStates(nextStates);
+    setFailedProposalIds(failedIds);
   }, [address, contractsConfigured, proposalIds, signTransaction]);
 
   useEffect(() => {
-    loadStates().catch(() => undefined);
+    void loadStates();
   }, [loadStates]);
+
+  const availableStates = useMemo(
+    () =>
+      PROPOSAL_STATE_ORDER.filter((state) =>
+        Object.values(states).includes(state),
+      ),
+    [states],
+  );
+
+  const filteredIds = useMemo(
+    () =>
+      stateFilter === ALL_FILTER
+        ? proposalIds
+        : proposalIds.filter((id) => states[id] === stateFilter),
+    [proposalIds, states, stateFilter],
+  );
+
+  useEffect(() => {
+    if (stateFilter !== ALL_FILTER && !availableStates.includes(stateFilter)) {
+      setStateFilter(ALL_FILTER);
+    }
+  }, [availableStates, stateFilter]);
 
   async function handleCreateProposal() {
     if (!address) {
-      setStatus("Connect your wallet first.");
+      setStatus({ message: "Connect your wallet first.", tone: "error" });
       return;
     }
     if (!description.trim()) {
-      setStatus("Description is required.");
+      setDescriptionError("Proposal description is required.");
+      setStatus(null);
       return;
     }
 
-    setLoadingCreate(true);
-    setStatus(null);
+    setDescriptionError(null);
+    setSubmitting(true);
+    setStatus({
+      message: "Submitting proposal transaction…",
+      tone: "routine",
+    });
     try {
       const client = createGovernorClient({ publicKey: address, signTransaction });
       const target = address;
@@ -87,18 +127,25 @@ export default function ProposalsPage() {
       const idHex = Buffer.from(result.result).toString("hex");
       storeProposalId(idHex);
       setDescription("");
-      setStatus(`Proposal created: ${idHex.slice(0, 12)}...`);
+      setStatus({
+        message: `Proposal created: ${truncateEnd(idHex, 12)}`,
+        tone: "routine",
+      });
       await refresh();
       await loadStates();
-    } catch (error: unknown) {
-      setStatus(error instanceof Error ? error.message : "Proposal failed");
+    } catch (createError: unknown) {
+      setStatus({
+        message:
+          createError instanceof Error ? createError.message : "Proposal failed",
+        tone: "error",
+      });
     } finally {
-      setLoadingCreate(false);
+      setSubmitting(false);
     }
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
+    <div className="mx-auto w-full min-w-0 max-w-3xl px-4 py-10">
       <h1 className="text-2xl font-bold text-slate-100">Proposals</h1>
       <p className="mt-2 text-slate-400">
         Create and track DAO proposals. Voting power requires delegated NFTs.
@@ -112,65 +159,222 @@ export default function ProposalsPage() {
       )}
 
       {contractsConfigured && (
-        <section className="mt-6 rounded-xl border border-slate-800 bg-[#151b2b] p-5">
+        <section className="mt-6 min-w-0 rounded-xl border border-slate-800 bg-[#151b2b] p-4 sm:p-5">
           <h2 className="font-semibold text-slate-100">Create proposal</h2>
+          <label
+            htmlFor="proposal-description"
+            className="mt-3 block text-sm text-slate-400"
+          >
+            Proposal description{" "}
+            <span className="text-slate-500">(required)</span>
+          </label>
           <textarea
+            id="proposal-description"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(e) => {
+              setDescription(e.target.value);
+              setDescriptionError(null);
+            }}
             rows={3}
-            className="mt-3 w-full rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600"
+            required
+            aria-describedby={`proposal-description-help${
+              descriptionError ? " proposal-description-error" : ""
+            }`}
+            aria-invalid={Boolean(descriptionError)}
+            className="mt-1 box-border w-full min-w-0 resize-y rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600"
             placeholder="Describe the community decision..."
           />
+          <p
+            id="proposal-description-help"
+            className="mt-1 text-xs text-slate-500"
+          >
+            Summarize the decision and intended action recorded with the proposal.
+          </p>
+          {descriptionError && (
+            <p
+              id="proposal-description-error"
+              role="alert"
+              className="mt-1 text-xs text-rose-300"
+            >
+              {descriptionError}
+            </p>
+          )}
           <button
             type="button"
-            onClick={handleCreateProposal}
-            disabled={!address || loadingCreate}
-            className="mt-3 rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400 disabled:opacity-50"
+            onClick={() => void handleCreateProposal()}
+            disabled={!address || submitting}
+            className="mt-3 min-h-11 w-full touch-manipulation rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400 disabled:opacity-50 sm:w-auto"
           >
-            {loadingCreate ? "Submitting..." : "Create proposal"}
+            {submitting ? "Submitting..." : "Create proposal"}
           </button>
+          {status && (
+            <LiveStatus
+              tone={status.tone}
+              className={`mt-3 min-w-0 break-words rounded-lg border bg-[#0b0f19] p-3 text-sm [overflow-wrap:anywhere] ${
+                status.tone === "error"
+                  ? "border-rose-800/70 text-rose-200"
+                  : "border-slate-800 text-slate-200"
+              }`}
+            >
+              {status.message}
+            </LiveStatus>
+          )}
         </section>
       )}
 
       <section className="mt-6">
-        <h2 className="font-semibold text-slate-100">Proposals</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-semibold text-slate-100">Proposals</h2>
+          {proposalIds.length > 0 && (
+            <div className="flex items-center gap-2">
+              <label
+                htmlFor="proposal-state-filter"
+                className="text-sm text-slate-500"
+              >
+                Filter by state
+              </label>
+              <select
+                id="proposal-state-filter"
+                aria-label="Filter proposals by state"
+                value={
+                  stateFilter === ALL_FILTER ? ALL_FILTER : String(stateFilter)
+                }
+                onChange={(e) =>
+                  setStateFilter(
+                    e.target.value === ALL_FILTER
+                      ? ALL_FILTER
+                      : (Number(e.target.value) as ProposalState),
+                  )
+                }
+                className="rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-1.5 text-sm text-slate-100"
+              >
+                <option value={ALL_FILTER}>All</option>
+                {availableStates.map((state) => (
+                  <option key={state} value={state}>
+                    {PROPOSAL_STATE_LABELS[state]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
         {loading && (
-          <p className="mt-2 text-sm text-slate-500">
-            Loading proposals…
-          </p>
+          <>
+            <ul className="mt-3 space-y-2">
+              {Array.from({ length: Math.max(proposalIds.length || 3, 1) }).map(
+                (_, i) => (
+                  <li key={i}>
+                    <div className="flex items-center justify-between rounded-lg border border-slate-800 bg-[#151b2b] px-4 py-3">
+                      <Skeleton className="h-5 w-48" />
+                      <Skeleton className="h-5 w-16" />
+                    </div>
+                  </li>
+                ),
+              )}
+            </ul>
+            <LiveStatus className="sr-only">Loading proposal history...</LiveStatus>
+          </>
         )}
-        {error && (
-          <p className="mt-2 text-sm text-red-400">
-            {error}
-          </p>
+
+        {!loading && error && (
+          <div
+            className="mt-3 rounded-lg border border-rose-800/70 bg-rose-950/40 p-4"
+            role="alert"
+          >
+            <p className="font-medium text-rose-200">
+              Proposal history is temporarily unavailable.
+            </p>
+            <p className="mt-1 text-sm text-rose-300/80">{error}</p>
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              className="mt-3 min-h-11 touch-manipulation rounded-lg border border-rose-600 px-3 py-2 text-sm font-medium text-rose-100 hover:bg-rose-900/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300"
+            >
+              Retry loading proposals
+            </button>
+          </div>
         )}
+
         {!loading && !error && empty && (
-          <p className="mt-2 text-sm text-slate-500">
+          <LiveStatus className="mt-3 rounded-lg border border-dashed border-slate-700 bg-slate-900/40 p-4 text-sm text-slate-400">
             No proposals yet.
+          </LiveStatus>
+        )}
+
+        {!loading && !error && proposalIds.length > 0 && filteredIds.length === 0 && (
+          <p className="mt-2 text-sm text-slate-500">
+            No proposals match the selected filter.
           </p>
         )}
-        {!loading && !error && proposalIds.length > 0 && (
-          <ul className="mt-3 space-y-2">
-            {proposalIds.map((id) => (
-              <li key={id}>
-                <Link
-                  href={`/proposals/${id}`}
-                  className="flex items-center justify-between rounded-lg border border-slate-800 bg-[#151b2b] px-4 py-3 text-sm text-slate-200 hover:bg-slate-800/80"
+
+        {!loading && !error && filteredIds.length > 0 && (
+          <>
+            {failedProposalIds.length > 0 && (
+              <div
+                className="mt-3 flex flex-col gap-3 rounded-lg border border-amber-800/70 bg-amber-950/40 p-4 text-sm text-amber-200 sm:flex-row sm:items-center sm:justify-between"
+                role="status"
+              >
+                <p>
+                  Some proposal states could not be loaded. Available proposals
+                  are shown below.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void loadStates()}
+                  className="min-h-11 shrink-0 touch-manipulation self-start rounded-lg border border-amber-600 px-3 py-2 font-medium hover:bg-amber-900/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:self-auto"
                 >
-                  <span className="truncate font-mono">{id}</span>
-                  <span className="ml-3 text-slate-500">{states[id] ?? "..."}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+                  Retry loading proposals
+                </button>
+              </div>
+            )}
+            <ul className="mt-3 space-y-2">
+              {filteredIds.map((id) => {
+                const state = states[id];
+                const stateFailed = failedProposalIds.includes(id);
+                const label =
+                  state === undefined
+                    ? "..."
+                    : state === "unknown"
+                      ? "Unknown"
+                      : PROPOSAL_STATE_LABELS[state];
+                return (
+                  <li key={id}>
+                    <div className="flex items-center justify-between rounded-lg border border-slate-800 bg-[#151b2b] px-4 py-3 text-sm text-slate-200 hover:bg-slate-800/80">
+                      <Link
+                        href={`/proposals/${id}`}
+                        className="flex min-w-0 items-center gap-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400"
+                      >
+                        <span className="truncate font-mono" title={id}>
+                          {truncateMiddle(id)}
+                        </span>
+                        <span
+                          className={
+                            stateFailed
+                              ? "shrink-0 text-amber-300"
+                              : "shrink-0 text-slate-500"
+                          }
+                        >
+                          {stateFailed ? "Unavailable" : label}
+                        </span>
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => void navigator.clipboard.writeText(id)}
+                        className="ml-2 shrink-0 rounded px-2 py-1 text-xs text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"
+                        title="Copy proposal ID"
+                        aria-label={`Copy proposal ID ${id}`}
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
       </section>
-
-      {status && (
-        <p className="mt-4 rounded-lg border border-slate-800 bg-[#151b2b] p-3 text-sm text-slate-200">
-          {status}
-        </p>
-      )}
     </div>
   );
 }

@@ -2,6 +2,8 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { WalletProvider } from "@/context/WalletProvider";
 
+export const dynamic = "force-dynamic";
+
 export default function AppLayout({
   children,
 }: Readonly<{
@@ -10,7 +12,9 @@ export default function AppLayout({
   return (
     <WalletProvider>
       <Header />
-      <main className="flex-1">{children}</main>
+      <main id="main-content" tabIndex={-1} className="flex-1 focus:outline-none">
+        {children}
+      </main>
       <Footer />
     </WalletProvider>
   );

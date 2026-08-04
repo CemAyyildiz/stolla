@@ -59,9 +59,12 @@ describe("ProposalsPage - localStorage not required for proposals", () => {
 
     render(<ProposalsPage />);
 
-    const proposalItems = screen.getAllByText("a".repeat(64));
-
-    expect(proposalItems.length).toBeGreaterThan(0);
+    const proposalId = "a".repeat(64);
+    expect(screen.getByTitle(proposalId)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /aaaaaa/i })).toHaveAttribute(
+      "href",
+      `/proposals/${proposalId}`,
+    );
     expect(getItemSpy).not.toHaveBeenCalled();
   });
 });
