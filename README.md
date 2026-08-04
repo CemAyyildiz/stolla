@@ -45,7 +45,15 @@ NEXT_PUBLIC_STELLAR_NETWORK=testnet
 NEXT_PUBLIC_STELLAR_RPC_URL=https://soroban-testnet.stellar.org
 NEXT_PUBLIC_NFT_CONTRACT_ID=<community-nft-contract-id>
 NEXT_PUBLIC_GOVERNOR_CONTRACT_ID=<governor-contract-id>
+# Lower ledger boundary for proposal event discovery (Governor deploy ledger).
+# Example (testnet): NEXT_PUBLIC_GOVERNOR_START_LEDGER=1500000
+NEXT_PUBLIC_GOVERNOR_START_LEDGER=<governor-deploy-ledger>
 ```
+
+`NEXT_PUBLIC_GOVERNOR_START_LEDGER` must be a positive integer. Use the ledger
+where the Governor contract was deployed (printed by the deploy script or
+visible in a Stellar explorer). Missing, zero, negative, and non-integer values
+fail with an actionable error when proposal discovery runs.
 
 You can use an existing deployment or deploy your own contracts using the
 instructions below.
