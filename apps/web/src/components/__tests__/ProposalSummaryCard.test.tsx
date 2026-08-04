@@ -6,14 +6,13 @@ import type { ProposalSummary } from "@/lib/proposal/types";
 const FULL_ID = "ab".repeat(32);
 
 function baseSummary(
-  overrides: Partial<ProposalSummary> = {},
+  overrides: Partial<
+    Omit<ProposalSummary, "description"> & { description?: string | null }
+  > = {},
 ): Pick<ProposalSummary, "proposalId"> &
-  Partial<
-    Pick<
-      ProposalSummary,
-      "description" | "proposer" | "voteSnapshot" | "voteEnd"
-    >
-  > {
+  Partial<Pick<ProposalSummary, "proposer" | "voteSnapshot" | "voteEnd">> & {
+    description?: string | null;
+  } {
   return {
     proposalId: FULL_ID,
     ...overrides,
@@ -28,6 +27,7 @@ describe("ProposalSummaryCard", () => {
           description: "Fund community grants",
           proposer: "GABCDEFGHIJKLMNOPQRSTUVWXYZ",
         })}
+        showDescription
         stateStatus="ready"
         stateLabel="Active"
         onCopyId={() => undefined}
@@ -42,11 +42,53 @@ describe("ProposalSummaryCard", () => {
     expect(screen.getByText("GABCDEFGHIJKLMNOPQRSTUVWXYZ")).toBeInTheDocument();
   });
 
+  it("clamps long descriptions without nested interactive controls", () => {
+    const longDescription = "A".repeat(280);
+    const { container } = render(
+      <ProposalSummaryCard
+        summary={baseSummary({ description: longDescription })}
+        showDescription
+        stateStatus="ready"
+        stateLabel="Active"
+      />,
+    );
+
+    const description = screen.getByText(longDescription);
+    expect(description.tagName).toBe("P");
+    expect(description.className).toContain("line-clamp-2");
+    expect(description).toHaveAttribute("title", longDescription);
+    expect(container.querySelectorAll("a")).toHaveLength(1);
+    expect(description.closest("a")).toBeTruthy();
+    expect(description.querySelector("button,a")).toBeNull();
+  });
+
+  it("shows an explicit fallback for empty and unavailable descriptions", () => {
+    const { rerender } = render(
+      <ProposalSummaryCard
+        summary={baseSummary({ description: "" })}
+        showDescription
+        stateStatus="ready"
+        stateLabel="Pending"
+      />,
+    );
+    expect(screen.getByText("Description unavailable")).toBeInTheDocument();
+    expect(screen.queryByText("No description provided")).not.toBeInTheDocument();
+
+    rerender(
+      <ProposalSummaryCard
+        summary={baseSummary({ description: null })}
+        showDescription
+        stateStatus="ready"
+        stateLabel="Pending"
+      />,
+    );
+    expect(screen.getByText("Description unavailable")).toBeInTheDocument();
+  });
+
   it("shows placeholders for partial optional metadata", () => {
     render(
       <ProposalSummaryCard
         summary={baseSummary({
-          description: "",
           proposer: null,
         })}
         stateStatus="ready"
@@ -55,7 +97,7 @@ describe("ProposalSummaryCard", () => {
     );
 
     expect(screen.getByText("Pending")).toBeInTheDocument();
-    expect(screen.getAllByText("Unavailable")).toHaveLength(2);
+    expect(screen.getByText("Unavailable")).toBeInTheDocument();
   });
 
   it("supports loading and failed state presentation", () => {
