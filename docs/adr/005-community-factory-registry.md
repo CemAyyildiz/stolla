@@ -104,6 +104,10 @@ Governance parameters remain authoritative in the Governor. The registry
 duplicates only discovery and provenance fields and must not become a second
 mutable governance configuration source.
 
+Field types, bounds, update policy, deterministic serialization, and the
+versioned off-chain document are specified in the
+[community metadata and governance schema](../community-metadata-governance-schema.md).
+
 ### Registry storage and pagination
 
 | Key | Storage | Value |
