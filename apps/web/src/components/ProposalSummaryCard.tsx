@@ -32,6 +32,7 @@ export type ProposalSummaryCardProps = {
   onRetryState?: () => void;
   isRetryingState?: boolean;
   onCopyId?: () => void;
+  href?: string;
 };
 
 function OptionalMeta({
@@ -89,6 +90,7 @@ export function ProposalSummaryCard({
   onRetryState,
   isRetryingState = false,
   onCopyId,
+  href,
 }: ProposalSummaryCardProps) {
   const { proposalId } = summary;
   const stateText =
@@ -101,7 +103,7 @@ export function ProposalSummaryCard({
   return (
     <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-800 bg-[#151b2b] px-4 py-3 text-sm text-slate-200 hover:bg-slate-800/80">
       <Link
-        href={`/proposals/${proposalId}`}
+        href={href ?? `/proposals/${proposalId}`}
         className="flex min-w-0 flex-1 flex-col gap-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400"
         aria-label={`View proposal ${proposalId}, state ${stateText}`}
       >

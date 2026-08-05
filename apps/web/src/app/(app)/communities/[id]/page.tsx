@@ -313,7 +313,7 @@ export default function CommunityDetailPage() {
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
         <Link
-          href={`/proposals?community=${record.id}`}
+          href={`/communities/${record.id}/proposals`}
           className="inline-flex min-h-11 items-center justify-center rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400"
         >
           View community proposals

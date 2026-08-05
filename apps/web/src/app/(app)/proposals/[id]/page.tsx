@@ -20,6 +20,7 @@ import { useTransactionLifecycle } from "@/hooks/useTransactionLifecycle";
 import { TransactionLifecycleDisplay } from "@/components/TransactionLifecycleDisplay";
 import { truncateMiddle } from "@/lib/truncate";
 import { LiveStatus } from "@/components/ui/LiveStatus";
+import type { CommunityView } from "@/lib/community/types";
 
 function shortenAddress(addr: string): string {
   if (addr.length <= 12) return addr;
@@ -38,9 +39,24 @@ type ProposalResult = {
 const backLinkClassName =
   "mt-4 inline-block rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400";
 
-export default function ProposalDetailPage() {
-  const params = useParams<{ id: string }>();
-  const proposalIdHex = params.id;
+export default function ProposalDetailPage({
+  proposalId,
+  community,
+}: {
+  proposalId?: string;
+  community?: CommunityView;
+} = {}) {
+  const params = useParams<{ id?: string; proposalId?: string }>();
+  const proposalIdHex = proposalId ?? params.proposalId ?? params.id ?? "";
+  const governorContractId =
+    community?.record.governorContract ?? contractIds.governor;
+  const nftContractId = community?.record.nftContract ?? contractIds.nft;
+  const backHref = community
+    ? `/communities/${community.record.id}/proposals`
+    : "/proposals";
+  const communityName =
+    community?.metadata?.name ??
+    (community ? `Community ${truncateMiddle(community.record.id)}` : null);
   const isValidId = parseProposalId(proposalIdHex) !== null;
   const { address, signTransaction } = useWallet();
   const [result, setResult] = useState<ProposalResult | null>(null);
@@ -68,14 +84,15 @@ export default function ProposalDetailPage() {
 
   const loadProposal = useCallback(async () => {
     const proposalId = parseProposalId(proposalIdHex);
-    if (!proposalId || !contractIds.governor) {
+    if (!proposalId || !governorContractId) {
       throw new Error("Proposal unavailable");
     }
     const client = createGovernorClient({
       publicKey: address ?? "",
       signTransaction,
+      contractId: governorContractId,
     });
-    const readOnlyClient = createReadOnlyGovernorClient();
+    const readOnlyClient = createReadOnlyGovernorClient(governorContractId);
 
     setSnapshotStatus("loading");
     setDeadlineStatus("loading");
@@ -86,7 +103,7 @@ export default function ProposalDetailPage() {
         ? client.has_voted({ proposal_id: proposalId, account: address })
         : Promise.resolve(null),
       client.proposal_snapshot({ proposal_id: proposalId }).catch(() => null),
-      fetchVoteTotals(proposalIdHex),
+      fetchVoteTotals(proposalIdHex, governorContractId),
     ]);
 
     setTotals(voteResult.totals);
@@ -136,7 +153,7 @@ export default function ProposalDetailPage() {
       state: PROPOSAL_STATE_LABELS[stateTx.result ?? ProposalState.Pending],
       hasVoted: votedTx ? Boolean(votedTx.result) : null,
     };
-  }, [address, proposalIdHex, signTransaction]);
+  }, [address, governorContractId, proposalIdHex, signTransaction]);
 
   useEffect(() => {
     if (!isValidId) return;
@@ -158,7 +175,7 @@ export default function ProposalDetailPage() {
   }, [isValidId, loadProposal, proposalIdHex]);
 
   const loadVotingPower = useCallback(async () => {
-    if (!address || !contractIds.nft) {
+    if (!address || !nftContractId) {
       setVotingPower(null);
       setVotingPowerStatus(address ? "unavailable" : "disconnected");
       return;
@@ -168,7 +185,7 @@ export default function ProposalDetailPage() {
     setVotingPower(null);
 
     try {
-      const client = createReadOnlyNftClient();
+      const client = createReadOnlyNftClient(nftContractId);
       const tx = await client.get_votes({ account: address });
       setVotingPower(tx.result ?? BigInt(0));
       setVotingPowerStatus("ready");
@@ -176,13 +193,13 @@ export default function ProposalDetailPage() {
       setVotingPower(null);
       setVotingPowerStatus("unavailable");
     }
-  }, [address]);
+  }, [address, nftContractId]);
 
   useEffect(() => {
     let active = true;
 
     void (async () => {
-      if (!address || !contractIds.nft) {
+      if (!address || !nftContractId) {
         if (!active) return;
         setVotingPower(null);
         setVotingPowerStatus(address ? "unavailable" : "disconnected");
@@ -193,7 +210,7 @@ export default function ProposalDetailPage() {
       setVotingPower(null);
 
       try {
-        const client = createReadOnlyNftClient();
+        const client = createReadOnlyNftClient(nftContractId);
         const tx = await client.get_votes({ account: address });
         if (!active) return;
         setVotingPower(tx.result ?? BigInt(0));
@@ -208,7 +225,7 @@ export default function ProposalDetailPage() {
     return () => {
       active = false;
     };
-  }, [address]);
+  }, [address, nftContractId]);
 
   // Transaction lifecycle management
   const {
@@ -238,7 +255,11 @@ export default function ProposalDetailPage() {
     resetLifecycle();
 
     await executeVote(voteType, reason, async () => {
-      const client = createGovernorClient({ publicKey: address, signTransaction });
+      const client = createGovernorClient({
+        publicKey: address,
+        signTransaction,
+        contractId: governorContractId,
+      });
       const tx = await client.cast_vote({
         proposal_id: proposalId,
         vote_type: voteType,
@@ -271,7 +292,7 @@ export default function ProposalDetailPage() {
           <code className="font-mono">{proposalIdHex}</code> is not a valid
           32-byte proposal identifier.
         </LiveStatus>
-        <Link href="/proposals" className={backLinkClassName}>
+        <Link href={backHref} className={backLinkClassName}>
           Back to proposals
         </Link>
       </div>
@@ -289,7 +310,7 @@ export default function ProposalDetailPage() {
           <code className="font-mono">{proposalIdHex}</code>. It may not exist,
           or the network may be temporarily unavailable.
         </LiveStatus>
-        <Link href="/proposals" className={backLinkClassName}>
+        <Link href={backHref} className={backLinkClassName}>
           Back to proposals
         </Link>
       </div>
@@ -329,6 +350,22 @@ export default function ProposalDetailPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
+      {community && (
+        <nav aria-label="Breadcrumb" className="mb-5 text-sm text-slate-400">
+          <Link
+            href={`/communities/${community.record.id}`}
+            className="hover:text-indigo-300"
+          >
+            {communityName}
+          </Link>
+          <span aria-hidden="true"> / </span>
+          <Link href={backHref} className="hover:text-indigo-300">
+            Proposals
+          </Link>
+          <span aria-hidden="true"> / </span>
+          <span aria-current="page">{truncateMiddle(proposalIdHex)}</span>
+        </nav>
+      )}
       <h1 className="text-2xl font-bold text-slate-100">Proposal</h1>
       <div className="mt-2 flex items-center gap-2">
         <p

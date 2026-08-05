@@ -27,8 +27,9 @@ export interface VoteAggregationResult {
  */
 export async function fetchVoteTotals(
   proposalIdHex: string,
+  governorContractId = contractIds.governor,
 ): Promise<VoteAggregationResult> {
-  if (!contractIds.governor) {
+  if (!governorContractId) {
     return {
       totals: { for: BigInt(0), against: BigInt(0), abstain: BigInt(0), total: BigInt(0) },
       incomplete: true,
@@ -51,7 +52,7 @@ export async function fetchVoteTotals(
   const filters: rpc.Api.EventFilter[] = [
     {
       type: "contract",
-      contractIds: [contractIds.governor],
+      contractIds: [governorContractId],
       topics: [
         [
           voteCastSymbol, // topic[0] = "vote_cast"
