@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useWallet } from "@/context/WalletProvider";
 import {
   createNftClient,
@@ -35,6 +35,7 @@ export default function CommunityPage() {
   const [dataLoadError, setDataLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [initialLoading, setInitialLoading] = useState(Boolean(contractIds.nft));
+  const refreshSeq = useRef(0);
   const delegationLifecycle = useOperationLifecycle();
   const mintLifecycle = useOperationLifecycle();
 
@@ -42,6 +43,8 @@ export default function CommunityPage() {
 
   const refresh = useCallback(async () => {
     if (!contractsConfigured) return false;
+
+    const seq = ++refreshSeq.current;
 
     return runCommunityRefresh(
       () =>
@@ -54,10 +57,12 @@ export default function CommunityPage() {
         }),
       {
         onStart() {
+          if (seq !== refreshSeq.current) return;
           setRefreshing(true);
           setDataLoadError(null);
         },
         onSuccess(data) {
+          if (seq !== refreshSeq.current) return;
           setName(data.name);
           setSymbol(data.symbol);
           setBalance(data.balance);
@@ -66,6 +71,7 @@ export default function CommunityPage() {
           setRefreshing(false);
         },
         onError(message) {
+          if (seq !== refreshSeq.current) return;
           setDataLoadError(message);
           setInitialLoading(false);
           setRefreshing(false);
