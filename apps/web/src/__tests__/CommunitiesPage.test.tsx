@@ -54,6 +54,7 @@ function deferred<T>() {
 describe("CommunitiesPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.replaceState({}, "", "/communities");
   });
 
   it("shows loading state and renders registry communities without a wallet", async () => {
@@ -172,5 +173,72 @@ describe("CommunitiesPage", () => {
     expect(
       screen.getByText(/1 malformed or duplicate record was skipped/),
     ).toBeInTheDocument();
+  });
+
+  it("filters names case-insensitively and preserves the query in the URL", async () => {
+    mocks.listCommunities.mockResolvedValue({
+      communities: [
+        community("f", "Builders Guild"),
+        community("1", "Civic DAO"),
+      ],
+      nextCursor: null,
+      malformedRecords: 0,
+    });
+
+    render(<CommunitiesPage />);
+    expect(await screen.findByText("Builders Guild")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Search communities by name"), {
+      target: { value: "  CIVIC  " },
+    });
+
+    expect(screen.getByText("Civic DAO")).toBeInTheDocument();
+    expect(screen.queryByText("Builders Guild")).not.toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get("q")).toBe("CIVIC");
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect(screen.getByText("Builders Guild")).toBeInTheDocument();
+    expect(window.location.search).toBe("");
+  });
+
+  it("distinguishes no search matches and restores valid URL state", async () => {
+    window.history.replaceState({}, "", "/communities?q=missing");
+    mocks.listCommunities.mockResolvedValue({
+      communities: [community("2", "Civic DAO")],
+      nextCursor: null,
+      malformedRecords: 0,
+    });
+
+    render(<CommunitiesPage />);
+
+    expect(
+      await screen.findByText(/No communities match “missing”/),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    expect(screen.getByText("Civic DAO")).toBeInTheDocument();
+  });
+
+  it("restores paginated URL state and canonicalizes malformed values", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/communities?q=%20Civic%20&page=2",
+    );
+    mocks.listCommunities
+      .mockResolvedValueOnce({
+        communities: [community("3", "First DAO")],
+        nextCursor: 9,
+        malformedRecords: 0,
+      })
+      .mockResolvedValueOnce({
+        communities: [community("4", "Civic DAO")],
+        nextCursor: null,
+        malformedRecords: 0,
+      });
+
+    render(<CommunitiesPage />);
+    expect(await screen.findByText("Civic DAO")).toBeInTheDocument();
+    expect(mocks.listCommunities).toHaveBeenNthCalledWith(1, null, 9);
+    expect(mocks.listCommunities).toHaveBeenNthCalledWith(2, 9, 9);
+    expect(window.location.search).toBe("?q=Civic&page=2");
   });
 });

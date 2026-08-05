@@ -64,6 +64,14 @@ describe("CommunityDetailPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.useParams.mockReturnValue({ id: COMMUNITY_ID });
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+    });
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: undefined,
+    });
   });
 
   it("shows loading then renders public metadata, contracts, and governance", async () => {
@@ -165,5 +173,51 @@ describe("CommunityDetailPage", () => {
       screen.getByRole("button", { name: "Retry community request" }),
     );
     expect(await screen.findByText("Builders Guild")).toBeInTheDocument();
+  });
+
+  it("copies canonical identifiers and falls back to copying the share URL", async () => {
+    mocks.getCommunity.mockResolvedValue(foundResult);
+    render(<CommunityDetailPage />);
+    await screen.findByText("Builders Guild");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Copy full community ID" }),
+    );
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(COMMUNITY_ID);
+    expect(await screen.findByText("Community ID copied.")).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Share Builders Guild community page" }),
+    );
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      `${window.location.origin}/communities/${COMMUNITY_ID}`,
+    );
+    expect(
+      await screen.findByText("Community page link copied."),
+    ).toBeInTheDocument();
+  });
+
+  it("uses native sharing and announces permission failures", async () => {
+    const share = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("denied"));
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: share,
+    });
+    mocks.getCommunity.mockResolvedValue(foundResult);
+    render(<CommunityDetailPage />);
+    await screen.findByText("Builders Guild");
+    const shareButton = screen.getByRole("button", {
+      name: "Share Builders Guild community page",
+    });
+
+    fireEvent.click(shareButton);
+    expect(await screen.findByText("Community page shared.")).toBeInTheDocument();
+    fireEvent.click(shareButton);
+    expect(
+      await screen.findByText("Could not share the community page."),
+    ).toBeInTheDocument();
   });
 });

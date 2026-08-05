@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { resolveCommunityResourceUrl } from "@/lib/community/schema";
+import { CommunityAvatar } from "@/components/CommunityAvatar";
 import type { CommunityView } from "@/lib/community/types";
 import { truncateMiddle } from "@/lib/truncate";
 
@@ -10,21 +10,11 @@ export function CommunityCard({ community }: { community: CommunityView }) {
   return (
     <article className="flex h-full min-w-0 flex-col rounded-xl border border-slate-800 bg-[#151b2b] p-4 sm:p-5">
       <div className="flex min-w-0 items-start gap-3">
-        {metadata?.logo ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={resolveCommunityResourceUrl(metadata.logo)}
-            alt={`${name} logo`}
-            className="h-12 w-12 shrink-0 rounded-lg border border-slate-700 bg-slate-900 object-cover"
-          />
-        ) : (
-          <div
-            aria-hidden="true"
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-indigo-950 text-lg font-semibold text-indigo-300"
-          >
-            {metadata?.name.trim().charAt(0).toUpperCase() || "C"}
-          </div>
-        )}
+        <CommunityAvatar
+          communityId={record.id}
+          name={name}
+          logo={metadata?.logo}
+        />
         <div className="min-w-0">
           <h2 className="break-words text-lg font-semibold text-slate-100 [overflow-wrap:anywhere]">
             {name}
@@ -39,7 +29,10 @@ export function CommunityCard({ community }: { community: CommunityView }) {
       </div>
 
       {metadata ? (
-        <p className="mt-4 line-clamp-3 break-words text-sm leading-6 text-slate-400 [overflow-wrap:anywhere]">
+        <p
+          className="mt-4 line-clamp-3 break-words text-sm leading-6 text-slate-400 [overflow-wrap:anywhere]"
+          title={metadata.description}
+        >
           {metadata.description}
         </p>
       ) : (
