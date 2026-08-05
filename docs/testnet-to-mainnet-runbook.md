@@ -332,7 +332,7 @@ The coordinator reads aloud or screen-shares the network, passphrase, release
 SHA, deployer public key, and WASM hashes. A second person confirms each against
 the release record.
 
-### 2. Install and record WASM
+### 2. Upload and record WASM
 
 Use the exact CLI syntax validated during the testnet dry run. For each artifact:
 
@@ -342,7 +342,7 @@ test -f "$WASM_FILE"
 LOCAL_WASM_SHA256="$(sha256sum "$WASM_FILE" | awk '{print $1}')"
 
 INSTALLED_WASM_HASH="$(
-  stellar contract install \
+  stellar contract upload \
     --wasm "$WASM_FILE" \
     --source-account "$DEPLOYER_IDENTITY" \
     --network "$NETWORK"
@@ -352,8 +352,8 @@ printf 'file=%s\nsha256=%s\ninstalled_wasm_hash=%s\n' \
   "$WASM_FILE" "$LOCAL_WASM_SHA256" "$INSTALLED_WASM_HASH"
 ```
 
-Record the installed WASM hash and transaction/ledger from RPC or explorer.
-Installing code does not authorize it and is safe to do before deploying IDs,
+Record the uploaded WASM hash and transaction/ledger from RPC or explorer.
+Uploading code does not authorize it and is safe to do before deploying IDs,
 but all fees and hashes still require review.
 
 ### 3. Deploy in dependency order
@@ -612,7 +612,8 @@ surface must be validated during the testnet drill:
 
 stellar contract extend \
   --id "$CONTRACT_ID" \
-  --ledgers "$EXTEND_TO_LEDGERS" \
+  --ledgers-to-extend "$EXTEND_TO_LEDGERS" \
+  --durability persistent \
   --source-account "$DEPLOYER_IDENTITY" \
   --network "$NETWORK"
 ```
@@ -635,6 +636,7 @@ live-until ledgers.
    : "${CONTRACT_ID:?Set the verified archived contract ID}"
    stellar contract restore \
      --id "$CONTRACT_ID" \
+     --durability persistent \
      --source-account "$DEPLOYER_IDENTITY" \
      --network "$NETWORK"
    ```
