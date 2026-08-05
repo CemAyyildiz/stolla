@@ -201,7 +201,10 @@ function ScopedProposalHistory({ community }: { community: CommunityView }) {
               return (
                 <li key={proposal.id}>
                   <ProposalSummaryCard
-                    summary={proposal}
+                    summary={{
+                      proposalId: proposal.id,
+                      description: proposal.description,
+                    }}
                     showDescription
                     href={`/communities/${community.record.id}/proposals/${proposal.id}`}
                     stateStatus={
