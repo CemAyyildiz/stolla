@@ -1,3 +1,4 @@
+/** Covers issue #149: community detail and scoped proposal navigation states. */
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommunityDetailResult } from "@/lib/community/types";
