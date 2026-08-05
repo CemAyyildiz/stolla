@@ -1,8 +1,12 @@
+import { NETWORKS } from "./network";
 import { Networks } from "@stellar/stellar-sdk";
 
 const network = process.env.NEXT_PUBLIC_STELLAR_NETWORK ?? "testnet";
 
 export const stellarNetwork = network === "mainnet" ? "mainnet" : "testnet";
+
+/** Configured deployment network used by wizard and network-guard UI. */
+export const activeNetwork = NETWORKS[stellarNetwork];
 
 export const stellarConfig = {
   testnet: {
@@ -29,6 +33,8 @@ export const contractIds = {
   governor: process.env.NEXT_PUBLIC_GOVERNOR_CONTRACT_ID ?? "",
   communityFactory:
     process.env.NEXT_PUBLIC_COMMUNITY_FACTORY_CONTRACT_ID ?? "",
+  /** Alias used by assignee community-creation wizard modules. */
+  factory: process.env.NEXT_PUBLIC_COMMUNITY_FACTORY_CONTRACT_ID ?? "",
 };
 
 export function requireContractIds(): { nft: string; governor: string } {
