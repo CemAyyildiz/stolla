@@ -174,7 +174,7 @@ describe("ProposalsPage public history", () => {
     rerender(<ProposalsPage />);
 
     expect(
-      screen.getByText("Proposal history is temporarily unavailable."),
+      screen.getByText("More proposal history could not be loaded."),
     ).toBeInTheDocument();
     expect(screen.getByText("Next page RPC timeout")).toBeInTheDocument();
     expect(
