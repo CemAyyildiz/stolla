@@ -52,7 +52,7 @@ separate reviewed upgrade.
 
 ### Identifier and deployment sequence
 
-`community_id` is `sha256(network_passphrase || factory_address ||
+`community_id` is `sha256(network_id || factory_address ||
 creator_address || external_key)`, where `external_key` is caller-supplied
 bytes with a maximum documented length. The factory rejects an existing
 `community_id`; identifiers are never reused after registration.
