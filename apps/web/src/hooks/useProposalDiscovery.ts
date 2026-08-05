@@ -1,11 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { xdr } from "@stellar/stellar-sdk";
 import { Server as RpcServer } from "@stellar/stellar-sdk/rpc";
 import type { Api } from "@stellar/stellar-sdk/rpc";
-import { config } from "@/lib/stellar";
-import { requireContractIds } from "@/lib/stellar";
+import { config, requireContractIds, requireGovernorStartLedger } from "@/lib/stellar";
 import { decodeProposalEvent } from "@/lib/proposalEvents";
 import { getE2EBridge } from "@/lib/e2eMock";
 
@@ -48,10 +46,7 @@ export function useProposalDiscovery(governorContractId?: string) {
   const discover = useCallback(async () => {
     const governor = governorContractId ?? requireContractIds().governor;
     const server = new RpcServer(config.rpcUrl);
-
-    const proposalCreatedTopic = xdr
-      .ScVal.scvString("proposal_created")
-      .toXDR("base64");
+    const startLedger = requireGovernorStartLedger();
 
     setLoading(true);
     setError(null);
@@ -68,37 +63,29 @@ export function useProposalDiscovery(governorContractId?: string) {
       let cursor: string | undefined = undefined;
 
       for (;;) {
+        // Topic filters against current testnet RPC return empty for OZ
+        // contract-event symbols; fetch by contract id and filter client-side.
         const request:
           | {
-              filters: { contractIds: string[]; topics: string[][] }[];
+              filters: { contractIds: string[] }[];
               startLedger: number;
               limit?: number;
               cursor?: never;
             }
           | {
-              filters: { contractIds: string[]; topics: string[][] }[];
+              filters: { contractIds: string[] }[];
               cursor: string;
               startLedger?: never;
               limit?: number;
             } = cursor
           ? {
-              filters: [
-                {
-                  contractIds: [governor],
-                  topics: [[proposalCreatedTopic]],
-                },
-              ],
+              filters: [{ contractIds: [governor] }],
               cursor,
               limit: 100,
             }
           : {
-              filters: [
-                {
-                  contractIds: [governor],
-                  topics: [[proposalCreatedTopic]],
-                },
-              ],
-              startLedger: 1,
+              filters: [{ contractIds: [governor] }],
+              startLedger,
               limit: 100,
             };
 
@@ -106,6 +93,14 @@ export function useProposalDiscovery(governorContractId?: string) {
 
         for (const event of response.events) {
           if (event.topic.length < 2) continue;
+          const kind = event.topic[0];
+          const kindName =
+            kind.switch().name === "scvSymbol"
+              ? kind.sym().toString()
+              : kind.switch().name === "scvString"
+                ? kind.str().toString()
+                : "";
+          if (kindName !== "proposal_created") continue;
           const proposalIdScVal = event.topic[1];
           if (proposalIdScVal.switch().name !== "scvBytes") continue;
           const proposalIdBytes = proposalIdScVal.bytes();
