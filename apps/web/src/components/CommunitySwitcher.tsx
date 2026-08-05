@@ -36,7 +36,7 @@ export function CommunitySwitcher() {
   }, [open]);
 
   useEffect(() => {
-    if (!open || loaded || loading) return;
+    if (!open || loaded) return;
     let active = true;
     const load = async () => {
       setLoading(true);
@@ -69,7 +69,7 @@ export function CommunitySwitcher() {
     return () => {
       active = false;
     };
-  }, [loaded, loading, open]);
+  }, [loaded, open]);
 
   const selected = communities.find(
     (community) => community.record.id === selectedId,

@@ -97,7 +97,10 @@ describe("CommunityDetailPage", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "View community proposals" }),
-    ).toHaveAttribute("href", `/proposals?community=${COMMUNITY_ID}`);
+    ).toHaveAttribute(
+      "href",
+      `/communities/${COMMUNITY_ID}/proposals`,
+    );
     expect(
       screen.getAllByRole("button", { name: /Copy full .* address/ }),
     ).toHaveLength(2);
