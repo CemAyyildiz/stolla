@@ -20,20 +20,25 @@ import {
   INITIAL_CREATION_STATE,
   creationReducer,
   deploymentBlocker,
+  deploymentStage,
   isDraftComplete,
   isDraftDirty,
   readPersistedDraft,
   readPersistedSubmission,
   simulationBlocker,
   type CommunityDraft,
+  type CommunityRegistryEntry,
   type CommunitySimulation,
   type CreationBlocker,
   type CreationContext,
   type CreationStep,
+  type DeploymentStage,
 } from "@/lib/community-creation";
 import {
+  confirmCommunityDeployment,
   simulateCommunityDeployment,
   submitCommunityDeployment,
+  verifyCommunityRegistry,
 } from "@/lib/community-factory";
 import {
   contractUrl,
@@ -46,7 +51,17 @@ import { activeNetwork, config, contractIds } from "@/lib/stellar";
 export type CommunityDeploymentPort = {
   simulate: (admin: string, draft: CommunityDraft) => Promise<CommunitySimulation>;
   submit: (simulation: CommunitySimulation) => Promise<string>;
+  confirm: (transactionHash: string) => Promise<void>;
+  verify: (admin: string) => Promise<CommunityRegistryEntry>;
 };
+
+const PROGRESS_STAGES: { stage: DeploymentStage; label: string }[] = [
+  { stage: "simulated", label: "Simulated" },
+  { stage: "awaiting-approval", label: "Approved in wallet" },
+  { stage: "submitted", label: "Submitted" },
+  { stage: "confirmed", label: "Confirmed on chain" },
+  { stage: "verified", label: "Verified in registry" },
+];
 
 const STEP_LABELS: Record<CreationStep, string> = {
   metadata: "Metadata",
@@ -167,6 +182,15 @@ export function CreateCommunityWizard({
             rpcUrl: config.rpcUrl,
             signTransaction,
           }),
+        confirm: (transactionHash) =>
+          confirmCommunityDeployment(config.rpcUrl, transactionHash),
+        verify: (admin) =>
+          verifyCommunityRegistry({
+            network: activeNetwork,
+            rpcUrl: config.rpcUrl,
+            factoryAddress: contractIds.factory,
+            admin,
+          }),
       },
     [deployment, signTransaction],
   );
@@ -200,11 +224,20 @@ export function CreateCommunityWizard({
     }
   }
 
+  /**
+   * State updates are batched, so two clicks in the same tick would both pass
+   * the blocker check. The ref closes that window before any signature request.
+   */
+  const deployingRef = useRef(false);
+
   async function handleDeploy() {
-    if (deployBlocker || !state.simulation) return;
     const simulation = state.simulation;
+    if (deployBlocker || !simulation || !address || deployingRef.current) return;
+
+    deployingRef.current = true;
     dispatch({ type: "signing-started" });
     setError(null);
+
     try {
       const transactionHash = await port.submit(simulation);
       dispatch({
@@ -213,14 +246,29 @@ export function CreateCommunityWizard({
           networkPassphrase: simulation.networkPassphrase,
           transactionHash,
           status: "pending",
+          registry: null,
         },
       });
+
+      try {
+        await port.confirm(transactionHash);
+        dispatch({ type: "submission-settled", status: "confirmed" });
+        const registry = await port.verify(address);
+        dispatch({ type: "registry-verified", registry });
+      } catch (caught) {
+        const message = errorMessage(caught, "Confirmation failed.");
+        dispatch({ type: "submission-settled", status: "failed", message });
+        setError(message);
+      }
     } catch (caught) {
       dispatch({ type: "signing-ended" });
       setError(errorMessage(caught, "Deployment failed."));
+    } finally {
+      deployingRef.current = false;
     }
   }
 
+  const stage = deploymentStage(state);
   const stepIndex = CREATION_STEPS.indexOf(state.step);
   const goToStep = (step: CreationStep) => dispatch({ type: "step-changed", step });
 
@@ -362,10 +410,17 @@ export function CreateCommunityWizard({
           )}
 
           {state.submission && (
-            <SubmissionSummary
-              transactionHash={state.submission.transactionHash}
-              networkPassphrase={state.submission.networkPassphrase}
-            />
+            <>
+              <DeploymentProgress stage={stage} />
+              <SubmissionSummary
+                transactionHash={state.submission.transactionHash}
+                networkPassphrase={state.submission.networkPassphrase}
+              />
+            </>
+          )}
+
+          {state.submission?.registry && (
+            <CommunityCreated registry={state.submission.registry} />
           )}
         </Panel>
       )}
@@ -543,6 +598,68 @@ function NetworkFacts({
         </dd>
       </div>
     </dl>
+  );
+}
+
+function DeploymentProgress({ stage }: { stage: DeploymentStage }) {
+  const reached = PROGRESS_STAGES.findIndex((entry) => entry.stage === stage);
+
+  return (
+    <ol aria-label="Deployment progress" className="space-y-2 text-sm">
+      {PROGRESS_STAGES.map((entry, index) => {
+        const done = stage === "failed" ? index < reached : index <= reached;
+
+        return (
+          <li
+            key={entry.stage}
+            data-stage={entry.stage}
+            data-state={done ? "done" : "pending"}
+            className={done ? "text-emerald-300" : "text-slate-500"}
+          >
+            {done ? "✓" : "○"} {entry.label}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function CommunityCreated({ registry }: { registry: CommunityRegistryEntry }) {
+  const contracts = [
+    { label: "Community NFT", id: registry.nftContractId },
+    { label: "Governor", id: registry.governorContractId },
+  ];
+
+  return (
+    <div
+      data-testid="community-created"
+      className="rounded-xl border border-emerald-800/60 bg-emerald-950/40 p-4"
+    >
+      <p className="font-semibold text-emerald-200">Community created</p>
+      <p className="mt-1 text-sm text-emerald-100/80">
+        The factory registry lists both contracts for this community.
+      </p>
+      <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+        {contracts.map((contract) => {
+          const link = contractUrl(activeNetwork, contract.id);
+
+          return (
+            <div key={contract.label}>
+              <dt className="text-emerald-300/70">{contract.label}</dt>
+              <dd className="break-all font-mono text-emerald-50">
+                {link ? (
+                  <a href={link} target="_blank" rel="noreferrer" className="hover:underline">
+                    {contract.id}
+                  </a>
+                ) : (
+                  contract.id
+                )}
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
+    </div>
   );
 }
 

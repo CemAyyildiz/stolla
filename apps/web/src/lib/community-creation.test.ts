@@ -4,6 +4,7 @@ import {
   INITIAL_CREATION_STATE,
   creationReducer,
   deploymentBlocker,
+  deploymentStage,
   isDraftComplete,
   simulationBlocker,
   type CommunityDraft,
@@ -200,6 +201,7 @@ describe("post-submission network changes", () => {
         networkPassphrase: Networks.TESTNET,
         transactionHash: "hash-1",
         status: "pending",
+        registry: null,
       },
     });
 
@@ -213,6 +215,7 @@ describe("post-submission network changes", () => {
       networkPassphrase: Networks.TESTNET,
       transactionHash: "hash-1",
       status: "pending",
+      registry: null,
     });
   });
 
@@ -239,6 +242,62 @@ describe("post-submission network changes", () => {
     );
 
     expect(confirmed.submission?.status).toBe("confirmed");
+  });
+});
+
+describe("deployment stage", () => {
+  const REGISTRY = { nftContractId: "CNFT", governorContractId: "CGOV" };
+
+  const submittedState = () =>
+    creationReducer(onTestnet, {
+      type: "submission-recorded",
+      submission: {
+        networkPassphrase: Networks.TESTNET,
+        transactionHash: "hash-1",
+        status: "pending",
+        registry: null,
+      },
+    });
+
+  it("advances through the flow", () => {
+    expect(deploymentStage(INITIAL_CREATION_STATE)).toBe("draft");
+    expect(deploymentStage(onTestnet)).toBe("simulated");
+    expect(
+      deploymentStage(creationReducer(onTestnet, { type: "signing-started" })),
+    ).toBe("awaiting-approval");
+    expect(deploymentStage(submittedState())).toBe("submitted");
+  });
+
+  it("only reports verified once the registry has answered", () => {
+    const confirmed = creationReducer(submittedState(), {
+      type: "submission-settled",
+      status: "confirmed",
+    });
+    expect(deploymentStage(confirmed)).toBe("confirmed");
+
+    const verified = creationReducer(confirmed, {
+      type: "registry-verified",
+      registry: REGISTRY,
+    });
+    expect(deploymentStage(verified)).toBe("verified");
+    expect(verified.submission?.registry).toEqual(REGISTRY);
+  });
+
+  it("reports failure regardless of registry state", () => {
+    const failed = creationReducer(submittedState(), {
+      type: "submission-settled",
+      status: "failed",
+      message: "on chain failure",
+    });
+    expect(deploymentStage(failed)).toBe("failed");
+  });
+
+  it("ignores a registry result with no submission to attach it to", () => {
+    const orphan = creationReducer(onTestnet, {
+      type: "registry-verified",
+      registry: REGISTRY,
+    });
+    expect(orphan).toBe(onTestnet);
   });
 });
 
