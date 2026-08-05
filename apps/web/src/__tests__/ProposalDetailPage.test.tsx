@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   useWallet: vi.fn(),
   createGovernorClient: vi.fn(),
   createReadOnlyGovernorClient: vi.fn(),
+  createReadOnlyNftClient: vi.fn(),
   fetchVoteTotals: vi.fn(),
   useTransactionLifecycle: vi.fn(),
 }));
@@ -16,6 +17,7 @@ vi.mock("@/context/WalletProvider", () => ({ useWallet: mocks.useWallet }));
 vi.mock("@/lib/contracts", () => ({
   createGovernorClient: mocks.createGovernorClient,
   createReadOnlyGovernorClient: mocks.createReadOnlyGovernorClient,
+  createReadOnlyNftClient: mocks.createReadOnlyNftClient,
 }));
 vi.mock("@/lib/voteAggregation", () => ({
   fetchVoteTotals: mocks.fetchVoteTotals,
@@ -100,6 +102,23 @@ function mockGovernor(overrides: Record<string, unknown> = {}) {
   });
 }
 
+function mockNft(overrides: Record<string, unknown> = {}) {
+  mocks.createReadOnlyNftClient.mockReturnValue({
+    get_votes: vi.fn().mockResolvedValue({ result: BigInt(3) }),
+    ...overrides,
+  });
+}
+
+function mockConnectedWallet(address = "GWALLET") {
+  mocks.useWallet.mockReturnValue({
+    address,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    signTransaction: vi.fn(),
+    isConnecting: false,
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockWallet();
@@ -107,6 +126,7 @@ beforeEach(() => {
   mockVoteTotals();
   mockReadOnly();
   mockGovernor();
+  mockNft();
 });
 
 
@@ -247,5 +267,108 @@ describe("ProposalDetailPage", () => {
     });
     expect(screen.getByText("Active")).toBeInTheDocument();
     expect(screen.queryByText("Loading proposal…")).not.toBeInTheDocument();
+  });
+
+  it("asks disconnected users to connect instead of showing zero voting power", async () => {
+    mocks.useParams.mockReturnValue({ id: VALID_ID });
+    render(<ProposalDetailPage />);
+
+    expect(
+      await screen.findByText("Connect your wallet to view voting power."),
+    ).toBeInTheDocument();
+    expect(mocks.createReadOnlyNftClient).not.toHaveBeenCalled();
+    expect(screen.queryByText("Delegate your membership NFT")).not.toBeInTheDocument();
+  });
+
+  it("shows a loading state while voting power is fetched", async () => {
+    mocks.useParams.mockReturnValue({ id: VALID_ID });
+    mockConnectedWallet();
+    const pending = deferred<{ result: bigint }>();
+    mockNft({ get_votes: vi.fn().mockReturnValue(pending.promise) });
+
+    render(<ProposalDetailPage />);
+
+    expect(await screen.findByText("Active")).toBeInTheDocument();
+    const votingPowerLabel = screen.getByText("Your voting power");
+    const votingPowerValue = votingPowerLabel.parentElement;
+    expect(votingPowerValue?.textContent).not.toMatch(/\b0\b/);
+    expect(votingPowerValue?.textContent).not.toContain(
+      "Connect your wallet to view voting power.",
+    );
+    expect(votingPowerValue?.querySelector("[aria-hidden='true']")).toBeTruthy();
+
+    await act(async () => {
+      pending.resolve({ result: BigInt(7) });
+    });
+    expect(await screen.findByText("7")).toBeInTheDocument();
+  });
+
+  it("shows exact positive voting power without precision loss", async () => {
+    mocks.useParams.mockReturnValue({ id: VALID_ID });
+    mockConnectedWallet();
+    const power = BigInt("9007199254740993");
+    mockNft({
+      get_votes: vi.fn().mockResolvedValue({ result: power }),
+    });
+
+    render(<ProposalDetailPage />);
+
+    expect(await screen.findByText(power.toString())).toBeInTheDocument();
+  });
+
+  it("guides users when voting power is zero", async () => {
+    mocks.useParams.mockReturnValue({ id: VALID_ID });
+    mockConnectedWallet();
+    mockNft({
+      get_votes: vi.fn().mockResolvedValue({ result: BigInt(0) }),
+    });
+
+    render(<ProposalDetailPage />);
+
+    expect(
+      await screen.findByText(/Delegate your membership NFT on the Community page/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Your voting power").parentElement?.querySelector(".font-mono")
+        ?.textContent,
+    ).toBe("0");
+  });
+
+  it("keeps proposal details visible when voting power read fails", async () => {
+    mocks.useParams.mockReturnValue({ id: VALID_ID });
+    mockConnectedWallet();
+    mockNft({
+      get_votes: vi.fn().mockRejectedValue(new Error("votes boom")),
+    });
+
+    render(<ProposalDetailPage />);
+
+    expect(await screen.findByText("Active")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Cast vote" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Unavailable")).toBeInTheDocument();
+    expect(screen.queryByText("votes boom")).not.toBeInTheDocument();
+  });
+
+  it("refreshes voting power when the connected address changes", async () => {
+    mocks.useParams.mockReturnValue({ id: VALID_ID });
+    mockConnectedWallet("GWALLET1");
+    const getVotes = vi
+      .fn()
+      .mockResolvedValueOnce({ result: BigInt(1) })
+      .mockResolvedValueOnce({ result: BigInt(4) });
+    mockNft({ get_votes: getVotes });
+
+    const { rerender } = render(<ProposalDetailPage />);
+    expect(await screen.findByText("1")).toBeInTheDocument();
+
+    mockConnectedWallet("GWALLET2");
+    rerender(<ProposalDetailPage />);
+
+    expect(await screen.findByText("4")).toBeInTheDocument();
+    expect(getVotes).toHaveBeenCalledTimes(2);
+    expect(getVotes.mock.calls[0][0]).toEqual({ account: "GWALLET1" });
+    expect(getVotes.mock.calls[1][0]).toEqual({ account: "GWALLET2" });
   });
 });
