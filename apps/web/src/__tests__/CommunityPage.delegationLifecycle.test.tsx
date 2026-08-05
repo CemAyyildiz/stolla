@@ -157,4 +157,83 @@ describe("CommunityPage delegation lifecycle", () => {
     ).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText(/Transaction timed out while still pending/i)).not.toBeInTheDocument();
   });
+
+  it("disables delegation while disconnected", async () => {
+    mocks.useWallet.mockReturnValue({
+      address: null,
+      signTransaction: vi.fn(),
+      isConnecting: false,
+    });
+    const delegate = vi.fn();
+    mocks.createNftClient.mockReturnValue({ delegate });
+
+    render(<CommunityPage />);
+    expect(
+      await screen.findByRole("button", { name: "Delegate to self" }),
+    ).toBeDisabled();
+    expect(delegate).not.toHaveBeenCalled();
+  });
+
+  it("passes the connected address as account and delegatee", async () => {
+    const delegate = vi.fn().mockResolvedValue({
+      sign: async () => undefined,
+      send: async () => ({ status: "SUCCESS", hash: "abc" }),
+    });
+    mocks.createNftClient.mockReturnValue({ delegate });
+
+    render(<CommunityPage />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Delegate to self" }),
+    );
+
+    await waitFor(() => {
+      expect(delegate).toHaveBeenCalledWith({
+        account: "GWALLET",
+        delegatee: "GWALLET",
+      });
+    });
+  });
+
+  it("does not report success after wallet rejection", async () => {
+    mocks.createNftClient.mockReturnValue({
+      delegate: vi.fn().mockResolvedValue({
+        sign: async () => {
+          throw new Error("User rejected the request");
+        },
+        send: vi.fn(),
+      }),
+    });
+
+    render(<CommunityPage />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Delegate to self" }),
+    );
+
+    expect(
+      (await screen.findAllByText(/rejected the wallet request/i)).length,
+    ).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Delegate confirmed")).not.toBeInTheDocument();
+  });
+
+  it("exposes a terminal state after RPC send failure", async () => {
+    mocks.createNftClient.mockReturnValue({
+      delegate: vi.fn().mockResolvedValue({
+        sign: async () => undefined,
+        send: async () => {
+          throw new Error("send failed: rpc unavailable");
+        },
+      }),
+    });
+
+    render(<CommunityPage />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Delegate to self" }),
+    );
+
+    expect(
+      (await screen.findAllByText(/could not be submitted|temporarily unreachable/i))
+        .length,
+    ).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Delegate confirmed")).not.toBeInTheDocument();
+  });
 });
