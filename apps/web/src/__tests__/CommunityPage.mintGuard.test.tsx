@@ -146,6 +146,12 @@ describe("CommunityPage mint lifecycle", () => {
     expect(
       (await screen.findAllByText(/rejected the wallet request/i)).length,
     ).toBeGreaterThanOrEqual(1);
+    expect(screen.getByLabelText(/Recipient address/i)).toHaveValue(
+      "GRECIPIENT",
+    );
+    expect(screen.getByLabelText(/IPFS metadata URI/i)).toHaveValue(
+      "ipfs://meta",
+    );
     await waitFor(() => expect(button).not.toBeDisabled());
 
     fireEvent.click(button);
@@ -153,5 +159,121 @@ describe("CommunityPage mint lifecycle", () => {
       await screen.findByText("Minted token #9 successfully."),
     ).toBeInTheDocument();
     expect(mint).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not call mint when wallet is disconnected", async () => {
+    const mint = vi.fn();
+    mocks.createNftClient.mockReturnValue({ mint });
+    mocks.useWallet.mockReturnValue({
+      address: null,
+      signTransaction: vi.fn(),
+      isConnecting: false,
+    });
+
+    render(<CommunityPage />);
+    expect(
+      await screen.findByRole("button", { name: "Mint NFT" }),
+    ).toBeDisabled();
+    expect(mint).not.toHaveBeenCalled();
+  });
+
+  it("shows validation errors for missing recipient and token URI", async () => {
+    const mint = vi.fn();
+    mocks.createNftClient.mockReturnValue({ mint });
+
+    render(<CommunityPage />);
+    fireEvent.change(await screen.findByLabelText(/Recipient address/i), {
+      target: { value: "" },
+    });
+    fireEvent.change(screen.getByLabelText(/IPFS metadata URI/i), {
+      target: { value: "" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Mint NFT" }));
+
+    expect(
+      await screen.findByText("Recipient address is required."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("IPFS metadata URI is required."),
+    ).toBeInTheDocument();
+    expect(mint).not.toHaveBeenCalled();
+  });
+
+  it("calls mint with the exact recipient and token URI", async () => {
+    const mint = vi.fn().mockResolvedValue({
+      sign: async () => undefined,
+      send: async () => ({ result: 3 }),
+    });
+    mocks.createNftClient.mockReturnValue({ mint });
+
+    render(<CommunityPage />);
+    fireEvent.change(await screen.findByLabelText(/Recipient address/i), {
+      target: { value: "GRECIPIENT" },
+    });
+    fireEvent.change(screen.getByLabelText(/IPFS metadata URI/i), {
+      target: { value: "ipfs://collection/member.json" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Mint NFT" }));
+
+    await waitFor(() => {
+      expect(mint).toHaveBeenCalledWith({
+        to: "GRECIPIENT",
+        token_uri: "ipfs://collection/member.json",
+      });
+    });
+  });
+
+  it("shows simulation failure and preserves form input", async () => {
+    const mint = vi
+      .fn()
+      .mockRejectedValue(new Error("simulation failed: not the owner"));
+    mocks.createNftClient.mockReturnValue({ mint });
+
+    render(<CommunityPage />);
+    fireEvent.change(await screen.findByLabelText(/Recipient address/i), {
+      target: { value: "GRECIPIENT" },
+    });
+    fireEvent.change(screen.getByLabelText(/IPFS metadata URI/i), {
+      target: { value: "ipfs://meta" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Mint NFT" }));
+
+    expect(
+      (await screen.findAllByText(/could not be simulated/i)).length,
+    ).toBeGreaterThanOrEqual(1);
+    expect(screen.getByLabelText(/Recipient address/i)).toHaveValue(
+      "GRECIPIENT",
+    );
+    expect(screen.getByLabelText(/IPFS metadata URI/i)).toHaveValue(
+      "ipfs://meta",
+    );
+  });
+
+  it("shows submission failure and preserves form input", async () => {
+    const mint = vi.fn().mockResolvedValue({
+      sign: async () => undefined,
+      send: async () => {
+        throw new Error("send failed: rpc unavailable");
+      },
+    });
+    mocks.createNftClient.mockReturnValue({ mint });
+
+    render(<CommunityPage />);
+    fireEvent.change(await screen.findByLabelText(/Recipient address/i), {
+      target: { value: "GKEEP" },
+    });
+    fireEvent.change(screen.getByLabelText(/IPFS metadata URI/i), {
+      target: { value: "ipfs://keep" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Mint NFT" }));
+
+    expect(
+      (await screen.findAllByText(/could not be submitted|temporarily unreachable/i))
+        .length,
+    ).toBeGreaterThanOrEqual(1);
+    expect(screen.getByLabelText(/Recipient address/i)).toHaveValue("GKEEP");
+    expect(screen.getByLabelText(/IPFS metadata URI/i)).toHaveValue(
+      "ipfs://keep",
+    );
   });
 });
