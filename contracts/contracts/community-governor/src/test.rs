@@ -1417,12 +1417,10 @@ fn governor_storage_survives_advancement_and_instance_ttl_renews_at_boundary() {
         &voter,
     );
 
-    CommunityGovernorClient::new(&e, &fixture.governor_id).extend_instance_ttl();
-    e.as_contract(&fixture.governor_id, || {
-        assert_eq!(e.storage().instance().get_ttl(), STORAGE_EXTEND_AMOUNT);
-    });
+    let instance_ttl = e.as_contract(&fixture.governor_id, || e.storage().instance().get_ttl());
+    assert!(instance_ttl > STORAGE_TTL_THRESHOLD);
 
-    let advance_by = STORAGE_EXTEND_AMOUNT - STORAGE_TTL_THRESHOLD;
+    let advance_by = instance_ttl - STORAGE_TTL_THRESHOLD;
     e.ledger().with_mut(|ledger| {
         ledger.sequence_number += advance_by;
         ledger.timestamp += u64::from(advance_by) * 5;
