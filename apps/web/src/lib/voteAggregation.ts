@@ -1,6 +1,7 @@
 import { rpc, xdr, scValToNative } from "@stellar/stellar-sdk";
 import { Buffer } from "buffer";
 import { config, contractIds } from "./stellar";
+import { getE2EBridge } from "./e2eMock";
 
 export interface VoteTotals {
   for: bigint;
@@ -29,6 +30,17 @@ export async function fetchVoteTotals(
   proposalIdHex: string,
   governorContractId = contractIds.governor,
 ): Promise<VoteAggregationResult> {
+  if (getE2EBridge()?.proposals?.[governorContractId]) {
+    return {
+      totals: {
+        for: BigInt(0),
+        against: BigInt(0),
+        abstain: BigInt(0),
+        total: BigInt(0),
+      },
+      incomplete: false,
+    };
+  }
   if (!governorContractId) {
     return {
       totals: { for: BigInt(0), against: BigInt(0), abstain: BigInt(0), total: BigInt(0) },

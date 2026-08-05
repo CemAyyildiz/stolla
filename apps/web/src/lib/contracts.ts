@@ -1,13 +1,37 @@
+import { Buffer } from "buffer";
 import { Client as NftClient } from "@/lib/bindings/community-nft/src";
 import { Client as GovernorClient } from "@/lib/bindings/community-governor/src";
 import type { SignTransaction } from "@stellar/stellar-sdk/contract";
 import { config, requireContractIds } from "./stellar";
+import { getE2EBridge } from "./e2eMock";
 
 type ClientOptions = {
   publicKey: string;
   signTransaction: SignTransaction;
   contractId?: string;
 };
+
+function createE2EGovernorClient(contractId: string) {
+  const proposals = getE2EBridge()?.proposals?.[contractId];
+  if (!proposals) return null;
+  const proposal = (input: { proposal_id?: Uint8Array }) => {
+    const id = input.proposal_id
+      ? Buffer.from(input.proposal_id).toString("hex")
+      : "";
+    return proposals.find((candidate) => candidate.id === id);
+  };
+  const result = <T>(value: T) => Promise.resolve({ result: value });
+  return {
+    proposal_state: (input: { proposal_id: Uint8Array }) =>
+      result(proposal(input)?.state ?? 0),
+    has_voted: () => result(false),
+    proposal_snapshot: () => result(100),
+    proposal_deadline: () => result(200),
+    proposal_proposer: () => result(null),
+    quorum: () => result(BigInt(1)),
+    get_votes: () => result({ against: BigInt(0), for: BigInt(0), abstain: BigInt(0) }),
+  };
+}
 
 export function createNftClient({
   publicKey,
@@ -30,6 +54,8 @@ export function createGovernorClient({
   contractId,
 }: ClientOptions) {
   const governor = contractId ?? requireContractIds().governor;
+  const mocked = createE2EGovernorClient(governor);
+  if (mocked) return mocked as unknown as GovernorClient;
   return new GovernorClient({
     contractId: governor,
     networkPassphrase: config.networkPassphrase,
@@ -50,6 +76,8 @@ export function createReadOnlyNftClient(contractId?: string) {
 
 export function createReadOnlyGovernorClient(contractId?: string) {
   const governor = contractId ?? requireContractIds().governor;
+  const mocked = createE2EGovernorClient(governor);
+  if (mocked) return mocked as unknown as GovernorClient;
   return new GovernorClient({
     contractId: governor,
     networkPassphrase: config.networkPassphrase,

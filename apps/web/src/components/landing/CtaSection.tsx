@@ -17,13 +17,15 @@ export function CtaSection() {
               Ready to launch your community?
             </h2>
             <p className="landing-cta-desc">
-              Connect your wallet, bring members together, and run your first
-              governance vote with Stolla.
+              Prepare your configuration before connecting a wallet. Deployment
+              requires approval, network fees, and ledger confirmation.
             </p>
             <div className="landing-hero-actions">
-              <LinkButton href="/community">Get started</LinkButton>
-              <LinkButton href="/proposals" variant="ghost">
-                Browse proposals
+              <LinkButton href="/communities/create">
+                Create a community
+              </LinkButton>
+              <LinkButton href="/communities" variant="ghost">
+                Browse communities
               </LinkButton>
             </div>
           </div>

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 async function expectNoHorizontalOverflow(page: Page) {
+  const width = page.viewportSize()?.width;
   await expect
     .poll(() =>
       page.evaluate(() => ({
@@ -10,9 +11,9 @@ async function expectNoHorizontalOverflow(page: Page) {
       })),
     )
     .toEqual({
-      clientWidth: 390,
-      documentWidth: 390,
-      bodyWidth: 390,
+      clientWidth: width,
+      documentWidth: width,
+      bodyWidth: width,
     });
 }
 
@@ -23,11 +24,11 @@ test("navigates landing, Community, and Proposals without mobile overflow", asyn
   await expect(page).toHaveURL("/");
   await expectNoHorizontalOverflow(page);
 
-  await page.getByRole("link", { name: "Get started" }).first().click();
-  await expect(page).toHaveURL("/community");
+  await page.getByRole("link", { name: "Browse communities" }).first().click();
+  await expect(page).toHaveURL("/communities");
 
   await expect(
-    page.getByRole("heading", { level: 1, name: "Community NFT" }),
+    page.getByRole("heading", { level: 1, name: "Communities" }),
   ).toBeVisible();
   const appNavigation = page.getByRole("navigation");
   await expect(

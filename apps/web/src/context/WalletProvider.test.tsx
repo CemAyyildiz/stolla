@@ -12,8 +12,13 @@ import { WalletProvider } from "./WalletProvider";
 const walletKit = vi.hoisted(() => ({
   authModal: vi.fn(),
   disconnect: vi.fn(),
+  getNetwork: vi.fn(),
   init: vi.fn(),
-  on: vi.fn(() => vi.fn()),
+  on: vi.fn((type?: unknown, handler?: unknown) => {
+    void type;
+    void handler;
+    return vi.fn();
+  }),
 }));
 
 vi.mock("@creit.tech/stellar-wallets-kit/sdk", () => ({
@@ -45,6 +50,11 @@ describe("wallet connection feedback", () => {
   beforeEach(() => {
     walletKit.authModal.mockReset();
     walletKit.disconnect.mockReset();
+    walletKit.getNetwork.mockReset();
+    walletKit.getNetwork.mockResolvedValue({
+      network: "testnet",
+      networkPassphrase: "Test SDF Network ; September 2015",
+    });
     walletKit.init.mockReset();
     walletKit.on.mockClear();
     vi.spyOn(console, "error").mockImplementation(() => undefined);

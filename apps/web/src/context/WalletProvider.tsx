@@ -9,9 +9,13 @@ import {
   useRef,
   useState,
   type ReactNode,
-} from "react";import { StellarWalletsKit } from "@creit.tech/stellar-wallets-kit/sdk";
+} from "react";
+import { StellarWalletsKit } from "@creit.tech/stellar-wallets-kit/sdk";
 import { Networks, KitEventType } from "@creit.tech/stellar-wallets-kit/types";
 import { FreighterModule } from "@creit.tech/stellar-wallets-kit/modules/freighter";
+import type { SignTransaction } from "@stellar/stellar-sdk/contract";
+import { getE2EBridge } from "@/lib/e2eMock";
+import { config } from "@/lib/stellar";
 
 export type WalletConnectionError = {
   code: "request-rejected" | "wallet-unavailable" | "connection-failed";
@@ -20,9 +24,11 @@ export type WalletConnectionError = {
 
 type WalletContextValue = {
   address: string | null;
+  walletNetwork?: string | null;
+  walletNetworkPassphrase?: string | null;
   connect: () => Promise<void>;
   disconnect: () => void;
-  signTransaction: (xdr: string) => Promise<{ signedTxXdr: string }>;
+  signTransaction: SignTransaction;
   isConnecting: boolean;
   connectionError: WalletConnectionError | null;
 };
@@ -105,7 +111,10 @@ function ensureKit() {
   if (!kitInitialized && typeof window !== "undefined") {
     StellarWalletsKit.init({
       modules: [new FreighterModule()],
-      network: Networks.TESTNET,
+      network:
+        config.networkPassphrase === Networks.PUBLIC
+          ? Networks.PUBLIC
+          : Networks.TESTNET,
     });
     kitInitialized = true;
   }
@@ -113,18 +122,55 @@ function ensureKit() {
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [address, setAddress] = useState<string | null>(null);
+  const [walletNetwork, setWalletNetwork] = useState<string | null>(null);
+  const [walletNetworkPassphrase, setWalletNetworkPassphrase] = useState<
+    string | null
+  >(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] =
     useState<WalletConnectionError | null>(null);
   const connectInFlightRef = useRef(false);
 
   useEffect(() => {
+    const mockedWallet = getE2EBridge()?.wallet;
+    if (mockedWallet) {
+      const initialize = window.setTimeout(() => {
+        setAddress(mockedWallet.address);
+        setWalletNetworkPassphrase(mockedWallet.networkPassphrase);
+        setWalletNetwork(
+          mockedWallet.networkPassphrase === Networks.PUBLIC
+            ? "mainnet"
+            : "testnet",
+        );
+      }, 0);
+      const interval = window.setInterval(() => {
+        const current = getE2EBridge()?.wallet;
+        if (!current) return;
+        setAddress(current.address);
+        setWalletNetworkPassphrase(current.networkPassphrase);
+        setWalletNetwork(
+          current.networkPassphrase === Networks.PUBLIC ? "mainnet" : "testnet",
+        );
+      }, 100);
+      return () => {
+        window.clearTimeout(initialize);
+        window.clearInterval(interval);
+      };
+    }
     ensureKit();
     const unsubscribe = StellarWalletsKit.on(
       KitEventType.STATE_UPDATED,
       (event) => {
         const updatedAddress = event.payload.address ?? null;
         setAddress(updatedAddress);
+        setWalletNetworkPassphrase(event.payload.networkPassphrase || null);
+        setWalletNetwork(
+          event.payload.networkPassphrase === Networks.PUBLIC
+            ? "mainnet"
+            : event.payload.networkPassphrase === Networks.TESTNET
+              ? "testnet"
+              : "custom",
+        );
         if (updatedAddress) {
           setConnectionError(null);
         }
@@ -139,9 +185,30 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setConnectionError(null);
     setIsConnecting(true);
     try {
+      const mockedWallet = getE2EBridge()?.wallet;
+      if (mockedWallet) {
+        setAddress(mockedWallet.address);
+        setWalletNetworkPassphrase(mockedWallet.networkPassphrase);
+        setWalletNetwork(
+          mockedWallet.networkPassphrase === Networks.PUBLIC ? "mainnet" : "testnet",
+        );
+        return;
+      }
       ensureKit();
       const { address: walletAddress } = await StellarWalletsKit.authModal();
+      const selectedNetwork =
+        typeof StellarWalletsKit.getNetwork === "function"
+          ? await StellarWalletsKit.getNetwork()
+          : {
+              network:
+                config.networkPassphrase === Networks.PUBLIC
+                  ? "mainnet"
+                  : "testnet",
+              networkPassphrase: config.networkPassphrase,
+            };
       setAddress(walletAddress);
+      setWalletNetwork(selectedNetwork.network);
+      setWalletNetworkPassphrase(selectedNetwork.networkPassphrase);
       setConnectionError(null);
     } catch (error) {
       const safeError = toWalletConnectionError(error);
@@ -155,22 +222,48 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, []);
   const disconnect = useCallback(() => {
+    if (getE2EBridge()?.wallet) {
+      setAddress(null);
+      setWalletNetwork(null);
+      setWalletNetworkPassphrase(null);
+      return;
+    }
     ensureKit();
     void StellarWalletsKit.disconnect();
     setAddress(null);
     setConnectionError(null);
   }, []);
 
-  const signTransaction = useCallback(async (xdr: string) => {
+  const signTransaction = useCallback<SignTransaction>(async (xdr, options) => {
+    const mockedWallet = getE2EBridge()?.wallet;
+    if (mockedWallet) {
+      if (mockedWallet.rejected) throw new Error("User rejected the request.");
+      if (
+        options?.networkPassphrase &&
+        options.networkPassphrase !== mockedWallet.networkPassphrase
+      ) {
+        throw new Error("Wallet network does not match the transaction network.");
+      }
+      return { signedTxXdr: xdr, signerAddress: mockedWallet.address };
+    }
+    if (
+      walletNetworkPassphrase &&
+      walletNetworkPassphrase !== config.networkPassphrase
+    ) {
+      throw new Error("Wallet network does not match the application network.");
+    }
     ensureKit();
     return StellarWalletsKit.signTransaction(xdr, {
-      networkPassphrase: Networks.TESTNET,
+      ...options,
+      networkPassphrase: config.networkPassphrase,
     });
-  }, []);
+  }, [walletNetworkPassphrase]);
 
   const value = useMemo(
     () => ({
       address,
+      walletNetwork,
+      walletNetworkPassphrase,
       connect,
       disconnect,
       signTransaction,
@@ -179,6 +272,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }),
     [
       address,
+      walletNetwork,
+      walletNetworkPassphrase,
       connect,
       disconnect,
       signTransaction,

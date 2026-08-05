@@ -2,6 +2,7 @@ import { Buffer } from "buffer";
 import { AssembledTransaction } from "@stellar/stellar-sdk/contract";
 import { nativeToScVal, scValToNative, xdr } from "@stellar/stellar-sdk";
 import { config, requireCommunityFactoryId } from "@/lib/stellar";
+import { e2eGetCommunity, e2eListCommunities } from "@/lib/e2eMock";
 import {
   parseCommunityMetadata,
   resolveCommunityResourceUrl,
@@ -245,6 +246,8 @@ export async function listCommunities(
   cursor: number | null,
   limit: number,
 ): Promise<CommunityRegistryPage> {
+  const mocked = e2eListCommunities(cursor, limit);
+  if (mocked) return mocked;
   const factoryId = requireCommunityFactoryId();
   const rawPage = asObject(
     await readContract(factoryId, "list_communities", [
@@ -295,6 +298,8 @@ export async function getCommunity(
   communityId: string,
 ): Promise<CommunityDetailResult> {
   if (!isCommunityId(communityId)) return { status: "not-found" };
+  const mocked = e2eGetCommunity(communityId);
+  if (mocked) return mocked;
 
   const rawRecord = await readContract(
     requireCommunityFactoryId(),
