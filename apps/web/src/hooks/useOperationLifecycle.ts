@@ -25,6 +25,7 @@ export function useOperationLifecycle() {
   const [outcomeKind, setOutcomeKind] = useState<OperationOutcomeKind | null>(
     null,
   );
+  const [transactionHash, setTransactionHash] = useState<string | null>(null);
   const inFlightRef = useRef(false);
 
   const reset = useCallback(() => {
@@ -32,6 +33,7 @@ export function useOperationLifecycle() {
     setStage("idle");
     setError(null);
     setOutcomeKind(null);
+    setTransactionHash(null);
   }, []);
 
   const execute = useCallback(
@@ -47,6 +49,7 @@ export function useOperationLifecycle() {
       inFlightRef.current = true;
       setError(null);
       setOutcomeKind(null);
+      setTransactionHash(null);
 
       try {
         const result = await runTransactionLifecycle({
@@ -62,9 +65,11 @@ export function useOperationLifecycle() {
         if (!result.ok) {
           setOutcomeKind(result.kind);
           setError(result.message);
+          setTransactionHash(result.transactionHash ?? null);
         } else {
           setOutcomeKind(null);
           setError(null);
+          setTransactionHash(result.transactionHash);
         }
 
         return result;
@@ -79,6 +84,7 @@ export function useOperationLifecycle() {
     stage,
     error,
     outcomeKind,
+    transactionHash,
     isInFlight: isPendingTransactionLifecycleStage(stage),
     execute,
     reset,

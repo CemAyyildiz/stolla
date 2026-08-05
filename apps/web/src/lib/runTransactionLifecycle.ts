@@ -37,12 +37,25 @@ function isStillPending(message: string): boolean {
 }
 
 export type TransactionLifecycleOutcome =
-  | { ok: true }
+  | { ok: true; transactionHash: string | null }
   | {
       ok: false;
       kind: "wallet_rejected" | "send_failed" | "still_pending" | "simulation_failed";
       message: string;
+      transactionHash?: string | null;
     };
+
+function extractTransactionHash(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.hash === "string") return record.hash;
+  const sendResponse = record.sendTransactionResponse;
+  if (sendResponse && typeof sendResponse === "object") {
+    const hash = (sendResponse as { hash?: unknown }).hash;
+    if (typeof hash === "string") return hash;
+  }
+  return null;
+}
 
 /**
  * Runs assemble → approve → submit → confirm stage transitions for a signed
@@ -58,22 +71,23 @@ export async function runTransactionLifecycle({
 
     onStage("awaiting_approval");
 
+    let sent: unknown;
     if (typeof tx.sign === "function" && typeof tx.send === "function") {
       await tx.sign();
       onStage("submitting");
       onStage("confirming");
-      await tx.send();
+      sent = await tx.send();
     } else if (typeof tx.signAndSend === "function") {
       const pending = tx.signAndSend();
       onStage("submitting");
       onStage("confirming");
-      await pending;
+      sent = await pending;
     } else {
       throw new Error("Transaction cannot be signed or sent.");
     }
 
     onStage("success");
-    return { ok: true };
+    return { ok: true, transactionHash: extractTransactionHash(sent) };
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : String(error ?? "Unknown error");

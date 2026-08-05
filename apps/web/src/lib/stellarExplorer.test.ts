@@ -1,0 +1,48 @@
+import { describe, expect, it } from "vitest";
+import {
+  buildStellarExplorerTxUrl,
+  resolveStellarNetworkId,
+} from "@/lib/stellarExplorer";
+
+const VALID_HASH =
+  "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0";
+
+describe("buildStellarExplorerTxUrl", () => {
+  it("builds a testnet explorer URL", () => {
+    expect(buildStellarExplorerTxUrl(VALID_HASH, "testnet")).toBe(
+      `https://stellar.expert/explorer/testnet/tx/${VALID_HASH}`,
+    );
+  });
+
+  it("builds a mainnet explorer URL", () => {
+    expect(buildStellarExplorerTxUrl(VALID_HASH, "mainnet")).toBe(
+      `https://stellar.expert/explorer/public/tx/${VALID_HASH}`,
+    );
+  });
+
+  it("normalizes hash casing", () => {
+    expect(buildStellarExplorerTxUrl(VALID_HASH.toUpperCase(), "testnet")).toBe(
+      `https://stellar.expert/explorer/testnet/tx/${VALID_HASH}`,
+    );
+  });
+
+  it("returns null for missing or invalid hashes", () => {
+    expect(buildStellarExplorerTxUrl(null, "testnet")).toBeNull();
+    expect(buildStellarExplorerTxUrl(undefined, "mainnet")).toBeNull();
+    expect(buildStellarExplorerTxUrl("", "testnet")).toBeNull();
+    expect(buildStellarExplorerTxUrl("not-a-hash", "testnet")).toBeNull();
+    expect(buildStellarExplorerTxUrl("abcd", "mainnet")).toBeNull();
+    expect(
+      buildStellarExplorerTxUrl(`${VALID_HASH}ff`, "testnet"),
+    ).toBeNull();
+  });
+});
+
+describe("resolveStellarNetworkId", () => {
+  it("maps configured network values", () => {
+    expect(resolveStellarNetworkId("mainnet")).toBe("mainnet");
+    expect(resolveStellarNetworkId("testnet")).toBe("testnet");
+    expect(resolveStellarNetworkId(undefined)).toBe("testnet");
+    expect(resolveStellarNetworkId("other")).toBe("testnet");
+  });
+});

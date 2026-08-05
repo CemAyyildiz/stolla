@@ -76,7 +76,7 @@ describe("CommunityPage delegation lifecycle", () => {
 
   it("walks delegation through approval, submission, confirmation, then refreshes votes", async () => {
     const signGate = deferred<void>();
-    const sendGate = deferred<void>();
+    const sendGate = deferred<{ status: string; hash: string }>();
     const sign = vi.fn().mockReturnValue(signGate.promise);
     const send = vi.fn().mockReturnValue(sendGate.promise);
 
@@ -106,10 +106,19 @@ describe("CommunityPage delegation lifecycle", () => {
     const refreshCallsBeforeConfirm = mocks.runCommunityRefresh.mock.calls.length;
 
     await act(async () => {
-      sendGate.resolve();
+      sendGate.resolve({
+        status: "SUCCESS",
+        hash: "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0",
+      });
     });
 
     expect(await screen.findByText("Delegate confirmed")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /View on Stellar Expert/i }),
+    ).toHaveAttribute(
+      "href",
+      "https://stellar.expert/explorer/testnet/tx/a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0",
+    );
     await waitFor(() => {
       expect(mocks.runCommunityRefresh.mock.calls.length).toBeGreaterThan(
         refreshCallsBeforeConfirm,
