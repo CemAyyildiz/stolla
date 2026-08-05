@@ -29,10 +29,10 @@ function community(
       creationIndex: index,
       metadataUri: `https://fixtures.stolla.test/${id}.json`,
       metadataHash: "12".repeat(32),
-      metadataSchemaVersion: 1,
+      metadataSchemaVersion: 1 as const,
     },
     metadata: {
-      schemaVersion: 1,
+      schemaVersion: 1 as const,
       name,
       description: `${name} deterministic browser fixture.`,
       externalLinks: [],

@@ -105,7 +105,12 @@ function isValidHexId(value: unknown): value is string {
  * @returns Array of canonical (lowercase) hex proposal IDs.
  */
 export function getLegacyLocalProposalIds(): string[] {
-  const raw = getStoredProposalIds();
+  let raw: unknown;
+  try {
+    raw = getStoredProposalIds();
+  } catch {
+    return [];
+  }
   // getStoredProposalIds may return a non-array (e.g. null, {}) when
   // localStorage contains valid JSON that isn't an array.  Guard
   // against this so we never call .filter on a non-array value.

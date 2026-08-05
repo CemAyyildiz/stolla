@@ -1,5 +1,4 @@
-import { scValToNative } from "@stellar/stellar-sdk";
-import { Networks } from "@stellar/stellar-sdk";
+import { Networks, scValToNative } from "@stellar/stellar-sdk";
 import { describe, expect, it } from "vitest";
 import {
   formatStroopsAsXlm,
@@ -8,7 +7,7 @@ import {
   serializeCommunityFactoryInvocation,
 } from "./deployment";
 
-const creator = `G${"A".repeat(55)}`;
+const creator = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
 const factoryId = `C${"A".repeat(55)}`;
 const input = {
   creator,
@@ -57,7 +56,9 @@ describe("community deployment serialization", () => {
     );
     expect(governance.quorum).toBe(BigInt("9007199254740993"));
     expect(governance.voting_delay).toBe(12);
-    expect(metadata.metadata_hash).toEqual(hash);
+    expect(Array.from(metadata.metadata_hash as Uint8Array)).toEqual(
+      Array.from(hash),
+    );
   });
 
   it("fails closed on a mismatched network passphrase before simulation", async () => {

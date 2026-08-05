@@ -117,9 +117,12 @@ export default function CreateCommunityPage() {
   useEffect(() => {
     const update = () =>
       setHasSubmittedRecovery(Boolean(sessionStorage.getItem(recoveryKey)));
-    update();
+    const timeout = window.setTimeout(update, 0);
     window.addEventListener("stolla:deployment-recovery", update);
-    return () => window.removeEventListener("stolla:deployment-recovery", update);
+    return () => {
+      window.clearTimeout(timeout);
+      window.removeEventListener("stolla:deployment-recovery", update);
+    };
   }, [recoveryKey]);
 
   useEffect(() => {

@@ -46,7 +46,7 @@ test("browses canonical scoped routes and switches communities without stale pro
     "Alpha Builders",
   );
 
-  await page.getByRole("button", { name: /Alpha Builders|Choose community/ }).click();
+  await page.locator('button[aria-haspopup="dialog"]').click();
   const switcher = page.getByRole("dialog", { name: "Choose a community" });
   await switcher.getByRole("link", { name: /Beta Citizens/ }).click();
   await expect(page).toHaveURL(`/communities/${BETA_ID}`);

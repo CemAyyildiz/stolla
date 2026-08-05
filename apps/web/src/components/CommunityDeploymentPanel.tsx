@@ -73,6 +73,7 @@ export function CommunityDeploymentPanel({
   >("idle");
   const [knownTransactionStatus, setKnownTransactionStatus] =
     useState<DeploymentTransactionStatus | null>(null);
+  const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
   const previousInput = useRef("");
 
@@ -109,13 +110,16 @@ export function CommunityDeploymentPanel({
     if (previousInput.current === inputSignature) return;
     previousInput.current = inputSignature;
     if (!transactionHash) {
-      setSimulation(null);
-      setStage("idle");
-      setMessage(
-        networkMismatch
-          ? "Network changed. The previous simulation was invalidated; restore the expected network to continue."
-          : "Deployment inputs changed. Run a fresh simulation before wallet approval.",
-      );
+      const timeout = window.setTimeout(() => {
+        setSimulation(null);
+        setStage("idle");
+        setMessage(
+          networkMismatch
+            ? "Network changed. The previous simulation was invalidated; restore the expected network to continue."
+            : "Deployment inputs changed. Run a fresh simulation before wallet approval.",
+        );
+      }, 0);
+      return () => window.clearTimeout(timeout);
     }
   }, [inputSignature, networkMismatch, transactionHash]);
 
@@ -160,6 +164,7 @@ export function CommunityDeploymentPanel({
     async (saved: CommunityDeploymentRecovery) => {
       if (inFlight.current) return;
       inFlight.current = true;
+      setBusy(true);
       setStage("confirming");
       setMessage("Checking the submitted transaction without requesting another signature.");
       try {
@@ -187,20 +192,24 @@ export function CommunityDeploymentPanel({
         }
       } finally {
         inFlight.current = false;
+        setBusy(false);
       }
     },
     [adapter, verifyExpectedRecord],
   );
 
   useEffect(() => {
-    const stored = parseCommunityDeploymentRecovery(
-      sessionStorage.getItem(recoveryKey),
-      network,
-    );
-    if (!stored) return;
-    setRecovery(stored);
-    setTransactionHash(stored.transactionHash);
-    void observeTransaction(stored);
+    const timeout = window.setTimeout(() => {
+      const stored = parseCommunityDeploymentRecovery(
+        sessionStorage.getItem(recoveryKey),
+        network,
+      );
+      if (!stored) return;
+      setRecovery(stored);
+      setTransactionHash(stored.transactionHash);
+      void observeTransaction(stored);
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [network, observeTransaction, recoveryKey]);
 
   async function simulate() {
@@ -215,6 +224,7 @@ export function CommunityDeploymentPanel({
       return;
     }
     inFlight.current = true;
+    setBusy(true);
     setStage("simulating");
     setMessage("Loading a fresh source sequence and Soroban resource footprint.");
     setSimulation(null);
@@ -238,6 +248,7 @@ export function CommunityDeploymentPanel({
       setMessage(friendlyError(error));
     } finally {
       inFlight.current = false;
+      setBusy(false);
     }
   }
 
@@ -253,6 +264,7 @@ export function CommunityDeploymentPanel({
       return;
     }
     inFlight.current = true;
+    setBusy(true);
     setStage("awaiting_approval");
     setMessage("Approve the simulated CommunityFactory invocation in your wallet.");
     try {
@@ -276,6 +288,7 @@ export function CommunityDeploymentPanel({
       setStage("confirming");
       setMessage("Transaction submitted. Confirming it on the configured network.");
       inFlight.current = false;
+      setBusy(false);
       await observeTransaction(saved);
     } catch (error) {
       setStage("failure");
@@ -289,6 +302,7 @@ export function CommunityDeploymentPanel({
       }
     } finally {
       inFlight.current = false;
+      setBusy(false);
     }
   }
 
@@ -375,7 +389,7 @@ export function CommunityDeploymentPanel({
             type="button"
             onClick={() => void simulate()}
             disabled={
-              inFlight.current ||
+              busy ||
               !confirmed ||
               !address ||
               !factoryId ||
@@ -392,7 +406,7 @@ export function CommunityDeploymentPanel({
               type="button"
               onClick={() => void submit()}
               disabled={
-                inFlight.current ||
+                busy ||
                 !confirmed ||
                 networkMismatch ||
                 walletNetworkUnknown ||
@@ -411,7 +425,7 @@ export function CommunityDeploymentPanel({
           <button
             type="button"
             onClick={() => recovery && void observeTransaction(recovery)}
-            disabled={inFlight.current}
+            disabled={busy}
             className="min-h-11 rounded-lg border border-indigo-500 px-4 py-2 text-sm text-indigo-200 disabled:opacity-50"
           >
             Retry transaction and registry status

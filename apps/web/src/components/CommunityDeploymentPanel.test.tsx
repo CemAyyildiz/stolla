@@ -137,7 +137,9 @@ describe("CommunityDeploymentPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Simulate deployment" }));
     await screen.findByText(/12345678 stroops/);
     fireEvent.click(screen.getByRole("button", { name: "Approve and deploy" }));
-    expect(await screen.findByText(/fresh sequence, timeout/)).toBeInTheDocument();
+    expect(
+      (await screen.findAllByText(/fresh sequence, timeout/))[0],
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Simulate deployment" }));
     await waitFor(() => expect(deployment.simulate).toHaveBeenCalledTimes(2));
     expect(deployment.signAndSubmit).toHaveBeenCalledTimes(1);
@@ -159,7 +161,9 @@ describe("CommunityDeploymentPanel", () => {
     );
     render(<CommunityDeploymentPanel {...props} />);
 
-    expect(await screen.findByText(/RPC status is ambiguous/)).toBeInTheDocument();
+    expect(
+      (await screen.findAllByText(/RPC status is ambiguous/))[0],
+    ).toBeInTheDocument();
     expect(deployment.transactionStatus).toHaveBeenCalledWith("cd".repeat(32));
     expect(deployment.signAndSubmit).not.toHaveBeenCalled();
     expect(

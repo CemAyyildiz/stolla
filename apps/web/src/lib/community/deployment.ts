@@ -85,7 +85,10 @@ function hexToBytes(value: string): Uint8Array {
 }
 
 async function digest(bytes: Uint8Array): Promise<Uint8Array> {
-  return new Uint8Array(await globalThis.crypto.subtle.digest("SHA-256", bytes));
+  const copy = Uint8Array.from(bytes);
+  return new Uint8Array(
+    await globalThis.crypto.subtle.digest("SHA-256", copy.buffer),
+  );
 }
 
 function metadataMatchesDraft(
@@ -235,7 +238,9 @@ export function formatStroopsAsXlm(value: string): string {
 
 export function isExpiredOrStaleDeploymentError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return /expired|timebounds|too late|bad_seq|sequence number|stale/i.test(message);
+  return /expired|timebounds|too[_ ]late|bad[_ ]seq|sequence number|stale/i.test(
+    message,
+  );
 }
 
 export function communityDeploymentRecoveryKey(

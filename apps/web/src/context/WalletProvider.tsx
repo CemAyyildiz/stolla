@@ -24,8 +24,8 @@ export type WalletConnectionError = {
 
 type WalletContextValue = {
   address: string | null;
-  walletNetwork: string | null;
-  walletNetworkPassphrase: string | null;
+  walletNetwork?: string | null;
+  walletNetworkPassphrase?: string | null;
   connect: () => Promise<void>;
   disconnect: () => void;
   signTransaction: SignTransaction;
@@ -134,11 +134,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const mockedWallet = getE2EBridge()?.wallet;
     if (mockedWallet) {
-      setAddress(mockedWallet.address);
-      setWalletNetworkPassphrase(mockedWallet.networkPassphrase);
-      setWalletNetwork(
-        mockedWallet.networkPassphrase === Networks.PUBLIC ? "mainnet" : "testnet",
-      );
+      const initialize = window.setTimeout(() => {
+        setAddress(mockedWallet.address);
+        setWalletNetworkPassphrase(mockedWallet.networkPassphrase);
+        setWalletNetwork(
+          mockedWallet.networkPassphrase === Networks.PUBLIC
+            ? "mainnet"
+            : "testnet",
+        );
+      }, 0);
       const interval = window.setInterval(() => {
         const current = getE2EBridge()?.wallet;
         if (!current) return;
@@ -148,7 +152,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           current.networkPassphrase === Networks.PUBLIC ? "mainnet" : "testnet",
         );
       }, 100);
-      return () => window.clearInterval(interval);
+      return () => {
+        window.clearTimeout(initialize);
+        window.clearInterval(interval);
+      };
     }
     ensureKit();
     const unsubscribe = StellarWalletsKit.on(
@@ -189,7 +196,16 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       }
       ensureKit();
       const { address: walletAddress } = await StellarWalletsKit.authModal();
-      const selectedNetwork = await StellarWalletsKit.getNetwork();
+      const selectedNetwork =
+        typeof StellarWalletsKit.getNetwork === "function"
+          ? await StellarWalletsKit.getNetwork()
+          : {
+              network:
+                config.networkPassphrase === Networks.PUBLIC
+                  ? "mainnet"
+                  : "testnet",
+              networkPassphrase: config.networkPassphrase,
+            };
       setAddress(walletAddress);
       setWalletNetwork(selectedNetwork.network);
       setWalletNetworkPassphrase(selectedNetwork.networkPassphrase);

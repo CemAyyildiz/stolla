@@ -90,6 +90,7 @@ describe("decodeProposalEvent", () => {
       if (!result.ok) return;
 
       expect(result.event.kind).toBe("proposal_created");
+      if (result.event.kind !== "proposal_created") return;
       expect(result.event.proposalId).toBe(PROPOSAL_HEX);
       expect(result.event.proposer).toBe(PROPOSER);
       expect(result.event.targets).toEqual([PROPOSER]);
@@ -108,6 +109,7 @@ describe("decodeProposalEvent", () => {
       if (!result.ok) return;
 
       expect(result.event.kind).toBe("vote_cast");
+      if (result.event.kind !== "vote_cast") return;
       expect(result.event.proposalId).toBe(PROPOSAL_HEX);
       expect(result.event.voter).toBe(VOTER);
       expect(result.event.voteType).toBe(1);
