@@ -43,8 +43,11 @@ Set the contract IDs in `apps/web/.env.local`:
 ```dotenv
 NEXT_PUBLIC_STELLAR_NETWORK=testnet
 NEXT_PUBLIC_STELLAR_RPC_URL=https://soroban-testnet.stellar.org
+NEXT_PUBLIC_COMMUNITY_FACTORY_CONTRACT_ID=<community-factory-contract-id>
 NEXT_PUBLIC_NFT_CONTRACT_ID=<community-nft-contract-id>
 NEXT_PUBLIC_GOVERNOR_CONTRACT_ID=<governor-contract-id>
+# Optional gateway used to resolve ipfs:// community metadata and logos.
+NEXT_PUBLIC_IPFS_GATEWAY_URL=https://ipfs.io/ipfs/
 # Lower ledger boundary for proposal event discovery (Governor deploy ledger).
 # Example (testnet): NEXT_PUBLIC_GOVERNOR_START_LEDGER=1500000
 NEXT_PUBLIC_GOVERNOR_START_LEDGER=<governor-deploy-ledger>
@@ -141,8 +144,10 @@ Add these environment variables in the Vercel project settings:
 |----------|-------|
 | `NEXT_PUBLIC_STELLAR_NETWORK` | `testnet` |
 | `NEXT_PUBLIC_STELLAR_RPC_URL` | `https://soroban-testnet.stellar.org` |
+| `NEXT_PUBLIC_COMMUNITY_FACTORY_CONTRACT_ID` | From the factory deployment |
 | `NEXT_PUBLIC_NFT_CONTRACT_ID` | From deploy script output |
 | `NEXT_PUBLIC_GOVERNOR_CONTRACT_ID` | From deploy script output |
+| `NEXT_PUBLIC_IPFS_GATEWAY_URL` | Public IPFS gateway ending in `/ipfs/` |
 
 After the first production deployment, Vercel will redeploy automatically when
 new commits are pushed to the production branch.

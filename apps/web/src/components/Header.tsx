@@ -8,6 +8,7 @@ import { truncateMiddle } from "@/lib/truncate";
 import { LiveStatus } from "@/components/ui/LiveStatus";
 
 const navItems = [
+  { href: "/communities", label: "Communities" },
   { href: "/community", label: "Community" },
   { href: "/proposals", label: "Proposals" },
 ];
@@ -65,7 +66,8 @@ export function Header() {
           </Link>
           <nav className="flex shrink-0 gap-1 sm:gap-2">
             {navItems.map((item) => {
-              const isActive = pathname.startsWith(item.href);
+              const isActive =
+                pathname === item.href || pathname.startsWith(`${item.href}/`);
 
               return (
                 <Link
