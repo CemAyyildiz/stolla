@@ -178,4 +178,68 @@ describe("wallet connection feedback", () => {
       screen.getByRole("button", { name: "Connect Wallet" }),
     ).not.toBeNull();
   });
+
+  it("stores the address returned by a successful connection", async () => {
+    walletKit.authModal.mockResolvedValue({ address: "GSUCCESS" });
+    renderWalletHeader();
+
+    fireEvent.click(screen.getByRole("button", { name: "Connect Wallet" }));
+    expect(
+      await screen.findByRole("button", { name: "Disconnect" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Wallet connected.");
+  });
+
+  it("updates the address from STATE_UPDATED events", async () => {
+    let emitState: ((event: { payload: { address?: string | null } }) => void) |
+      undefined;
+    const unsubscribe = vi.fn();
+    walletKit.on.mockImplementation((_type, handler) => {
+      emitState = handler as typeof emitState;
+      return unsubscribe;
+    });
+    walletKit.authModal.mockResolvedValue({ address: "GINITIAL" });
+    renderWalletHeader();
+
+    fireEvent.click(screen.getByRole("button", { name: "Connect Wallet" }));
+    await screen.findByRole("button", { name: "Disconnect" });
+
+    emitState?.({ payload: { address: "GUPDATED" } });
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("Wallet connected."),
+    );
+
+    emitState?.({ payload: { address: null } });
+    expect(
+      await screen.findByRole("button", { name: "Connect Wallet" }),
+    ).toBeInTheDocument();
+  });
+
+  it("removes event subscriptions on unmount", () => {
+    const unsubscribe = vi.fn();
+    walletKit.on.mockReturnValue(unsubscribe);
+    const { unmount } = renderWalletHeader();
+    // Trigger ensureKit + subscription via connect attempt
+    fireEvent.click(screen.getByRole("button", { name: "Connect Wallet" }));
+    unmount();
+    expect(unsubscribe).toHaveBeenCalled();
+  });
+
+  it("ignores overlapping connection attempts", async () => {
+    let finishFirst: (value: { address: string }) => void = () => undefined;
+    const first = new Promise<{ address: string }>((resolve) => {
+      finishFirst = resolve;
+    });
+    walletKit.authModal.mockReturnValueOnce(first);
+    renderWalletHeader();
+
+    fireEvent.click(screen.getByRole("button", { name: "Connect Wallet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Connecting..." }));
+
+    expect(walletKit.authModal).toHaveBeenCalledTimes(1);
+    finishFirst({ address: "GONCE" });
+    expect(
+      await screen.findByRole("button", { name: "Disconnect" }),
+    ).toBeInTheDocument();
+  });
 });
