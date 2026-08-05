@@ -36,7 +36,7 @@ export default function CommunityPage() {
   const [status, setStatus] = useState<ActionStatus | null>(null);
   const [dataLoadError, setDataLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(Boolean(contractIds.nft));
+  const [initialLoading, setInitialLoading] = useState(true);
   const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(
     null,
   );
@@ -276,7 +276,7 @@ export default function CommunityPage() {
         </p>
       )}
 
-      {contractsConfigured && (
+      {(contractsConfigured || !routeResolved) && (
         <div className="mt-6 space-y-6">
           {dataLoadError && (
             <section
