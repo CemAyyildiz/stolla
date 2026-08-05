@@ -123,7 +123,7 @@ describe("CommunityPage mint submission guard", () => {
 
     const button = screen.getByRole("button", { name: "Mint NFT" });
     fireEvent.click(button);
-    expect(await screen.findByText("User rejected the request")).toBeInTheDocument();
+    expect(await screen.findByText(/rejected the wallet request/i)).toBeInTheDocument();
     await waitFor(() => expect(button).not.toBeDisabled());
 
     fireEvent.click(button);

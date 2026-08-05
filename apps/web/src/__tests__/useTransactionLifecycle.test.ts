@@ -42,7 +42,7 @@ describe("useTransactionLifecycle", () => {
     });
 
     expect(result.current.state.stage).toBe("wallet_rejected");
-    expect(result.current.state.error).toBe("User rejected the transaction");
+    expect(result.current.state.error).toMatch(/rejected the wallet request/i);
     expect(result.current.state.isTerminal).toBe(true);
     expect(result.current.state.voteType).toBe(1);
     expect(result.current.state.reason).toBe("test");
@@ -98,6 +98,7 @@ describe("useTransactionLifecycle", () => {
     });
 
     expect(result.current.state.stage).toBe("simulation_failed");
+    expect(result.current.state.error).toMatch(/could not be simulated/i);
     expect(result.current.state.isTerminal).toBe(true);
   });
 
@@ -111,7 +112,7 @@ describe("useTransactionLifecycle", () => {
     });
 
     expect(result.current.state.stage).toBe("submission_failed");
-    expect(result.current.state.error).toBe("Network timeout");
+    expect(result.current.state.error).toMatch(/timed out|pending|try again|submitted/i);
     expect(result.current.state.isTerminal).toBe(true);
     // Reason is preserved for retry
     expect(result.current.state.reason).toBe("Needs more review");

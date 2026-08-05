@@ -16,6 +16,7 @@ import { ProposalSummaryCard } from "@/components/ProposalSummaryCard";
 import { truncateEnd } from "@/lib/truncate";
 import { LiveStatus } from "@/components/ui/LiveStatus";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
+import { mapTransactionError } from "@/lib/transactionErrors";
 
 type ActionStatus = {
   message: string;
@@ -196,10 +197,7 @@ export default function ProposalsPage() {
         await loadStates();
       } catch (createError: unknown) {
         setStatus({
-          message:
-            createError instanceof Error
-              ? createError.message
-              : "Proposal failed",
+          message: mapTransactionError(createError).message,
           tone: "error",
         });
       }

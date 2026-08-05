@@ -57,7 +57,8 @@ describe("runTransactionLifecycle", () => {
     expect(result).toEqual({
       ok: false,
       kind: "wallet_rejected",
-      message: "User rejected the request",
+      message:
+        "You rejected the wallet request. Approve the next prompt to continue.",
     });
     expect(stages.at(-1)).toBe("failure");
     expect(stages).toContain("awaiting_approval");
@@ -79,7 +80,8 @@ describe("runTransactionLifecycle", () => {
     expect(result).toEqual({
       ok: false,
       kind: "send_failed",
-      message: "RPC send failed",
+      message:
+        "The transaction could not be submitted. Check your connection and retry.",
     });
   });
 
@@ -98,7 +100,8 @@ describe("runTransactionLifecycle", () => {
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error("expected failure");
     expect(result.kind).toBe("still_pending");
-    expect(result.message).toMatch(/still pending/i);
+    expect(result.message).toMatch(/still pending|timed out|pending/i);
+    expect(result.message.toLowerCase()).not.toMatch(/\bfailed\b/);
   });
 
   it("falls back to signAndSend when granular methods are missing", async () => {

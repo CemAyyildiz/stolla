@@ -2,6 +2,7 @@ import {
   isPendingTransactionLifecycleStage,
   type TransactionLifecycleStage,
 } from "@/lib/transactionLifecycle";
+import { mapTransactionError } from "@/lib/transactionErrors";
 
 export type LifecycleAssembledTransaction = {
   sign?: () => Promise<unknown>;
@@ -13,28 +14,6 @@ export type RunTransactionLifecycleOptions = {
   assemble: () => Promise<LifecycleAssembledTransaction>;
   onStage: (stage: TransactionLifecycleStage) => void;
 };
-
-function isWalletRejection(message: string): boolean {
-  const lower = message.toLowerCase();
-  return (
-    lower.includes("user rejected") ||
-    lower.includes("user declined") ||
-    lower.includes("denied") ||
-    lower.includes("rejected") ||
-    lower.includes("cancel")
-  );
-}
-
-function isStillPending(message: string): boolean {
-  const lower = message.toLowerCase();
-  return (
-    lower.includes("timed out") ||
-    lower.includes("timeout") ||
-    lower.includes("still pending") ||
-    lower.includes("not yet") ||
-    lower.includes("pending")
-  );
-}
 
 export type TransactionLifecycleOutcome =
   | { ok: true; transactionHash: string | null }
@@ -89,35 +68,38 @@ export async function runTransactionLifecycle({
     onStage("success");
     return { ok: true, transactionHash: extractTransactionHash(sent) };
   } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : String(error ?? "Unknown error");
+    const mapped = mapTransactionError(error);
+    onStage("failure");
 
-    if (isWalletRejection(message)) {
-      onStage("failure");
-      return { ok: false, kind: "wallet_rejected", message };
-    }
-
-    if (isStillPending(message)) {
-      onStage("failure");
+    if (mapped.category === "wallet_rejected") {
       return {
         ok: false,
-        kind: "still_pending",
-        message:
-          "Transaction is still pending on the network. Check your wallet or explorer and try again later.",
+        kind: "wallet_rejected",
+        message: mapped.message,
       };
     }
 
-    // Failures before approval are treated as simulation/build errors.
-    if (
-      message.toLowerCase().includes("simulation") ||
-      message.toLowerCase().includes("simulate")
-    ) {
-      onStage("failure");
-      return { ok: false, kind: "simulation_failed", message };
+    if (mapped.category === "still_pending" || mapped.category === "confirmation_timeout") {
+      return {
+        ok: false,
+        kind: "still_pending",
+        message: mapped.message,
+      };
     }
 
-    onStage("failure");
-    return { ok: false, kind: "send_failed", message };
+    if (mapped.category === "simulation_failed") {
+      return {
+        ok: false,
+        kind: "simulation_failed",
+        message: mapped.message,
+      };
+    }
+
+    return {
+      ok: false,
+      kind: "send_failed",
+      message: mapped.message,
+    };
   }
 }
 
