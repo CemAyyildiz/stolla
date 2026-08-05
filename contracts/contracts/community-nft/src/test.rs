@@ -447,7 +447,9 @@ fn nft_storage_and_instance_ttls_renew_at_the_policy_boundary() {
 
     assert_eq!(client.owner_of(&token_id), member);
     assert_eq!(client.custom_token_uri(&token_id), uri);
-    assert_eq!(VotesClient::new(&e, &client.address).get_votes(&member), 1);
+    let votes = VotesClient::new(&e, &client.address);
+    assert_eq!(votes.get_votes(&member), 1);
+    assert_eq!(votes.get_delegate(&member), Some(member.clone()));
 
     e.as_contract(&client.address, || {
         assert_eq!(e.storage().instance().get_ttl(), STORAGE_EXTEND_AMOUNT);
@@ -487,7 +489,8 @@ fn nft_storage_and_instance_ttls_renew_at_the_policy_boundary() {
     // renews the contract instance and its owner/metadata/counter state.
     assert_eq!(client.custom_token_uri(&token_id), uri);
     assert_eq!(client.owner_of(&token_id), member);
-    assert_eq!(VotesClient::new(&e, &client.address).get_votes(&member), 1);
+    assert_eq!(votes.get_votes(&member), 1);
+    assert_eq!(votes.get_delegate(&member), Some(member.clone()));
     client.extend_instance_ttl();
 
     e.as_contract(&client.address, || {
