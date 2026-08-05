@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { mapTransactionError } from "@/lib/transactionErrors";
 
 /**
  * Transaction lifecycle stages for vote submission.
@@ -120,29 +121,22 @@ export function useTransactionLifecycle(options?: UseTransactionLifecycleOptions
         await onConfirmedRef.current?.();
         return { started: true as const };
       } catch (error: unknown) {
-        const message =
-          error instanceof Error ? error.message : String(error ?? "Unknown error");
+        const mapped = mapTransactionError(error);
 
-        if (
-          message.toLowerCase().includes("user rejected") ||
-          message.toLowerCase().includes("user declined") ||
-          message.toLowerCase().includes("denied") ||
-          message.toLowerCase().includes("rejected") ||
-          message.toLowerCase().includes("cancel")
-        ) {
+        if (mapped.category === "wallet_rejected") {
           setState((prev) => ({
             ...prev,
             stage: "wallet_rejected",
-            error: message,
+            error: mapped.message,
             isTerminal: true,
           }));
           return { started: true as const };
         }
 
         if (
-          message.includes("AlreadyVoted") ||
-          message.includes("already voted") ||
-          message.includes("5016")
+          mapped.diagnostic?.includes("AlreadyVoted") ||
+          mapped.diagnostic?.includes("already voted") ||
+          mapped.diagnostic?.includes("5016")
         ) {
           setState((prev) => ({
             ...prev,
@@ -153,14 +147,11 @@ export function useTransactionLifecycle(options?: UseTransactionLifecycleOptions
           return { started: true as const };
         }
 
-        if (
-          message.toLowerCase().includes("simulation") ||
-          message.toLowerCase().includes("simulate")
-        ) {
+        if (mapped.category === "simulation_failed") {
           setState((prev) => ({
             ...prev,
             stage: "simulation_failed",
-            error: message,
+            error: mapped.message,
             isTerminal: true,
           }));
           return { started: true as const };
@@ -169,7 +160,7 @@ export function useTransactionLifecycle(options?: UseTransactionLifecycleOptions
         setState((prev) => ({
           ...prev,
           stage: "submission_failed",
-          error: message,
+          error: mapped.message,
           isTerminal: true,
         }));
         return { started: true as const };

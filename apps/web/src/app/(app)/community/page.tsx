@@ -12,6 +12,7 @@ import { LiveStatus } from "@/components/ui/LiveStatus";
 import { TransactionLifecycleStatus } from "@/components/TransactionLifecycleStatus";
 import { useOperationLifecycle } from "@/hooks/useOperationLifecycle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
+import { mapTransactionError } from "@/lib/transactionErrors";
 import {
   loadCommunityData,
   runCommunityRefresh,
@@ -107,7 +108,7 @@ export default function CommunityPage() {
         await refresh();
       } catch (error: unknown) {
         setStatus({
-          message: error instanceof Error ? error.message : "Mint failed",
+          message: mapTransactionError(error).message,
           tone: "error",
         });
       }

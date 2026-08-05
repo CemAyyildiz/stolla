@@ -155,5 +155,6 @@ describe("CommunityPage delegation lifecycle", () => {
     expect(
       screen.getAllByText(/still pending on the network/i).length,
     ).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText(/Transaction timed out while still pending/i)).not.toBeInTheDocument();
   });
 });
