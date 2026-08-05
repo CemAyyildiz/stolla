@@ -1,14 +1,18 @@
 #![cfg(test)]
 
 use soroban_sdk::{
-    testutils::{Address as _, Events as _, Ledger as _},
-    vec, Address, Env, Event, String, Symbol, Val, Vec,
+    contract, contractimpl,
+    testutils::{
+        Address as _, AuthorizedFunction, AuthorizedInvocation, Events as _, Ledger as _, MockAuth,
+        MockAuthInvoke,
+    },
+    vec, Address, BytesN, Env, Event, IntoVal, String, Symbol, Val, Vec,
 };
 extern crate std;
 use stellar_governance::{
     governor::{
-        get_proposal_vote_counts, GovernorClient, ProposalCreated, ProposalState, VoteCast,
-        VOTE_ABSTAIN, VOTE_AGAINST, VOTE_FOR,
+        get_proposal_vote_counts, GovernorClient, ProposalCancelled, ProposalCreated,
+        ProposalExecuted, ProposalState, VoteCast, VOTE_ABSTAIN, VOTE_AGAINST, VOTE_FOR,
     },
     votes::VotesClient,
 };
@@ -16,6 +20,43 @@ use stellar_governance::{
 use community_nft::{CommunityNft, CommunityNftClient};
 
 use crate::CommunityGovernor;
+
+#[contract]
+struct GovernorExecutionTarget;
+
+#[contractimpl]
+impl GovernorExecutionTarget {
+    pub fn apply(e: &Env, value: u32) {
+        let value_key = Symbol::new(e, "value");
+        let calls_key = Symbol::new(e, "calls");
+        let calls: u32 = e.storage().instance().get(&calls_key).unwrap_or(0);
+        e.storage().instance().set(&value_key, &value);
+        e.storage().instance().set(&calls_key, &(calls + 1));
+    }
+
+    pub fn value(e: &Env) -> u32 {
+        e.storage()
+            .instance()
+            .get(&Symbol::new(e, "value"))
+            .unwrap_or(0)
+    }
+
+    pub fn calls(e: &Env) -> u32 {
+        e.storage()
+            .instance()
+            .get(&Symbol::new(e, "calls"))
+            .unwrap_or(0)
+    }
+}
+
+struct ExecutableProposal {
+    target_id: Address,
+    targets: Vec<Address>,
+    functions: Vec<Symbol>,
+    args: Vec<Vec<Val>>,
+    description: String,
+    description_hash: BytesN<32>,
+}
 
 /// Default governance parameters used by most Governor unit tests.
 pub struct GovernanceParams {
@@ -129,6 +170,77 @@ pub fn signaling_proposal(e: &Env) -> SignalingProposal {
     }
 }
 
+fn executable_proposal(e: &Env, value: u32) -> ExecutableProposal {
+    let target_id = e.register(GovernorExecutionTarget, ());
+    let targets = vec![e, target_id.clone()];
+    let functions = vec![e, Symbol::new(e, "apply")];
+    let args = vec![e, vec![e, value.into_val(e)]];
+    let description = String::from_str(e, "Set the execution fixture value");
+    let description_hash = e.crypto().keccak256(&description.to_bytes()).to_bytes();
+
+    ExecutableProposal {
+        target_id,
+        targets,
+        functions,
+        args,
+        description,
+        description_hash,
+    }
+}
+
+fn pass_executable_proposal(
+    fixture: &GovernanceFixture<'_>,
+    proposal: &ExecutableProposal,
+    proposer: &Address,
+) -> BytesN<32> {
+    let proposal_id = fixture.governor.propose(
+        &proposal.targets,
+        &proposal.functions,
+        &proposal.args,
+        &proposal.description,
+        proposer,
+    );
+    let snapshot = fixture.governor.proposal_snapshot(&proposal_id);
+    set_ledger_sequence(fixture.env, snapshot + 1);
+    fixture.governor.cast_vote(
+        &proposal_id,
+        &VOTE_FOR,
+        &String::from_str(fixture.env, "Execute the approved action"),
+        proposer,
+    );
+    let deadline = fixture.governor.proposal_deadline(&proposal_id);
+    set_ledger_sequence(fixture.env, deadline + 1);
+    assert_eq!(
+        fixture.governor.proposal_state(&proposal_id),
+        ProposalState::Succeeded
+    );
+    proposal_id
+}
+
+fn mock_execute_auth(
+    e: &Env,
+    governor_id: &Address,
+    proposal: &ExecutableProposal,
+    executor: &Address,
+) {
+    e.mock_auths(&[MockAuth {
+        address: executor,
+        invoke: &MockAuthInvoke {
+            contract: governor_id,
+            fn_name: "execute",
+            args: (
+                &proposal.targets,
+                &proposal.functions,
+                &proposal.args,
+                &proposal.description_hash,
+                executor,
+            )
+                .into_val(e),
+            sub_invokes: &[],
+        },
+    }]);
+}
+
 fn mint_nfts(e: &Env, nft: &CommunityNftClient<'_>, to: &Address, count: u32) {
     for i in 0..count {
         let uri = String::from_str(e, &std::format!("ipfs://QmMember/{i}/metadata.json"));
@@ -192,7 +304,11 @@ pub fn deploy_governance<'a>(
 
 /// Convenience wrapper matching the historical single-voter setup.
 fn setup_governance(e: &Env) -> GovernanceFixture<'_> {
-    deploy_governance(e, GovernanceParams::default(), &[VoterSpec::self_delegate(1)])
+    deploy_governance(
+        e,
+        GovernanceParams::default(),
+        &[VoterSpec::self_delegate(1)],
+    )
 }
 
 #[test]
@@ -264,7 +380,9 @@ fn propose_and_cast_vote_succeeds() {
     advance_past_voting_delay(&e, &fixture.params);
 
     let reason = String::from_str(&e, "Support");
-    fixture.governor.cast_vote(&proposal_id, &1, &reason, &voter);
+    fixture
+        .governor
+        .cast_vote(&proposal_id, &1, &reason, &voter);
 
     advance_past_voting_period(&e, &fixture.params);
 
@@ -602,4 +720,677 @@ fn weighted_votes_credit_for_against_and_abstain_buckets() {
     assert_eq!(fixture.votes.get_votes(&for_voter), 1);
     assert_eq!(fixture.votes.get_votes(&against_voter), 2);
     assert_eq!(fixture.votes.get_votes(&abstain_voter), 4);
+}
+
+#[test]
+fn quorum_one_below_is_defeated_and_exact_quorum_succeeds() {
+    let e = Env::default();
+    set_ledger_sequence(&e, 100);
+    let quorum = 4u128;
+    let fixture = deploy_governance(
+        &e,
+        GovernanceParams {
+            voting_delay: 1,
+            voting_period: 10,
+            proposal_threshold: 1,
+            quorum,
+        },
+        &[
+            VoterSpec::self_delegate(2),
+            VoterSpec::self_delegate(1),
+            VoterSpec::self_delegate(1),
+            VoterSpec::self_delegate(1),
+        ],
+    );
+    let for_voter = fixture.voters[0].clone();
+    let against_voter = fixture.voters[1].clone();
+    let first_abstain_voter = fixture.voters[2].clone();
+    let boundary_abstain_voter = fixture.voters[3].clone();
+
+    advance_ledger(&e, 1);
+    let below_id = fixture.propose_signaling(&for_voter);
+    let below_snapshot = fixture.governor.proposal_snapshot(&below_id);
+    assert_eq!(fixture.governor.quorum(&below_snapshot), quorum);
+    set_ledger_sequence(&e, below_snapshot + 1);
+    fixture.governor.cast_vote(
+        &below_id,
+        &VOTE_FOR,
+        &String::from_str(&e, "Two for"),
+        &for_voter,
+    );
+    fixture.governor.cast_vote(
+        &below_id,
+        &VOTE_AGAINST,
+        &String::from_str(&e, "Against does not count toward quorum"),
+        &against_voter,
+    );
+    fixture.governor.cast_vote(
+        &below_id,
+        &VOTE_ABSTAIN,
+        &String::from_str(&e, "One abstention"),
+        &first_abstain_voter,
+    );
+    let below_counts = e.as_contract(&fixture.governor_id, || {
+        get_proposal_vote_counts(&e, &below_id)
+    });
+    assert_eq!(below_counts.for_votes, 2);
+    assert_eq!(below_counts.against_votes, 1);
+    assert_eq!(below_counts.abstain_votes, 1);
+    assert_eq!(
+        below_counts.for_votes + below_counts.abstain_votes,
+        quorum - 1
+    );
+    set_ledger_sequence(&e, fixture.governor.proposal_deadline(&below_id) + 1);
+    assert_eq!(
+        fixture.governor.proposal_state(&below_id),
+        ProposalState::Defeated
+    );
+
+    let exact_id = fixture.propose_signaling(&for_voter);
+    let exact_snapshot = fixture.governor.proposal_snapshot(&exact_id);
+    assert_eq!(fixture.governor.quorum(&exact_snapshot), quorum);
+    set_ledger_sequence(&e, exact_snapshot + 1);
+    fixture.governor.cast_vote(
+        &exact_id,
+        &VOTE_FOR,
+        &String::from_str(&e, "Two for"),
+        &for_voter,
+    );
+    fixture.governor.cast_vote(
+        &exact_id,
+        &VOTE_AGAINST,
+        &String::from_str(&e, "One against"),
+        &against_voter,
+    );
+    fixture.governor.cast_vote(
+        &exact_id,
+        &VOTE_ABSTAIN,
+        &String::from_str(&e, "First abstention"),
+        &first_abstain_voter,
+    );
+    fixture.governor.cast_vote(
+        &exact_id,
+        &VOTE_ABSTAIN,
+        &String::from_str(&e, "Boundary abstention"),
+        &boundary_abstain_voter,
+    );
+    let exact_counts = e.as_contract(&fixture.governor_id, || {
+        get_proposal_vote_counts(&e, &exact_id)
+    });
+    assert_eq!(exact_counts.for_votes, 2);
+    assert_eq!(exact_counts.against_votes, 1);
+    assert_eq!(exact_counts.abstain_votes, 2);
+    assert_eq!(exact_counts.for_votes + exact_counts.abstain_votes, quorum);
+    assert!(exact_counts.for_votes > exact_counts.against_votes);
+    set_ledger_sequence(&e, fixture.governor.proposal_deadline(&exact_id) + 1);
+    assert_eq!(
+        fixture.governor.proposal_state(&exact_id),
+        ProposalState::Succeeded
+    );
+}
+
+#[test]
+fn proposer_can_cancel_with_exact_authorization() {
+    let e = Env::default();
+    set_ledger_sequence(&e, 100);
+    let fixture = setup_governance(&e);
+    let proposer = fixture.primary_voter().clone();
+    advance_ledger(&e, 1);
+    let proposal = signaling_proposal(&e);
+    let proposal_id = fixture.governor.propose(
+        &proposal.targets,
+        &proposal.functions,
+        &proposal.args,
+        &proposal.description,
+        &proposer,
+    );
+    let description_hash = e
+        .crypto()
+        .keccak256(&proposal.description.to_bytes())
+        .to_bytes();
+
+    e.mock_auths(&[MockAuth {
+        address: &proposer,
+        invoke: &MockAuthInvoke {
+            contract: &fixture.governor_id,
+            fn_name: "cancel",
+            args: (
+                &proposal.targets,
+                &proposal.functions,
+                &proposal.args,
+                &description_hash,
+                &proposer,
+            )
+                .into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+    let cancelled_id = fixture.governor.cancel(
+        &proposal.targets,
+        &proposal.functions,
+        &proposal.args,
+        &description_hash,
+        &proposer,
+    );
+
+    assert_eq!(cancelled_id, proposal_id);
+    assert_eq!(
+        e.events().all(),
+        std::vec![ProposalCancelled {
+            proposal_id: proposal_id.clone(),
+        }
+        .to_xdr(&e, &fixture.governor_id)]
+    );
+    assert_eq!(
+        e.auths(),
+        [(
+            proposer.clone(),
+            AuthorizedInvocation {
+                function: AuthorizedFunction::Contract((
+                    fixture.governor_id.clone(),
+                    Symbol::new(&e, "cancel"),
+                    (
+                        &proposal.targets,
+                        &proposal.functions,
+                        &proposal.args,
+                        &description_hash,
+                        &proposer,
+                    )
+                        .into_val(&e),
+                )),
+                sub_invocations: [].into(),
+            },
+        )]
+    );
+    assert_eq!(
+        fixture.governor.proposal_state(&proposal_id),
+        ProposalState::Canceled
+    );
+}
+
+#[test]
+fn non_proposer_cannot_cancel_and_emits_no_cancellation_event() {
+    let e = Env::default();
+    set_ledger_sequence(&e, 100);
+    let fixture = setup_governance(&e);
+    let proposer = fixture.primary_voter().clone();
+    let non_proposer = Address::generate(&e);
+    advance_ledger(&e, 1);
+    let proposal = signaling_proposal(&e);
+    let proposal_id = fixture.governor.propose(
+        &proposal.targets,
+        &proposal.functions,
+        &proposal.args,
+        &proposal.description,
+        &proposer,
+    );
+    let description_hash = e
+        .crypto()
+        .keccak256(&proposal.description.to_bytes())
+        .to_bytes();
+
+    e.mock_auths(&[MockAuth {
+        address: &non_proposer,
+        invoke: &MockAuthInvoke {
+            contract: &fixture.governor_id,
+            fn_name: "cancel",
+            args: (
+                &proposal.targets,
+                &proposal.functions,
+                &proposal.args,
+                &description_hash,
+                &non_proposer,
+            )
+                .into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        fixture.governor.cancel(
+            &proposal.targets,
+            &proposal.functions,
+            &proposal.args,
+            &description_hash,
+            &non_proposer,
+        );
+    }));
+
+    assert!(result.is_err());
+    assert_eq!(e.events().all(), std::vec![]);
+    assert_eq!(
+        fixture.governor.proposal_state(&proposal_id),
+        ProposalState::Pending
+    );
+}
+
+#[test]
+fn proposer_cannot_cancel_without_authorization() {
+    let e = Env::default();
+    set_ledger_sequence(&e, 100);
+    let fixture = setup_governance(&e);
+    let proposer = fixture.primary_voter().clone();
+    advance_ledger(&e, 1);
+    let proposal = signaling_proposal(&e);
+    let proposal_id = fixture.governor.propose(
+        &proposal.targets,
+        &proposal.functions,
+        &proposal.args,
+        &proposal.description,
+        &proposer,
+    );
+    let description_hash = e
+        .crypto()
+        .keccak256(&proposal.description.to_bytes())
+        .to_bytes();
+
+    e.mock_auths(&[]);
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        fixture.governor.cancel(
+            &proposal.targets,
+            &proposal.functions,
+            &proposal.args,
+            &description_hash,
+            &proposer,
+        );
+    }));
+
+    assert!(result.is_err());
+    assert_eq!(e.events().all(), std::vec![]);
+    assert_eq!(
+        fixture.governor.proposal_state(&proposal_id),
+        ProposalState::Pending
+    );
+}
+
+#[test]
+fn duplicate_vote_is_rejected_without_tally_or_event_mutation() {
+    let e = Env::default();
+    set_ledger_sequence(&e, 100);
+    let fixture = deploy_governance(
+        &e,
+        GovernanceParams {
+            voting_delay: 1,
+            voting_period: 10,
+            proposal_threshold: 1,
+            quorum: 1,
+        },
+        &[VoterSpec::self_delegate(3)],
+    );
+    let voter = fixture.primary_voter().clone();
+    advance_ledger(&e, 1);
+    let proposal_id = fixture.propose_signaling(&voter);
+    advance_past_voting_delay(&e, &fixture.params);
+    let first_reason = String::from_str(&e, "Initial support");
+
+    assert_eq!(
+        fixture
+            .governor
+            .cast_vote(&proposal_id, &VOTE_FOR, &first_reason, &voter),
+        3
+    );
+    assert_eq!(
+        e.events().all(),
+        std::vec![VoteCast {
+            voter: voter.clone(),
+            proposal_id: proposal_id.clone(),
+            vote_type: VOTE_FOR,
+            weight: 3,
+            reason: first_reason,
+        }
+        .to_xdr(&e, &fixture.governor_id)]
+    );
+    assert!(fixture.governor.has_voted(&proposal_id, &voter));
+    let before = e.as_contract(&fixture.governor_id, || {
+        get_proposal_vote_counts(&e, &proposal_id)
+    });
+
+    let duplicate = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        fixture.governor.cast_vote(
+            &proposal_id,
+            &VOTE_AGAINST,
+            &String::from_str(&e, "Attempt to replace the vote"),
+            &voter,
+        );
+    }));
+    assert!(duplicate.is_err());
+    assert_eq!(e.events().all(), std::vec![]);
+
+    let after = e.as_contract(&fixture.governor_id, || {
+        get_proposal_vote_counts(&e, &proposal_id)
+    });
+    assert_eq!(after.for_votes, before.for_votes);
+    assert_eq!(after.against_votes, before.against_votes);
+    assert_eq!(after.abstain_votes, before.abstain_votes);
+    assert!(fixture.governor.has_voted(&proposal_id, &voter));
+    assert_eq!(
+        fixture.governor.proposal_state(&proposal_id),
+        ProposalState::Active
+    );
+}
+
+#[test]
+fn proposal_snapshot_ignores_later_mint_transfer_and_redelegation() {
+    let e = Env::default();
+    set_ledger_sequence(&e, 100);
+    let fixture = deploy_governance(
+        &e,
+        GovernanceParams {
+            voting_delay: 1,
+            voting_period: 20,
+            proposal_threshold: 1,
+            quorum: 1,
+        },
+        &[
+            VoterSpec::self_delegate(1),
+            VoterSpec::self_delegate(1),
+            VoterSpec::self_delegate(1),
+        ],
+    );
+    let mint_voter = fixture.voters[0].clone();
+    let transfer_voter = fixture.voters[1].clone();
+    let redelegating_voter = fixture.voters[2].clone();
+    let transfer_recipient = Address::generate(&e);
+    let new_delegate = Address::generate(&e);
+
+    advance_ledger(&e, 1);
+    let proposal_id = fixture.propose_signaling(&mint_voter);
+    let snapshot = fixture.governor.proposal_snapshot(&proposal_id);
+    set_ledger_sequence(&e, snapshot + 1);
+
+    fixture.nft.mint(
+        &mint_voter,
+        &String::from_str(&e, "ipfs://members/post-snapshot.json"),
+    );
+    fixture
+        .votes
+        .delegate(&transfer_recipient, &transfer_recipient);
+    fixture
+        .nft
+        .transfer(&transfer_voter, &transfer_recipient, &1);
+    fixture.votes.delegate(&redelegating_voter, &new_delegate);
+
+    assert_eq!(fixture.votes.get_votes(&mint_voter), 2);
+    assert_eq!(fixture.votes.get_votes(&transfer_voter), 0);
+    assert_eq!(fixture.votes.get_votes(&transfer_recipient), 1);
+    assert_eq!(fixture.votes.get_votes(&redelegating_voter), 0);
+    assert_eq!(fixture.votes.get_votes(&new_delegate), 1);
+    assert_eq!(
+        fixture
+            .votes
+            .get_votes_at_checkpoint(&mint_voter, &snapshot),
+        1
+    );
+    assert_eq!(
+        fixture
+            .votes
+            .get_votes_at_checkpoint(&transfer_voter, &snapshot),
+        1
+    );
+    assert_eq!(
+        fixture
+            .votes
+            .get_votes_at_checkpoint(&redelegating_voter, &snapshot),
+        1
+    );
+
+    for voter in [&mint_voter, &transfer_voter, &redelegating_voter] {
+        let reason = String::from_str(&e, "Snapshot weight");
+        assert_eq!(
+            fixture
+                .governor
+                .cast_vote(&proposal_id, &VOTE_FOR, &reason, voter),
+            1
+        );
+        assert_eq!(
+            e.events().all(),
+            std::vec![VoteCast {
+                voter: voter.clone(),
+                proposal_id: proposal_id.clone(),
+                vote_type: VOTE_FOR,
+                weight: 1,
+                reason,
+            }
+            .to_xdr(&e, &fixture.governor_id)]
+        );
+    }
+    let original_counts = e.as_contract(&fixture.governor_id, || {
+        get_proposal_vote_counts(&e, &proposal_id)
+    });
+    assert_eq!(original_counts.for_votes, 3);
+
+    set_ledger_sequence(&e, fixture.governor.proposal_deadline(&proposal_id) + 1);
+    assert_eq!(
+        fixture.governor.proposal_state(&proposal_id),
+        ProposalState::Succeeded
+    );
+
+    let later_id = fixture.propose_signaling(&mint_voter);
+    let later_snapshot = fixture.governor.proposal_snapshot(&later_id);
+    set_ledger_sequence(&e, later_snapshot + 1);
+    assert_eq!(
+        fixture.governor.cast_vote(
+            &later_id,
+            &VOTE_FOR,
+            &String::from_str(&e, "Updated mint power"),
+            &mint_voter,
+        ),
+        2
+    );
+    assert_eq!(
+        fixture.governor.cast_vote(
+            &later_id,
+            &VOTE_FOR,
+            &String::from_str(&e, "Updated transfer power"),
+            &transfer_recipient,
+        ),
+        1
+    );
+    assert_eq!(
+        fixture.governor.cast_vote(
+            &later_id,
+            &VOTE_FOR,
+            &String::from_str(&e, "Updated delegation power"),
+            &new_delegate,
+        ),
+        1
+    );
+    let later_counts = e.as_contract(&fixture.governor_id, || {
+        get_proposal_vote_counts(&e, &later_id)
+    });
+    assert_eq!(later_counts.for_votes, 4);
+}
+
+#[test]
+fn succeeded_proposal_executes_target_once_with_exact_authorization() {
+    let e = Env::default();
+    set_ledger_sequence(&e, 100);
+    let fixture = setup_governance(&e);
+    let proposer = fixture.primary_voter().clone();
+    let executor = Address::generate(&e);
+    let proposal = executable_proposal(&e, 42);
+    let target = GovernorExecutionTargetClient::new(&e, &proposal.target_id);
+    assert_eq!(target.value(), 0);
+    assert_eq!(target.calls(), 0);
+
+    advance_ledger(&e, 1);
+    let proposal_id = pass_executable_proposal(&fixture, &proposal, &proposer);
+    mock_execute_auth(&e, &fixture.governor_id, &proposal, &executor);
+    let executed_id = fixture.governor.execute(
+        &proposal.targets,
+        &proposal.functions,
+        &proposal.args,
+        &proposal.description_hash,
+        &executor,
+    );
+
+    assert_eq!(executed_id, proposal_id);
+    assert_eq!(
+        e.events().all(),
+        std::vec![ProposalExecuted {
+            proposal_id: proposal_id.clone(),
+        }
+        .to_xdr(&e, &fixture.governor_id)]
+    );
+    assert_eq!(
+        e.auths(),
+        [(
+            executor.clone(),
+            AuthorizedInvocation {
+                function: AuthorizedFunction::Contract((
+                    fixture.governor_id.clone(),
+                    Symbol::new(&e, "execute"),
+                    (
+                        &proposal.targets,
+                        &proposal.functions,
+                        &proposal.args,
+                        &proposal.description_hash,
+                        &executor,
+                    )
+                        .into_val(&e),
+                )),
+                sub_invocations: [].into(),
+            },
+        )]
+    );
+    assert_eq!(
+        fixture.governor.proposal_state(&proposal_id),
+        ProposalState::Executed
+    );
+    assert_eq!(target.value(), 42);
+    assert_eq!(target.calls(), 1);
+}
+
+#[test]
+fn proposal_cannot_execute_before_it_succeeds() {
+    let e = Env::default();
+    set_ledger_sequence(&e, 100);
+    let fixture = setup_governance(&e);
+    let proposer = fixture.primary_voter().clone();
+    let executor = Address::generate(&e);
+    let proposal = executable_proposal(&e, 17);
+    let target = GovernorExecutionTargetClient::new(&e, &proposal.target_id);
+
+    advance_ledger(&e, 1);
+    let proposal_id = fixture.governor.propose(
+        &proposal.targets,
+        &proposal.functions,
+        &proposal.args,
+        &proposal.description,
+        &proposer,
+    );
+    mock_execute_auth(&e, &fixture.governor_id, &proposal, &executor);
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        fixture.governor.execute(
+            &proposal.targets,
+            &proposal.functions,
+            &proposal.args,
+            &proposal.description_hash,
+            &executor,
+        );
+    }));
+
+    assert!(result.is_err());
+    assert_eq!(e.events().all(), std::vec![]);
+    assert_eq!(target.value(), 0);
+    assert_eq!(target.calls(), 0);
+    assert_eq!(
+        fixture.governor.proposal_state(&proposal_id),
+        ProposalState::Pending
+    );
+}
+
+#[test]
+fn mismatched_action_data_cannot_execute_succeeded_proposal() {
+    let e = Env::default();
+    set_ledger_sequence(&e, 100);
+    let fixture = setup_governance(&e);
+    let proposer = fixture.primary_voter().clone();
+    let executor = Address::generate(&e);
+    let proposal = executable_proposal(&e, 23);
+    let target = GovernorExecutionTargetClient::new(&e, &proposal.target_id);
+
+    advance_ledger(&e, 1);
+    let proposal_id = pass_executable_proposal(&fixture, &proposal, &proposer);
+    let mismatched_args = vec![&e, vec![&e, 999u32.into_val(&e)]];
+    e.mock_auths(&[MockAuth {
+        address: &executor,
+        invoke: &MockAuthInvoke {
+            contract: &fixture.governor_id,
+            fn_name: "execute",
+            args: (
+                &proposal.targets,
+                &proposal.functions,
+                &mismatched_args,
+                &proposal.description_hash,
+                &executor,
+            )
+                .into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        fixture.governor.execute(
+            &proposal.targets,
+            &proposal.functions,
+            &mismatched_args,
+            &proposal.description_hash,
+            &executor,
+        );
+    }));
+
+    assert!(result.is_err());
+    assert_eq!(e.events().all(), std::vec![]);
+    assert_eq!(target.value(), 0);
+    assert_eq!(target.calls(), 0);
+    assert_eq!(
+        fixture.governor.proposal_state(&proposal_id),
+        ProposalState::Succeeded
+    );
+}
+
+#[test]
+fn executed_proposal_cannot_execute_twice() {
+    let e = Env::default();
+    set_ledger_sequence(&e, 100);
+    let fixture = setup_governance(&e);
+    let proposer = fixture.primary_voter().clone();
+    let executor = Address::generate(&e);
+    let proposal = executable_proposal(&e, 31);
+    let target = GovernorExecutionTargetClient::new(&e, &proposal.target_id);
+
+    advance_ledger(&e, 1);
+    let proposal_id = pass_executable_proposal(&fixture, &proposal, &proposer);
+    mock_execute_auth(&e, &fixture.governor_id, &proposal, &executor);
+    assert_eq!(
+        fixture.governor.execute(
+            &proposal.targets,
+            &proposal.functions,
+            &proposal.args,
+            &proposal.description_hash,
+            &executor,
+        ),
+        proposal_id
+    );
+    assert_eq!(target.value(), 31);
+    assert_eq!(target.calls(), 1);
+
+    mock_execute_auth(&e, &fixture.governor_id, &proposal, &executor);
+    let second = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        fixture.governor.execute(
+            &proposal.targets,
+            &proposal.functions,
+            &proposal.args,
+            &proposal.description_hash,
+            &executor,
+        );
+    }));
+
+    assert!(second.is_err());
+    assert_eq!(e.events().all(), std::vec![]);
+    assert_eq!(target.value(), 31);
+    assert_eq!(target.calls(), 1);
+    assert_eq!(
+        fixture.governor.proposal_state(&proposal_id),
+        ProposalState::Executed
+    );
 }
