@@ -1,6 +1,7 @@
 export type StellarNetworkId = "testnet" | "mainnet";
 
 const TX_HASH_PATTERN = /^[0-9a-fA-F]{64}$/;
+const CONTRACT_ADDRESS_PATTERN = /^C[A-Z2-7]{55}$/;
 
 /**
  * Build a Stellar Expert explorer URL for a confirmed transaction hash.
@@ -24,4 +25,13 @@ export function resolveStellarNetworkId(
   raw: string | undefined = process.env.NEXT_PUBLIC_STELLAR_NETWORK,
 ): StellarNetworkId {
   return raw === "mainnet" ? "mainnet" : "testnet";
+}
+
+export function buildStellarExplorerContractUrl(
+  contractId: string,
+  network: StellarNetworkId = "testnet",
+): string | null {
+  if (!CONTRACT_ADDRESS_PATTERN.test(contractId)) return null;
+  const explorerNetwork = network === "mainnet" ? "public" : "testnet";
+  return `https://stellar.expert/explorer/${explorerNetwork}/contract/${contractId}`;
 }

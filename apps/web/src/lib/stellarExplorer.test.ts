@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildStellarExplorerContractUrl,
   buildStellarExplorerTxUrl,
   resolveStellarNetworkId,
 } from "@/lib/stellarExplorer";
@@ -35,6 +36,23 @@ describe("buildStellarExplorerTxUrl", () => {
     expect(
       buildStellarExplorerTxUrl(`${VALID_HASH}ff`, "testnet"),
     ).toBeNull();
+  });
+});
+
+describe("buildStellarExplorerContractUrl", () => {
+  const contractId = `C${"A".repeat(55)}`;
+
+  it("builds network-specific contract links", () => {
+    expect(buildStellarExplorerContractUrl(contractId, "testnet")).toBe(
+      `https://stellar.expert/explorer/testnet/contract/${contractId}`,
+    );
+    expect(buildStellarExplorerContractUrl(contractId, "mainnet")).toBe(
+      `https://stellar.expert/explorer/public/contract/${contractId}`,
+    );
+  });
+
+  it("rejects malformed contract addresses", () => {
+    expect(buildStellarExplorerContractUrl("CNFT", "testnet")).toBeNull();
   });
 });
 
