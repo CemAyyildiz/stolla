@@ -292,6 +292,7 @@ dependencies = [
  "community-governor",
  "community-nft",
  "soroban-sdk",
+ "stellar-governance",
 ]
 
 [[package]]
