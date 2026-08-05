@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   useProposalDiscovery: vi.fn(),
   createGovernorClient: vi.fn(),
   refresh: vi.fn(),
+  signTransaction: vi.fn(),
 }));
 
 vi.mock("@/hooks/useProposalDiscovery", () => ({
@@ -23,7 +24,7 @@ vi.mock("@/lib/stellar", () => ({
 vi.mock("@/context/WalletProvider", () => ({
   useWallet: () => ({
     address: null,
-    signTransaction: vi.fn(),
+    signTransaction: mocks.signTransaction,
     isConnecting: false,
   }),
 }));
