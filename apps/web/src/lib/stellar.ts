@@ -2,6 +2,8 @@ import { Networks } from "@stellar/stellar-sdk";
 
 const network = process.env.NEXT_PUBLIC_STELLAR_NETWORK ?? "testnet";
 
+export const stellarNetwork = network === "mainnet" ? "mainnet" : "testnet";
+
 export const stellarConfig = {
   testnet: {
     rpcUrl:
@@ -45,6 +47,10 @@ export function requireCommunityFactoryId(): string {
     );
   }
   return contractIds.communityFactory;
+}
+
+export function requireCommunityFactoryContractId(): string {
+  return requireCommunityFactoryId();
 }
 
 /**
