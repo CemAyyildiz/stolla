@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ProposalState } from "@/lib/bindings/community-governor/src";
 
 const mocks = vi.hoisted(() => ({
@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
   createReadOnlyGovernorClient: vi.fn(),
   createReadOnlyNftClient: vi.fn(),
   fetchVoteTotals: vi.fn(),
-  useTransactionLifecycle: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({ useParams: mocks.useParams }));
@@ -21,9 +20,6 @@ vi.mock("@/lib/contracts", () => ({
 }));
 vi.mock("@/lib/voteAggregation", () => ({
   fetchVoteTotals: mocks.fetchVoteTotals,
-}));
-vi.mock("@/hooks/useTransactionLifecycle", () => ({
-  useTransactionLifecycle: mocks.useTransactionLifecycle,
 }));
 vi.mock("@/lib/stellar", () => ({
   contractIds: { nft: "CNFT", governor: "CGOV" },
@@ -58,21 +54,6 @@ function mockWallet() {
   });
 }
 
-function mockLifecycle() {
-  mocks.useTransactionLifecycle.mockReturnValue({
-    state: {
-      stage: "idle",
-      voteType: null,
-      reason: "",
-      error: null,
-      isTerminal: false,
-    },
-    execute: vi.fn(),
-    reset: vi.fn(),
-    isInFlight: false,
-  });
-}
-
 function mockVoteTotals() {
   mocks.fetchVoteTotals.mockResolvedValue({
     totals: {
@@ -99,6 +80,9 @@ function mockGovernor(overrides: Record<string, unknown> = {}) {
     has_voted: vi.fn().mockResolvedValue({ result: false }),
     proposal_snapshot: vi.fn().mockResolvedValue({ result: 1_500_000 }),
     quorum: vi.fn().mockResolvedValue({ result: BigInt(100) }),
+    cast_vote: vi.fn().mockResolvedValue({
+      signAndSend: vi.fn().mockResolvedValue(undefined),
+    }),
     ...overrides,
   });
 }
@@ -123,7 +107,6 @@ function mockConnectedWallet(address = "GWALLET") {
 beforeEach(() => {
   vi.clearAllMocks();
   mockWallet();
-  mockLifecycle();
   mockVoteTotals();
   mockReadOnly();
   mockGovernor();
@@ -371,5 +354,123 @@ describe("ProposalDetailPage", () => {
     expect(getVotes).toHaveBeenCalledTimes(2);
     expect(getVotes.mock.calls[0][0]).toEqual({ account: "GWALLET1" });
     expect(getVotes.mock.calls[1][0]).toEqual({ account: "GWALLET2" });
+  });
+
+  it("requests has_voted only when a wallet is connected", async () => {
+    mocks.useParams.mockReturnValue({ id: VALID_ID });
+    const hasVoted = vi.fn().mockResolvedValue({ result: false });
+    mockGovernor({ has_voted: hasVoted });
+
+    render(<ProposalDetailPage />);
+    expect(await screen.findByText("Active")).toBeInTheDocument();
+    expect(hasVoted).not.toHaveBeenCalled();
+
+    mockConnectedWallet("GWALLET");
+    mockGovernor({ has_voted: hasVoted });
+    const { unmount } = render(<ProposalDetailPage />);
+    unmount();
+    render(<ProposalDetailPage />);
+    await waitFor(() => expect(hasVoted).toHaveBeenCalled());
+    expect(hasVoted.mock.calls[0][0].account).toBe("GWALLET");
+  });
+
+  it.each([
+    ["For", 1],
+    ["Against", 0],
+    ["Abstain", 2],
+  ] as const)(
+    "maps %s votes to vote_type %i with reason and voter",
+    async (label, voteType) => {
+      mocks.useParams.mockReturnValue({ id: VALID_ID });
+      mockConnectedWallet("GVOTER");
+      const castVote = vi.fn().mockResolvedValue({
+        signAndSend: vi.fn().mockResolvedValue(undefined),
+      });
+      mockGovernor({ cast_vote: castVote });
+
+      render(<ProposalDetailPage />);
+      expect(await screen.findByRole("heading", { name: "Cast vote" })).toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText(/Vote reason/i), {
+        target: { value: "My reason" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: label }));
+
+      await waitFor(() => expect(castVote).toHaveBeenCalledTimes(1));
+      const args = castVote.mock.calls[0][0];
+      expect(args.vote_type).toBe(voteType);
+      expect(args.reason).toBe("My reason");
+      expect(args.voter).toBe("GVOTER");
+      expect(Buffer.from(args.proposal_id).toString("hex")).toBe(VALID_ID);
+      expect(await screen.findByText("Vote confirmed!")).toBeInTheDocument();
+    },
+  );
+
+  it("refreshes proposal state after a confirmed vote", async () => {
+    mocks.useParams.mockReturnValue({ id: VALID_ID });
+    mockConnectedWallet();
+    const proposalState = vi
+      .fn()
+      .mockResolvedValueOnce({ result: ProposalState.Active })
+      .mockResolvedValueOnce({ result: ProposalState.Succeeded });
+    const hasVoted = vi
+      .fn()
+      .mockResolvedValueOnce({ result: false })
+      .mockResolvedValueOnce({ result: true });
+    mockGovernor({
+      proposal_state: proposalState,
+      has_voted: hasVoted,
+      cast_vote: vi.fn().mockResolvedValue({
+        signAndSend: vi.fn().mockResolvedValue(undefined),
+      }),
+    });
+
+    render(<ProposalDetailPage />);
+    expect(await screen.findByText("Active")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "For" }));
+    expect(await screen.findByText("Vote confirmed!")).toBeInTheDocument();
+    await waitFor(() => expect(proposalState.mock.calls.length).toBeGreaterThan(1));
+    await waitFor(() => expect(hasVoted.mock.calls.length).toBeGreaterThan(1));
+  });
+
+  it("does not report success after wallet rejection", async () => {
+    mocks.useParams.mockReturnValue({ id: VALID_ID });
+    mockConnectedWallet();
+    mockGovernor({
+      cast_vote: vi.fn().mockResolvedValue({
+        signAndSend: vi.fn().mockRejectedValue(new Error("User rejected the request")),
+      }),
+    });
+
+    render(<ProposalDetailPage />);
+    expect(await screen.findByRole("heading", { name: "Cast vote" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "For" }));
+
+    expect(
+      (await screen.findAllByText(/rejected the wallet request/i)).length,
+    ).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Vote confirmed!")).not.toBeInTheDocument();
+  });
+
+  it("does not report success after a duplicate vote", async () => {
+    mocks.useParams.mockReturnValue({ id: VALID_ID });
+    mockConnectedWallet();
+    mockGovernor({
+      cast_vote: vi.fn().mockResolvedValue({
+        signAndSend: vi
+          .fn()
+          .mockRejectedValue(new Error("HostError: Error(Contract, #5016)")),
+      }),
+    });
+
+    render(<ProposalDetailPage />);
+    expect(await screen.findByRole("heading", { name: "Cast vote" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Against" }));
+
+    expect(
+      (await screen.findAllByText("You have already voted on this proposal."))
+        .length,
+    ).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Vote confirmed!")).not.toBeInTheDocument();
   });
 });
