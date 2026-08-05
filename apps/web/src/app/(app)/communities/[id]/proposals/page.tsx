@@ -258,22 +258,25 @@ export default function CommunityProposalHistoryPage() {
 
   useEffect(() => {
     let active = true;
-    setStatus("loading");
-    setCommunity(null);
-    void getCommunity(id)
-      .then((result) => {
-        if (!active) return;
-        if (result.status !== "found") {
-          setStatus("not-found");
-          return;
-        }
-        setCommunity(result.community);
-      })
-      .catch(() => {
-        if (active) setStatus("error");
-      });
+    const timeout = window.setTimeout(() => {
+      setStatus("loading");
+      setCommunity(null);
+      void getCommunity(id)
+        .then((result) => {
+          if (!active) return;
+          if (result.status !== "found") {
+            setStatus("not-found");
+            return;
+          }
+          setCommunity(result.community);
+        })
+        .catch(() => {
+          if (active) setStatus("error");
+        });
+    }, 0);
     return () => {
       active = false;
+      window.clearTimeout(timeout);
     };
   }, [id]);
 

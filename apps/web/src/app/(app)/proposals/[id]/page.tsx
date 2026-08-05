@@ -159,18 +159,21 @@ export default function ProposalDetailPage({
     if (!isValidId) return;
     let active = true;
 
-    loadProposal()
-      .then((data) => {
-        if (!active) return;
-        setLoadErrorId(null);
-        setResult(data);
-      })
-      .catch(() => {
-        if (active) setLoadErrorId(proposalIdHex);
-      });
+    const timeout = window.setTimeout(() => {
+      loadProposal()
+        .then((data) => {
+          if (!active) return;
+          setLoadErrorId(null);
+          setResult(data);
+        })
+        .catch(() => {
+          if (active) setLoadErrorId(proposalIdHex);
+        });
+    }, 0);
 
     return () => {
       active = false;
+      window.clearTimeout(timeout);
     };
   }, [isValidId, loadProposal, proposalIdHex]);
 

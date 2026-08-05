@@ -25,29 +25,32 @@ export default function CommunityProposalDetailPage() {
 
   useEffect(() => {
     let active = true;
-    setCommunity(null);
-    setStatus("loading");
-    void getCommunity(id)
-      .then((result) => {
-        if (!active) return;
-        if (result.status !== "found") {
-          setStatus("community-not-found");
-          return;
-        }
-        if (
-          !isContractId(result.community.record.governorContract) ||
-          !isContractId(result.community.record.nftContract)
-        ) {
-          setStatus("invalid-contracts");
-          return;
-        }
-        setCommunity(result.community);
-      })
-      .catch(() => {
-        if (active) setStatus("error");
-      });
+    const timeout = window.setTimeout(() => {
+      setCommunity(null);
+      setStatus("loading");
+      void getCommunity(id)
+        .then((result) => {
+          if (!active) return;
+          if (result.status !== "found") {
+            setStatus("community-not-found");
+            return;
+          }
+          if (
+            !isContractId(result.community.record.governorContract) ||
+            !isContractId(result.community.record.nftContract)
+          ) {
+            setStatus("invalid-contracts");
+            return;
+          }
+          setCommunity(result.community);
+        })
+        .catch(() => {
+          if (active) setStatus("error");
+        });
+    }, 0);
     return () => {
       active = false;
+      window.clearTimeout(timeout);
     };
   }, [id]);
 
@@ -64,7 +67,11 @@ export default function CommunityProposalDetailPage() {
         <LiveStatus>Loading community proposal…</LiveStatus>
       ) : (
         <section
-          role={status === "error" || status === "invalid-contracts" ? "alert" : undefined}
+          role={
+            status === "error" || status === "invalid-contracts"
+              ? "alert"
+              : undefined
+          }
           className="rounded-xl border border-slate-800 bg-[#151b2b] p-6"
         >
           <h1 className="text-xl font-semibold text-slate-100">

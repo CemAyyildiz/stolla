@@ -126,7 +126,11 @@ export function useProposalDiscovery(governorContractId?: string) {
   }, [governorContractId]);
 
   useEffect(() => {
-    discover().catch(() => undefined);
+    const timeout = window.setTimeout(
+      () => void discover().catch(() => undefined),
+      0,
+    );
+    return () => window.clearTimeout(timeout);
   }, [discover]);
 
   const proposalIds = proposals.map((proposal) => proposal.id);
