@@ -32,12 +32,27 @@ export type CommunitySimulation = {
 
 export type SubmissionStatus = "pending" | "confirmed" | "failed";
 
+export type CommunityRegistryEntry = {
+  nftContractId: string;
+  governorContractId: string;
+};
+
 export type CommunitySubmission = {
   networkPassphrase: string;
   transactionHash: string;
   status: SubmissionStatus;
   message?: string;
+  registry?: CommunityRegistryEntry | null;
 };
+
+export type DeploymentStage =
+  | "draft"
+  | "simulated"
+  | "awaiting-approval"
+  | "submitted"
+  | "confirmed"
+  | "verified"
+  | "failed";
 
 export type CreationState = {
   step: CreationStep;
@@ -82,7 +97,8 @@ export type CreationAction =
   | { type: "signing-started" }
   | { type: "signing-ended" }
   | { type: "submission-recorded"; submission: CommunitySubmission }
-  | { type: "submission-settled"; status: SubmissionStatus; message?: string };
+  | { type: "submission-settled"; status: SubmissionStatus; message?: string }
+  | { type: "registry-verified"; registry: CommunityRegistryEntry };
 
 export function creationReducer(
   state: CreationState,
@@ -156,7 +172,29 @@ export function creationReducer(
             },
           }
         : state;
+
+    case "registry-verified":
+      return state.submission
+        ? {
+            ...state,
+            submission: {
+              ...state.submission,
+              registry: action.registry,
+            },
+          }
+        : state;
   }
+}
+
+/** Derived deployment progress for UI; never stored separately from state. */
+export function deploymentStage(state: CreationState): DeploymentStage {
+  if (state.submission?.status === "failed") return "failed";
+  if (state.submission?.registry) return "verified";
+  if (state.submission?.status === "confirmed") return "confirmed";
+  if (state.submission) return "submitted";
+  if (state.signing) return "awaiting-approval";
+  if (state.simulation) return "simulated";
+  return "draft";
 }
 
 export const CREATION_DRAFT_STORAGE_KEY = "stolla.community-creation.draft.v1";

@@ -1,5 +1,10 @@
 import { CreateCommunityWizard } from "@/components/community/CreateCommunityWizard";
 
+/**
+ * Assignee network-guard wizard (issue #146/#151). Primary product CTA uses
+ * `/communities/create`; this route remains for the parallel wizard + Playwright
+ * mocked-wallet creation suite.
+ */
 export default function CreateCommunityPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">

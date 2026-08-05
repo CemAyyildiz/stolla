@@ -7,6 +7,16 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/__tests__/setup.ts", "./vitest.setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
+    env: {
+      NEXT_PUBLIC_STELLAR_NETWORK: "testnet",
+      NEXT_PUBLIC_COMMUNITY_FACTORY_CONTRACT_ID:
+        "CFACTORY000000000000000000000000000000000000000000000000",
+      NEXT_PUBLIC_NFT_CONTRACT_ID:
+        "CNFT000000000000000000000000000000000000000000000000000000",
+      NEXT_PUBLIC_GOVERNOR_CONTRACT_ID:
+        "CGOV000000000000000000000000000000000000000000000000000000",
+      NEXT_PUBLIC_GOVERNOR_START_LEDGER: "1500000",
+    },
   },
   resolve: {
     alias: {
