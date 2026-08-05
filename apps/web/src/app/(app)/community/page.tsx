@@ -9,6 +9,8 @@ import {
 import { contractIds } from "@/lib/stellar";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { LiveStatus } from "@/components/ui/LiveStatus";
+import { TransactionLifecycleStatus } from "@/components/TransactionLifecycleStatus";
+import { useOperationLifecycle } from "@/hooks/useOperationLifecycle";
 import {
   loadCommunityData,
   runCommunityRefresh,
@@ -34,6 +36,7 @@ export default function CommunityPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(Boolean(contractIds.nft));
+  const delegationLifecycle = useOperationLifecycle();
 
   const contractsConfigured = Boolean(contractIds.nft);
 
@@ -115,31 +118,25 @@ export default function CommunityPage() {
       setStatus({ message: "Connect your wallet first.", tone: "error" });
       return;
     }
+    if (delegationLifecycle.isInFlight) return;
 
-    setLoading(true);
-    setStatus({
-      message: "Submitting delegation transaction…",
-      tone: "routine",
-    });
-    try {
+    setStatus(null);
+    delegationLifecycle.reset();
+
+    const result = await delegationLifecycle.execute(async () => {
       const client = createNftClient({ publicKey: address, signTransaction });
-      const tx = await client.delegate({
+      return client.delegate({
         account: address,
         delegatee: address,
       });
-      await tx.signAndSend();
+    });
+
+    if (result.ok) {
       setStatus({
         message: "Delegated voting power to yourself.",
         tone: "routine",
       });
       await refresh();
-    } catch (error: unknown) {
-      setStatus({
-        message: error instanceof Error ? error.message : "Delegate failed",
-        tone: "error",
-      });
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -239,12 +236,41 @@ export default function CommunityPage() {
               </dl>
               <button
                 type="button"
-                onClick={handleDelegate}
-                disabled={!address || loading}
+                onClick={() => void handleDelegate()}
+                disabled={!address || loading || delegationLifecycle.isInFlight}
                 className="mt-4 rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-50"
               >
-                Delegate to self
+                {delegationLifecycle.isInFlight
+                  ? "Delegation in progress…"
+                  : "Delegate to self"}
               </button>
+              <TransactionLifecycleStatus
+                stage={delegationLifecycle.stage}
+                operationLabel="Delegate"
+                error={delegationLifecycle.error}
+                metadata={
+                  delegationLifecycle.outcomeKind
+                    ? {
+                        details: [
+                          {
+                            label: "Outcome",
+                            value:
+                              delegationLifecycle.outcomeKind ===
+                              "wallet_rejected"
+                                ? "Wallet rejected"
+                                : delegationLifecycle.outcomeKind ===
+                                    "still_pending"
+                                  ? "Still pending"
+                                  : delegationLifecycle.outcomeKind ===
+                                      "simulation_failed"
+                                    ? "Simulation failed"
+                                    : "Send failed",
+                          },
+                        ],
+                      }
+                    : undefined
+                }
+              />
             </section>
           )}
 
