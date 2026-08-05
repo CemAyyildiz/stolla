@@ -19,7 +19,9 @@ use stellar_governance::{
 
 use community_nft::{CommunityNft, CommunityNftClient};
 
-use crate::{CommunityGovernor, STORAGE_EXTEND_AMOUNT, STORAGE_TTL_THRESHOLD};
+use crate::{
+    CommunityGovernor, CommunityGovernorClient, STORAGE_EXTEND_AMOUNT, STORAGE_TTL_THRESHOLD,
+};
 
 #[contract]
 struct GovernorExecutionTarget;
@@ -1454,7 +1456,7 @@ fn governor_storage_survives_advancement_and_instance_ttl_renews_at_boundary() {
     assert_eq!(counts.against_votes, 0);
     assert_eq!(counts.abstain_votes, 0);
 
-    fixture.governor.extend_instance_ttl();
+    CommunityGovernorClient::new(&e, &fixture.governor_id).extend_instance_ttl();
     e.as_contract(&fixture.governor_id, || {
         assert_eq!(e.storage().instance().get_ttl(), STORAGE_EXTEND_AMOUNT);
     });

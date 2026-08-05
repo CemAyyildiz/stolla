@@ -346,7 +346,7 @@ fn generated_sequences_conserve_delegated_voting_power() {
         let e = Env::default();
         e.mock_all_auths();
         e.ledger().set_sequence_number(100);
-        let (owner, first_account, client) = setup(&e);
+        let (_owner, first_account, client) = setup(&e);
         let accounts = std::vec![
             first_account,
             Address::generate(&e),
@@ -440,7 +440,7 @@ fn nft_storage_and_instance_ttls_renew_at_the_policy_boundary() {
     let e = Env::default();
     e.mock_all_auths();
     e.ledger().set_sequence_number(100);
-    let (owner, member, client) = setup(&e);
+    let (_owner, member, client) = setup(&e);
     let uri = String::from_str(&e, "ipfs://members/durable.json");
     let token_id = client.mint(&member, &uri);
     VotesClient::new(&e, &client.address).delegate(&member, &member);
