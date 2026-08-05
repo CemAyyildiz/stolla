@@ -211,8 +211,12 @@ export default function ProposalDetailPage() {
   }, [address]);
 
   // Transaction lifecycle management
-  const { state: txLifecycle, execute: executeVote, reset: resetLifecycle } =
-    useTransactionLifecycle({
+  const {
+    state: txLifecycle,
+    execute: executeVote,
+    reset: resetLifecycle,
+    isInFlight: isVoteInFlight,
+  } = useTransactionLifecycle({
       onConfirmed: async () => {
         // Refresh has_voted, proposal state, and available vote data after confirmation
         const data = await loadProposal();
@@ -252,12 +256,7 @@ export default function ProposalDetailPage() {
   const isLoading = !isInvalid && !isUnavailable && !isReady;
 
   // Disable voting buttons while a transaction is in progress
-  const isVotingDisabled =
-    !address ||
-    txLifecycle.stage === "simulating" ||
-    txLifecycle.stage === "wallet_approval" ||
-    txLifecycle.stage === "submitting" ||
-    txLifecycle.stage === "confirming";
+  const isVotingDisabled = !address || isVoteInFlight;
   const pendingVote = isVotingDisabled
     ? (txLifecycle.voteType as VoteType | null)
     : null;

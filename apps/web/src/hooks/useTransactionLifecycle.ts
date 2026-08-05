@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 /**
  * Transaction lifecycle stages for vote submission.
@@ -34,10 +34,18 @@ const TERMINAL_STAGES: TransactionStage[] = [
   "wallet_rejected",
   "submission_failed",
   "duplicate_vote",
+  "simulation_failed",
 ];
 
-function isTerminalStage(stage: TransactionStage): boolean {
-  return TERMINAL_STAGES.includes(stage);
+const PENDING_STAGES: TransactionStage[] = [
+  "simulating",
+  "wallet_approval",
+  "submitting",
+  "confirming",
+];
+
+export function isVoteLifecyclePending(stage: TransactionStage): boolean {
+  return PENDING_STAGES.includes(stage);
 }
 
 export type VoteTransactionFn = () => Promise<void>;
@@ -62,8 +70,12 @@ export function useTransactionLifecycle(options?: UseTransactionLifecycleOptions
     error: null,
     isTerminal: false,
   });
+  const inFlightRef = useRef(false);
+  const onConfirmedRef = useRef(options?.onConfirmed);
+  onConfirmedRef.current = options?.onConfirmed;
 
   const reset = useCallback(() => {
+    if (inFlightRef.current) return;
     setState({
       stage: "idle",
       voteType: null,
@@ -75,6 +87,11 @@ export function useTransactionLifecycle(options?: UseTransactionLifecycleOptions
 
   const execute = useCallback(
     async (voteType: number, reason: string, fn: VoteTransactionFn) => {
+      if (inFlightRef.current) {
+        return { started: false as const };
+      }
+      inFlightRef.current = true;
+
       setState({
         stage: "simulating",
         voteType,
@@ -84,10 +101,6 @@ export function useTransactionLifecycle(options?: UseTransactionLifecycleOptions
       });
 
       try {
-        // Stage: Simulating
-        // The SDK client.cast_vote() call simulates the transaction first
-        // before signing. If simulation fails, we catch it here.
-
         // Stage: Wallet approval + submission + confirmation
         // signAndSend() handles wallet approval, network submission,
         // and waiting for ledger confirmation
@@ -98,19 +111,18 @@ export function useTransactionLifecycle(options?: UseTransactionLifecycleOptions
 
         await fn();
 
-        // Stage: Confirmed
         setState((prev) => ({
           ...prev,
           stage: "confirmed",
           isTerminal: true,
         }));
 
-        // Notify caller
-        await options?.onConfirmed?.();
+        await onConfirmedRef.current?.();
+        return { started: true as const };
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error ?? "Unknown error");
+        const message =
+          error instanceof Error ? error.message : String(error ?? "Unknown error");
 
-        // Detect wallet rejection (user cancelled the signing prompt)
         if (
           message.toLowerCase().includes("user rejected") ||
           message.toLowerCase().includes("user declined") ||
@@ -124,10 +136,9 @@ export function useTransactionLifecycle(options?: UseTransactionLifecycleOptions
             error: message,
             isTerminal: true,
           }));
-          return;
+          return { started: true as const };
         }
 
-        // Detect duplicate vote (AlreadyVoted error from contract)
         if (
           message.includes("AlreadyVoted") ||
           message.includes("already voted") ||
@@ -139,10 +150,9 @@ export function useTransactionLifecycle(options?: UseTransactionLifecycleOptions
             error: "You have already voted on this proposal.",
             isTerminal: true,
           }));
-          return;
+          return { started: true as const };
         }
 
-        // Detect simulation failure
         if (
           message.toLowerCase().includes("simulation") ||
           message.toLowerCase().includes("simulate")
@@ -153,24 +163,27 @@ export function useTransactionLifecycle(options?: UseTransactionLifecycleOptions
             error: message,
             isTerminal: true,
           }));
-          return;
+          return { started: true as const };
         }
 
-        // Generic submission failure — preserve the reason for retry
         setState((prev) => ({
           ...prev,
           stage: "submission_failed",
           error: message,
           isTerminal: true,
         }));
+        return { started: true as const };
+      } finally {
+        inFlightRef.current = false;
       }
     },
-    [options],
+    [],
   );
 
   return {
     state,
     execute,
     reset,
+    isInFlight: isVoteLifecyclePending(state.stage),
   };
 }
