@@ -1,3 +1,6 @@
+/**
+ * Covers issue #151: Playwright community creation with mocked wallet and RPC.
+ */
 import { expect, test } from "@playwright/test";
 import {
   FACTORY_ID,

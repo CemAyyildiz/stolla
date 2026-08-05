@@ -1,3 +1,4 @@
+/** Covers issue #148: community list search, pagination, and metadata failures. */
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommunityView } from "@/lib/community/types";

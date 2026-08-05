@@ -1,3 +1,6 @@
+/**
+ * Covers issue #150: Playwright multi-community public browsing flow.
+ */
 import { expect, test } from "@playwright/test";
 import {
   ALPHA_ID,
