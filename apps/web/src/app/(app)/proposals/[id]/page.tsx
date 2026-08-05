@@ -9,6 +9,7 @@ import type { VoteType } from "@/components/voteOptions.mjs";
 import {
   createGovernorClient,
   createReadOnlyGovernorClient,
+  createReadOnlyNftClient,
 } from "@/lib/contracts";
 import { ProposalState } from "@/lib/bindings/community-governor/src";
 import { PROPOSAL_STATE_LABELS } from "@/lib/proposalState";
@@ -60,6 +61,10 @@ export default function ProposalDetailPage() {
   const [deadlineStatus, setDeadlineStatus] = useState<
     "loading" | "ready" | "unavailable"
   >("loading");
+  const [votingPower, setVotingPower] = useState<bigint | null>(null);
+  const [votingPowerStatus, setVotingPowerStatus] = useState<
+    "disconnected" | "loading" | "ready" | "unavailable"
+  >("disconnected");
 
   const loadProposal = useCallback(async () => {
     const proposalId = parseProposalId(proposalIdHex);
@@ -152,6 +157,59 @@ export default function ProposalDetailPage() {
     };
   }, [isValidId, loadProposal, proposalIdHex]);
 
+  const loadVotingPower = useCallback(async () => {
+    if (!address || !contractIds.nft) {
+      setVotingPower(null);
+      setVotingPowerStatus(address ? "unavailable" : "disconnected");
+      return;
+    }
+
+    setVotingPowerStatus("loading");
+    setVotingPower(null);
+
+    try {
+      const client = createReadOnlyNftClient();
+      const tx = await client.get_votes({ account: address });
+      setVotingPower(tx.result ?? BigInt(0));
+      setVotingPowerStatus("ready");
+    } catch {
+      setVotingPower(null);
+      setVotingPowerStatus("unavailable");
+    }
+  }, [address]);
+
+  useEffect(() => {
+    let active = true;
+
+    void (async () => {
+      if (!address || !contractIds.nft) {
+        if (!active) return;
+        setVotingPower(null);
+        setVotingPowerStatus(address ? "unavailable" : "disconnected");
+        return;
+      }
+
+      setVotingPowerStatus("loading");
+      setVotingPower(null);
+
+      try {
+        const client = createReadOnlyNftClient();
+        const tx = await client.get_votes({ account: address });
+        if (!active) return;
+        setVotingPower(tx.result ?? BigInt(0));
+        setVotingPowerStatus("ready");
+      } catch {
+        if (!active) return;
+        setVotingPower(null);
+        setVotingPowerStatus("unavailable");
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [address]);
+
   // Transaction lifecycle management
   const { state: txLifecycle, execute: executeVote, reset: resetLifecycle } =
     useTransactionLifecycle({
@@ -160,6 +218,7 @@ export default function ProposalDetailPage() {
         const data = await loadProposal();
         setLoadErrorId(null);
         setResult(data);
+        await loadVotingPower();
       },
     });
 
@@ -299,6 +358,35 @@ export default function ProposalDetailPage() {
           <dt className="text-slate-500">You voted</dt>
           <dd>
             {proposal.hasVoted === null ? "—" : proposal.hasVoted ? "Yes" : "No"}
+          </dd>
+        </div>
+        <div className="sm:col-span-2">
+          <dt className="text-slate-500">Your voting power</dt>
+          <dd className="mt-0.5">
+            {votingPowerStatus === "disconnected" && (
+              <span className="text-slate-400">
+                Connect your wallet to view voting power.
+              </span>
+            )}
+            {votingPowerStatus === "loading" && (
+              <Skeleton className="mt-0.5 h-5 w-24" />
+            )}
+            {votingPowerStatus === "unavailable" && (
+              <span className="text-amber-300">Unavailable</span>
+            )}
+            {votingPowerStatus === "ready" && votingPower !== null && (
+              <div>
+                <span className="font-mono text-slate-100">
+                  {votingPower.toString()}
+                </span>
+                {votingPower === BigInt(0) && (
+                  <p className="mt-1 text-xs text-slate-500">
+                    Delegate your membership NFT on the Community page to gain
+                    voting power.
+                  </p>
+                )}
+              </div>
+            )}
           </dd>
         </div>
         <div>
