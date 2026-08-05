@@ -84,7 +84,8 @@ describe("TransactionLifecycleStatus", () => {
   });
 
   it("renders optional metadata without horizontal overflow classes", () => {
-    const hash = "a".repeat(64);
+    const hash =
+      "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0";
     const { container } = render(
       <TransactionLifecycleStatus
         stage="success"
@@ -104,9 +105,28 @@ describe("TransactionLifecycleStatus", () => {
       screen.getByText("Support the treasury expansion plan"),
     ).toBeInTheDocument();
     expect(screen.getByTitle(hash)).toHaveTextContent(hash);
+    expect(
+      screen.getByRole("link", { name: /View on Stellar Expert/i }),
+    ).toHaveAttribute(
+      "href",
+      `https://stellar.expert/explorer/testnet/tx/${hash}`,
+    );
     expect(container.firstChild).toHaveClass("overflow-hidden");
     expect(container.firstChild).toHaveClass("min-w-0");
     expect(container.firstChild).toHaveClass("max-w-full");
+  });
+
+  it("does not render an explorer link for invalid hashes", () => {
+    render(
+      <TransactionLifecycleStatus
+        stage="success"
+        operationLabel="Mint"
+        metadata={{ transactionHash: "bad" }}
+      />,
+    );
+    expect(
+      screen.queryByRole("link", { name: /View on Stellar Expert/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows idle when explicitly requested", () => {

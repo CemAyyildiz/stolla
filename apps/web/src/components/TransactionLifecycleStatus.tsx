@@ -8,6 +8,10 @@ import {
   type TransactionLifecycleMetadata,
   type TransactionLifecycleStage,
 } from "@/lib/transactionLifecycle";
+import {
+  buildStellarExplorerTxUrl,
+  resolveStellarNetworkId,
+} from "@/lib/stellarExplorer";
 
 const STAGE_COLORS: Record<TransactionLifecycleStage, string> = {
   idle: "bg-slate-600",
@@ -142,6 +146,10 @@ export function TransactionLifecycleStatus({
   const isFailure = stage === "failure";
   const details = metadata?.details ?? [];
   const transactionHash = metadata?.transactionHash ?? null;
+  const explorerUrl =
+    stage === "success"
+      ? buildStellarExplorerTxUrl(transactionHash, resolveStellarNetworkId())
+      : null;
 
   return (
     <div
@@ -184,7 +192,7 @@ export function TransactionLifecycleStatus({
         </div>
       </div>
 
-      {(details.length > 0 || transactionHash) && (
+      {(details.length > 0 || transactionHash || explorerUrl) && (
         <dl className="mt-4 min-w-0 space-y-1 rounded-lg border border-slate-700 bg-[#0b0f19] p-3 text-sm">
           {details.map((detail) => (
             <div
@@ -206,6 +214,19 @@ export function TransactionLifecycleStatus({
               >
                 {transactionHash}
               </dd>
+            </div>
+          )}
+          {explorerUrl && (
+            <div className="pt-2">
+              <a
+                href={explorerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-11 items-center text-sm font-medium text-indigo-300 underline-offset-2 hover:text-indigo-200 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400"
+              >
+                View on Stellar Expert
+                <span className="sr-only"> (opens in a new tab)</span>
+              </a>
             </div>
           )}
         </dl>

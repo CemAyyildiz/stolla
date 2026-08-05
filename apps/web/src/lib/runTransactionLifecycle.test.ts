@@ -16,14 +16,21 @@ describe("runTransactionLifecycle", () => {
   it("shows approval, submission, and confirmation before success", async () => {
     const { stages, onStage } = trackStages();
     const sign = vi.fn().mockResolvedValue(undefined);
-    const send = vi.fn().mockResolvedValue({ status: "SUCCESS" });
+    const send = vi.fn().mockResolvedValue({
+      status: "SUCCESS",
+      hash: "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0",
+    });
 
     const result = await runTransactionLifecycle({
       assemble: async () => ({ sign, send }),
       onStage,
     });
 
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({
+      ok: true,
+      transactionHash:
+        "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0",
+    });
     expect(stages).toEqual([
       "simulating",
       "awaiting_approval",
@@ -103,7 +110,10 @@ describe("runTransactionLifecycle", () => {
       onStage,
     });
 
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({
+      ok: true,
+      transactionHash: null,
+    });
     expect(signAndSend).toHaveBeenCalledTimes(1);
     expect(stages).toEqual([
       "simulating",

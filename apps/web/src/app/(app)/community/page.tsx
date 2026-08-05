@@ -248,28 +248,27 @@ export default function CommunityPage() {
                 stage={delegationLifecycle.stage}
                 operationLabel="Delegate"
                 error={delegationLifecycle.error}
-                metadata={
-                  delegationLifecycle.outcomeKind
-                    ? {
-                        details: [
-                          {
-                            label: "Outcome",
-                            value:
-                              delegationLifecycle.outcomeKind ===
-                              "wallet_rejected"
-                                ? "Wallet rejected"
+                metadata={{
+                  transactionHash: delegationLifecycle.transactionHash,
+                  details: delegationLifecycle.outcomeKind
+                    ? [
+                        {
+                          label: "Outcome",
+                          value:
+                            delegationLifecycle.outcomeKind ===
+                            "wallet_rejected"
+                              ? "Wallet rejected"
+                              : delegationLifecycle.outcomeKind ===
+                                  "still_pending"
+                                ? "Still pending"
                                 : delegationLifecycle.outcomeKind ===
-                                    "still_pending"
-                                  ? "Still pending"
-                                  : delegationLifecycle.outcomeKind ===
-                                      "simulation_failed"
-                                    ? "Simulation failed"
-                                    : "Send failed",
-                          },
-                        ],
-                      }
-                    : undefined
-                }
+                                    "simulation_failed"
+                                  ? "Simulation failed"
+                                  : "Send failed",
+                        },
+                      ]
+                    : undefined,
+                }}
               />
             </section>
           )}
