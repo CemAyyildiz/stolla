@@ -4,6 +4,7 @@ use soroban_sdk::{
     testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation, MockAuth, MockAuthInvoke},
     Address, Env, IntoVal, String, Symbol,
 };
+extern crate std;
 use stellar_governance::votes::VotesClient;
 
 use crate::{CommunityNft, CommunityNftClient};
