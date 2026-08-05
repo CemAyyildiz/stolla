@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { resolveCommunityResourceUrl } from "@/lib/community/schema";
 
 const FALLBACK_STYLES = [
@@ -38,9 +38,8 @@ export function CommunityAvatar({
       return null;
     }
   }, [logo]);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => setFailed(false), [source]);
+  const [failedSource, setFailedSource] = useState<string | null>(null);
+  const failed = source !== null && failedSource === source;
 
   const sizeClass =
     size === "detail"
@@ -57,7 +56,7 @@ export function CommunityAvatar({
         alt=""
         width={size === "detail" ? 80 : 48}
         height={size === "detail" ? 80 : 48}
-        onError={() => setFailed(true)}
+        onError={() => setFailedSource(source)}
         className={`${sharedClass} bg-slate-900 object-cover`}
       />
     );

@@ -48,6 +48,8 @@ export default function CommunityPage() {
   const refreshSeq = useRef(0);
   const delegationLifecycle = useOperationLifecycle();
   const mintLifecycle = useOperationLifecycle();
+  const resetDelegationLifecycle = delegationLifecycle.reset;
+  const resetMintLifecycle = mintLifecycle.reset;
 
   const activeNftContract =
     activeCommunity?.record.nftContract ??
@@ -55,62 +57,65 @@ export default function CommunityPage() {
   const contractsConfigured = routeResolved && Boolean(activeNftContract);
 
   useEffect(() => {
-    const communityId = new URLSearchParams(window.location.search).get(
-      "community",
-    );
-    setSelectedCommunityId(communityId);
-    setRouteResolved(false);
-    setCommunitySelectionError("");
-    setActiveCommunity(null);
-    setName("");
-    setSymbol("");
-    setBalance(null);
-    setVotes(null);
-    setStatus(null);
-    setDataLoadError(null);
-    setRecipient("");
-    setTokenUri("ipfs://");
-    delegationLifecycle.reset();
-    mintLifecycle.reset();
-
-    if (!communityId) {
-      setInitialLoading(Boolean(contractIds.nft));
-      setRouteResolved(true);
-      return;
-    }
-
-    setInitialLoading(true);
     let active = true;
-    void getCommunity(communityId)
-      .then((result) => {
-        if (!active) return;
-        if (
-          result.status !== "found" ||
-          !/^C[A-Z2-7]{55}$/.test(result.community.record.nftContract)
-        ) {
-          setCommunitySelectionError(
-            "The selected community or its NFT contract is invalid. Choose a registered community before continuing.",
-          );
-          setInitialLoading(false);
-          return;
-        }
-        setActiveCommunity(result.community);
-      })
-      .catch(() => {
-        if (active) {
-          setCommunitySelectionError(
-            "The selected community could not be resolved from the registry.",
-          );
-          setInitialLoading(false);
-        }
-      })
-      .finally(() => {
-        if (active) setRouteResolved(true);
-      });
+    const timeout = window.setTimeout(() => {
+      const communityId = new URLSearchParams(window.location.search).get(
+        "community",
+      );
+      setSelectedCommunityId(communityId);
+      setRouteResolved(false);
+      setCommunitySelectionError("");
+      setActiveCommunity(null);
+      setName("");
+      setSymbol("");
+      setBalance(null);
+      setVotes(null);
+      setStatus(null);
+      setDataLoadError(null);
+      setRecipient("");
+      setTokenUri("ipfs://");
+      resetDelegationLifecycle();
+      resetMintLifecycle();
+
+      if (!communityId) {
+        setInitialLoading(Boolean(contractIds.nft));
+        setRouteResolved(true);
+        return;
+      }
+
+      setInitialLoading(true);
+      void getCommunity(communityId)
+        .then((result) => {
+          if (!active) return;
+          if (
+            result.status !== "found" ||
+            !/^C[A-Z2-7]{55}$/.test(result.community.record.nftContract)
+          ) {
+            setCommunitySelectionError(
+              "The selected community or its NFT contract is invalid. Choose a registered community before continuing.",
+            );
+            setInitialLoading(false);
+            return;
+          }
+          setActiveCommunity(result.community);
+        })
+        .catch(() => {
+          if (active) {
+            setCommunitySelectionError(
+              "The selected community could not be resolved from the registry.",
+            );
+            setInitialLoading(false);
+          }
+        })
+        .finally(() => {
+          if (active) setRouteResolved(true);
+        });
+    }, 0);
     return () => {
+      window.clearTimeout(timeout);
       active = false;
     };
-  }, [delegationLifecycle.reset, mintLifecycle.reset]);
+  }, [resetDelegationLifecycle, resetMintLifecycle]);
 
   const refresh = useCallback(async () => {
     if (!contractsConfigured) return false;

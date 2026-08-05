@@ -184,7 +184,7 @@ describe("CreateCommunityPage", () => {
     expect(screen.getByLabelText(/Quorum/)).toHaveValue("25");
   });
 
-  it("invalidates review confirmation when the connected account changes", () => {
+  it("invalidates review confirmation when the connected account changes", async () => {
     wallet.useWallet.mockReturnValue({
       address: "GOLDACCOUNT",
       connect: vi.fn(),
@@ -208,7 +208,11 @@ describe("CreateCommunityPage", () => {
     });
     rerender(<CreateCommunityPage />);
 
-    expect(screen.getByLabelText(/I confirm that these metadata/)).not.toBeChecked();
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText(/I confirm that these metadata/),
+      ).not.toBeChecked(),
+    );
     expect(
       screen.getByText(/Connected account changed. Review and confirm/),
     ).toBeInTheDocument();

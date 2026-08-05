@@ -17,7 +17,6 @@ import {
 import {
   communityWizardStorageKey,
   EMPTY_METADATA_DRAFT,
-  emptyCommunityWizardDraft,
   isCommunityWizardDirty,
   parseCommunityWizardDraft,
   type CommunityWizardStep,
@@ -164,18 +163,16 @@ export default function CreateCommunityPage() {
     if (previousAddress.current === address) return;
     const previous = previousAddress.current;
     previousAddress.current = address;
-    setConfirmed(false);
-    if (!address) {
-      setAccountStatus(
-        "Wallet disconnected. Your draft is preserved; reconnect before deployment.",
-      );
-    } else if (previous) {
-      setAccountStatus(
-        "Connected account changed. Review and confirm the deployment again.",
-      );
-    } else {
-      setAccountStatus("Wallet connected. Review the deployment before continuing.");
-    }
+    const nextStatus = !address
+      ? "Wallet disconnected. Your draft is preserved; reconnect before deployment."
+      : previous
+        ? "Connected account changed. Review and confirm the deployment again."
+        : "Wallet connected. Review the deployment before continuing.";
+    const timeout = window.setTimeout(() => {
+      setConfirmed(false);
+      setAccountStatus(nextStatus);
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [address]);
 
   function updateField(field: keyof CommunityMetadataDraft, value: string) {
