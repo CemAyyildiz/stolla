@@ -12,6 +12,11 @@ node_modules/
 apps/web/.next/
 apps/web/out/
 
+# Playwright
+apps/web/playwright-report/
+apps/web/test-results/
+apps/web/blob-report/
+
 # Rust
 contracts/target/
 **/*.rs.bk

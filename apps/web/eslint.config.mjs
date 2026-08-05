@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Playwright output:
+    "playwright-report/**",
+    "test-results/**",
     // Exclude auto-generated Soroban contract bindings from linting.
     // The Soroban binding generator emits patterns such as `any`, declaration
     // merging, and TypeScript suppression comments that are intentional in
