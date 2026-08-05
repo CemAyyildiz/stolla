@@ -33,6 +33,8 @@ contracts/target/
 
 # Logs
 *.log
+apps/web/playwright-report/
+apps/web/test-results/
 
 # Test snapshots
 contracts/**/test_snapshots/

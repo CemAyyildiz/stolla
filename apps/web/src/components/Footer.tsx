@@ -2,6 +2,7 @@ import Link from "next/link";
 
 const footerLinks = {
   product: [
+    { href: "/communities", label: "Communities" },
     { href: "/community", label: "Community" },
     { href: "/proposals", label: "Proposals" },
   ],
