@@ -13,6 +13,37 @@ export const COMMUNITY_LIMITS = {
   externalLinks: 10,
 } as const;
 
+export const GOVERNANCE_LIMITS = {
+  votingDelay: { min: 1, max: 4_294_967_295 },
+  votingPeriod: { min: 2, max: 4_294_967_295 },
+  proposalThreshold: {
+    min: BigInt(1),
+    max: (BigInt(1) << BigInt(128)) - BigInt(1),
+  },
+  quorum: {
+    min: BigInt(1),
+    max: (BigInt(1) << BigInt(128)) - BigInt(1),
+  },
+} as const;
+
+export type GovernanceDraft = {
+  proposalThreshold: string;
+  quorum: string;
+  votingDelay: string;
+  votingPeriod: string;
+};
+
+export type GovernanceDraftErrors = Partial<
+  Record<keyof GovernanceDraft, string>
+>;
+
+export const DEFAULT_GOVERNANCE_DRAFT: GovernanceDraft = {
+  proposalThreshold: "1",
+  quorum: "1",
+  votingDelay: "1",
+  votingPeriod: "10000",
+};
+
 export type CommunityMetadataDraft = {
   name: string;
   symbol: string;
@@ -139,6 +170,62 @@ export function validateCommunityMetadataDraft(
       errors.externalLinkUrl =
         "Use a valid https:// URL of at most 256 bytes.";
     }
+  }
+
+  return errors;
+}
+
+function parseUnsignedInteger(value: string): bigint | null {
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  try {
+    return BigInt(trimmed);
+  } catch {
+    return null;
+  }
+}
+
+export function validateGovernanceDraft(
+  draft: GovernanceDraft,
+): GovernanceDraftErrors {
+  const errors: GovernanceDraftErrors = {};
+  const proposalThreshold = parseUnsignedInteger(draft.proposalThreshold);
+  const quorum = parseUnsignedInteger(draft.quorum);
+  const votingDelay = parseUnsignedInteger(draft.votingDelay);
+  const votingPeriod = parseUnsignedInteger(draft.votingPeriod);
+
+  if (
+    proposalThreshold === null ||
+    proposalThreshold < GOVERNANCE_LIMITS.proposalThreshold.min ||
+    proposalThreshold > GOVERNANCE_LIMITS.proposalThreshold.max
+  ) {
+    errors.proposalThreshold =
+      "Enter a whole number from 1 through the maximum u128 value.";
+  }
+  if (
+    quorum === null ||
+    quorum < GOVERNANCE_LIMITS.quorum.min ||
+    quorum > GOVERNANCE_LIMITS.quorum.max
+  ) {
+    errors.quorum =
+      "Enter a whole number from 1 through the maximum u128 value.";
+  }
+  if (
+    votingDelay === null ||
+    votingDelay < BigInt(GOVERNANCE_LIMITS.votingDelay.min) ||
+    votingDelay > BigInt(GOVERNANCE_LIMITS.votingDelay.max)
+  ) {
+    errors.votingDelay = "Enter a whole number from 1 through 4,294,967,295 ledgers.";
+  }
+  if (
+    votingPeriod === null ||
+    votingPeriod < BigInt(GOVERNANCE_LIMITS.votingPeriod.min) ||
+    votingPeriod > BigInt(GOVERNANCE_LIMITS.votingPeriod.max)
+  ) {
+    errors.votingPeriod = "Enter a whole number from 2 through 4,294,967,295 ledgers.";
+  } else if (votingDelay !== null && votingPeriod <= votingDelay) {
+    errors.votingPeriod =
+      "Voting period must be greater than the voting delay.";
   }
 
   return errors;
