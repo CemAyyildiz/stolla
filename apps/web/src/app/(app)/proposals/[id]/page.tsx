@@ -159,21 +159,20 @@ export default function ProposalDetailPage({
     if (!isValidId) return;
     let active = true;
 
-    const timeout = window.setTimeout(() => {
-      loadProposal()
-        .then((data) => {
-          if (!active) return;
-          setLoadErrorId(null);
-          setResult(data);
-        })
-        .catch(() => {
-          if (active) setLoadErrorId(proposalIdHex);
-        });
-    }, 0);
+    // The async loader owns its independent loading sub-states.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadProposal()
+      .then((data) => {
+        if (!active) return;
+        setLoadErrorId(null);
+        setResult(data);
+      })
+      .catch(() => {
+        if (active) setLoadErrorId(proposalIdHex);
+      });
 
     return () => {
       active = false;
-      window.clearTimeout(timeout);
     };
   }, [isValidId, loadProposal, proposalIdHex]);
 
