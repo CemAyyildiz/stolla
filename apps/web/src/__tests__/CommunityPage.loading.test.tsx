@@ -179,6 +179,9 @@ describe("CommunityPage loading and RPC failures", () => {
 
     const { rerender } = render(<CommunityPage />);
     expect(screen.getByText("Loading community data…")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(mocks.loadCommunityData).toHaveBeenCalledTimes(1),
+    );
 
     mocks.useWallet.mockReturnValue({
       address: "GNEW",
@@ -186,6 +189,9 @@ describe("CommunityPage loading and RPC failures", () => {
       isConnecting: false,
     });
     rerender(<CommunityPage />);
+    await waitFor(() =>
+      expect(mocks.loadCommunityData).toHaveBeenCalledTimes(2),
+    );
 
     await act(async () => {
       second.resolve({
