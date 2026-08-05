@@ -1417,6 +1417,7 @@ fn governor_storage_survives_advancement_and_instance_ttl_renews_at_boundary() {
         &voter,
     );
 
+    CommunityGovernorClient::new(&e, &fixture.governor_id).extend_instance_ttl();
     e.as_contract(&fixture.governor_id, || {
         assert_eq!(e.storage().instance().get_ttl(), STORAGE_EXTEND_AMOUNT);
     });
