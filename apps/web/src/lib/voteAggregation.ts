@@ -1,6 +1,6 @@
 import { rpc, xdr, scValToNative } from "@stellar/stellar-sdk";
 import { Buffer } from "buffer";
-import { config, contractIds } from "./stellar";
+import { config, contractIds, requireGovernorStartLedger } from "./stellar";
 import { getE2EBridge } from "./e2eMock";
 
 export interface VoteTotals {
@@ -51,47 +51,51 @@ export async function fetchVoteTotals(
 
   const server = new rpc.Server(config.rpcUrl);
   const proposalIdBuffer = Buffer.from(proposalIdHex, "hex");
-
-  // Encode ScVals as base64 XDR for topic filtering
-  const voteCastSymbol = xdr.ScVal.scvSymbol("vote_cast").toXDR("base64");
-  const proposalIdScVal = xdr.ScVal.scvBytes(proposalIdBuffer).toXDR("base64");
+  const startLedger = requireGovernorStartLedger();
 
   const totals: VoteTotals = { for: BigInt(0), against: BigInt(0), abstain: BigInt(0), total: BigInt(0) };
   const seenEventIds = new Set<string>();
   let incomplete = false;
   let cursor: string | undefined;
 
+  // Testnet RPC rejects startLedger=1 and OZ topic filters currently return
+  // empty sets; scan by contract and match vote_cast + proposal id locally.
   const filters: rpc.Api.EventFilter[] = [
     {
       type: "contract",
       contractIds: [governorContractId],
-      topics: [
-        [
-          voteCastSymbol, // topic[0] = "vote_cast"
-          "*", // topic[1] = any voter address
-          proposalIdScVal, // topic[2] = proposal_id
-        ],
-      ],
     },
   ];
 
   try {
-    // Paginate through all vote_cast events for this proposal
     for (let page = 0; page < 50; page++) {
       const response = cursor
         ? await server.getEvents({ filters, cursor, limit: 100 })
-        : await server.getEvents({ filters, startLedger: 1, limit: 100 });
+        : await server.getEvents({ filters, startLedger, limit: 100 });
 
       if (!response.events || response.events.length === 0) {
         break;
       }
 
       for (const event of response.events) {
-        // Deduplicate by event ID
         if (seenEventIds.has(event.id)) continue;
         seenEventIds.add(event.id);
 
         try {
+          if (event.topic.length < 3) continue;
+          const kind = event.topic[0];
+          const kindName =
+            kind.switch().name === "scvSymbol"
+              ? kind.sym().toString()
+              : kind.switch().name === "scvString"
+                ? kind.str().toString()
+                : "";
+          if (kindName !== "vote_cast") continue;
+          const proposalTopic = event.topic[2];
+          if (proposalTopic.switch().name !== "scvBytes") continue;
+          const topicProposal = Buffer.from(proposalTopic.bytes());
+          if (!topicProposal.equals(proposalIdBuffer)) continue;
+
           // event.value is xdr.ScVal of type Vec[u32, u128, String]
           const native = scValToNative(event.value) as [
             number,

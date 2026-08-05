@@ -103,7 +103,19 @@ export default function ProposalDetailPage({
         ? client.has_voted({ proposal_id: proposalId, account: address })
         : Promise.resolve(null),
       client.proposal_snapshot({ proposal_id: proposalId }).catch(() => null),
-      fetchVoteTotals(proposalIdHex, governorContractId),
+      fetchVoteTotals(proposalIdHex, governorContractId).catch((error: unknown) => ({
+        totals: {
+          for: BigInt(0),
+          against: BigInt(0),
+          abstain: BigInt(0),
+          total: BigInt(0),
+        },
+        incomplete: true,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Vote history could not be loaded.",
+      })),
     ]);
 
     setTotals(voteResult.totals);
