@@ -17,51 +17,18 @@ The landing page uses a **professional light** enterprise SaaS design. It is sep
 |-------|---------|
 | `/` | Marketing landing (route group `(landing)`) |
 | `/community` | NFT collection, mint form |
-| `/community/new` | Community creation wizard |
+| `/community/[communityId]` | Community detail, resolved from the registry (`lib/communities/registry.ts`) |
+| `/community/[communityId]/proposals` | Proposals scoped to that community's Governor contract |
+| `/community/[communityId]/proposals/[proposalId]` | Single scoped proposal detail |
 | `/proposals` | Proposal list and voting |
+
+Multi-community registry is env-driven (`NEXT_PUBLIC_COMMUNITIES_JSON`, see `lib/communities/registry.ts`). Every hook/component under `lib/communities/` and `components/community/` takes its registry, metadata fetcher, and Governor reader as optional parameters, defaulting to production wiring — this is what makes them testable with the fixtures in `src/test/fixtures/communities.ts` and mocks in `src/test/mocks/governor.ts` without hitting the network.
 
 ## Stack
 
 - Next.js App Router, TypeScript, Tailwind CSS v4
 - `@stellar/stellar-sdk` + `@creit.tech/stellar-wallets-kit`
 - Contract IDs in `NEXT_PUBLIC_*` env vars — see `lib/stellar.ts`
-- Vitest + Testing Library — `npm run test --workspace=web`
-- Playwright — `npm run test:e2e --workspace=web`
-
-## End-to-end tests
-
-`e2e/` runs the community creation flow against a dev server, at desktop and
-mobile widths. Nothing touches a real wallet or network:
-
-- **Wallet** — `src/testing/mockWalletModule.ts` implements the wallets kit
-  `ModuleInterface` and signs with a fixed key, so signatures are real and bound
-  to the network passphrase the application asked for. Playwright steers it
-  through `window.__stollaMockWallet`.
-- **RPC** — `e2e/fixtures/sorobanRpc.ts` intercepts the JSON-RPC endpoint in the
-  browser and answers with envelopes built by the SDK, so the app runs its
-  normal parsing, assembly and polling paths. The configured RPC host is a
-  `.invalid` domain, so anything that escapes interception fails loudly.
-
-The mock wallet is gated twice and fails closed: the dynamic import is written
-as a literal expression over build constants so production bundles drop the
-chunk entirely, and `next.config.ts` refuses to build for production while
-`NEXT_PUBLIC_E2E_WALLET` is set. Do not route that check through a shared
-constant; it defeats dead-code elimination and the chunk ships again.
-
-## Networks
-
-`lib/network.ts` owns the network registry. Two rules hold across the app:
-
-- Anything network specific (a simulation, a submitted transaction) stores the
-  passphrase it belongs to. Gates compare against that stored value, never
-  against whatever is active at use time.
-- Explorer URL builders take a network argument. There is no ambient default, so
-  a link cannot outlive the network it was built for.
-
-`useNetworkGuard()` compares the wallet network with `activeNetwork` and is the
-only thing pages should read for mismatch decisions. `WalletProvider` re-reads
-the wallet network on every signature and throws `NetworkMismatchError` before
-handing over any XDR.
 
 ## Next.js note
 

@@ -1,43 +1,43 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const PORT = 3100;
-const BASE_URL = `http://localhost:${PORT}`;
-
-/**
- * Every Soroban call is intercepted in the browser. `.invalid` is reserved and
- * never resolves, so a request that escapes interception fails loudly instead
- * of silently reaching a real network.
- */
-const UNREACHABLE_RPC_URL = "https://soroban-rpc.invalid/";
+const PORT = process.env.PLAYWRIGHT_PORT ?? "3100";
+const baseURL = `http://127.0.0.1:${PORT}`;
 
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
-  retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: process.env.CI ? "github" : "list",
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 2 : undefined,
+  reporter: process.env.CI
+    ? [["github"], ["html", { open: "never" }]]
+    : [["list"], ["html", { open: "never" }]],
+  timeout: 30_000,
+  expect: { timeout: 5_000 },
   use: {
-    baseURL: BASE_URL,
+    baseURL,
     trace: "on-first-retry",
+    screenshot: "only-on-failure",
+    video: "retain-on-failure",
   },
   projects: [
-    { name: "desktop", use: { ...devices["Desktop Chrome"] } },
-    { name: "mobile", use: { ...devices["Pixel 7"] } },
+    {
+      name: "desktop-chromium",
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "mobile-chromium",
+      use: { ...devices["Pixel 5"] },
+    },
   ],
   webServer: {
-    command: `npx next dev --port ${PORT}`,
-    url: BASE_URL,
+    command: `npm run build && npm run start -- --port ${PORT}`,
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 180_000,
     env: {
-      NEXT_PUBLIC_E2E_WALLET: "mock",
       NEXT_PUBLIC_STELLAR_NETWORK: "testnet",
-      NEXT_PUBLIC_STELLAR_RPC_URL: UNREACHABLE_RPC_URL,
-      NEXT_PUBLIC_COMMUNITY_FACTORY_CONTRACT_ID:
-        "CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE",
+      NEXT_PUBLIC_STELLAR_RPC_URL: "https://soroban-testnet.stellar.org",
     },
   },
 });
-
-export { BASE_URL, UNREACHABLE_RPC_URL };

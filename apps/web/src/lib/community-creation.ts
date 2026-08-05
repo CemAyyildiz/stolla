@@ -32,17 +32,10 @@ export type CommunitySimulation = {
 
 export type SubmissionStatus = "pending" | "confirmed" | "failed";
 
-/** The contract pair the factory registered, read back after confirmation. */
-export type CommunityRegistryEntry = {
-  nftContractId: string;
-  governorContractId: string;
-};
-
 export type CommunitySubmission = {
   networkPassphrase: string;
   transactionHash: string;
   status: SubmissionStatus;
-  registry: CommunityRegistryEntry | null;
   message?: string;
 };
 
@@ -56,7 +49,7 @@ export type CreationState = {
 };
 
 /** Governance defaults match the testnet parameters documented in the PRD. */
-const DEFAULT_DRAFT: CommunityDraft = {
+export const DEFAULT_DRAFT: CommunityDraft = {
   name: "",
   symbol: "",
   metadataUri: "",
@@ -78,13 +71,18 @@ export const INITIAL_CREATION_STATE: CreationState = {
 export type CreationAction =
   | { type: "step-changed"; step: CreationStep }
   | { type: "draft-changed"; changes: Partial<CommunityDraft> }
+  | {
+      type: "state-restored";
+      draftState: PersistedCreationDraft | null;
+      submission: CommunitySubmission | null;
+    }
+  | { type: "draft-discarded" }
   | { type: "network-detected"; passphrase: string | null }
   | { type: "simulation-succeeded"; simulation: CommunitySimulation }
   | { type: "signing-started" }
   | { type: "signing-ended" }
   | { type: "submission-recorded"; submission: CommunitySubmission }
-  | { type: "submission-settled"; status: SubmissionStatus; message?: string }
-  | { type: "registry-verified"; registry: CommunityRegistryEntry };
+  | { type: "submission-settled"; status: SubmissionStatus; message?: string };
 
 export function creationReducer(
   state: CreationState,
@@ -96,6 +94,21 @@ export function creationReducer(
 
     case "draft-changed":
       return { ...state, draft: { ...state.draft, ...action.changes } };
+
+    case "state-restored":
+      return {
+        ...state,
+        step: action.draftState?.step ?? state.step,
+        draft: action.draftState?.draft ?? state.draft,
+        submission: action.submission ?? state.submission,
+      };
+
+    case "draft-discarded":
+      return {
+        ...INITIAL_CREATION_STATE,
+        detectedPassphrase: state.detectedPassphrase,
+        submission: state.submission,
+      };
 
     /**
      * Any change to the wallet network drops network-specific work. Draft values
@@ -143,40 +156,65 @@ export function creationReducer(
             },
           }
         : state;
-
-    case "registry-verified":
-      return state.submission
-        ? {
-            ...state,
-            submission: { ...state.submission, registry: action.registry },
-          }
-        : state;
   }
 }
 
-export type DeploymentStage =
-  | "draft"
-  | "simulated"
-  | "awaiting-approval"
-  | "submitted"
-  | "confirmed"
-  | "verified"
-  | "failed";
+export const CREATION_DRAFT_STORAGE_KEY = "stolla.community-creation.draft.v1";
+export const CREATION_SUBMISSION_STORAGE_KEY =
+  "stolla.community-creation.submission.v1";
 
-/**
- * Derived rather than stored, so the progress display can never disagree with
- * the state that gates the flow.
- */
-export function deploymentStage(state: CreationState): DeploymentStage {
-  const { submission, simulation, signing } = state;
+export type PersistedCreationDraft = {
+  step: CreationStep;
+  draft: CommunityDraft;
+};
 
-  if (submission) {
-    if (submission.status === "failed") return "failed";
-    if (submission.status === "pending") return "submitted";
-    return submission.registry ? "verified" : "confirmed";
+export function isDraftDirty(draft: CommunityDraft): boolean {
+  return (Object.keys(DEFAULT_DRAFT) as (keyof CommunityDraft)[]).some(
+    (key) => draft[key] !== DEFAULT_DRAFT[key],
+  );
+}
+
+function isCommunityDraft(value: unknown): value is CommunityDraft {
+  if (!value || typeof value !== "object") return false;
+  const draft = value as Record<string, unknown>;
+  return (Object.keys(DEFAULT_DRAFT) as (keyof CommunityDraft)[]).every(
+    (key) => typeof draft[key] === "string",
+  );
+}
+
+export function readPersistedDraft(
+  storage: Pick<Storage, "getItem">,
+): PersistedCreationDraft | null {
+  try {
+    const raw = storage.getItem(CREATION_DRAFT_STORAGE_KEY);
+    if (!raw) return null;
+    const value = JSON.parse(raw) as Partial<PersistedCreationDraft>;
+    return (
+      CREATION_STEPS.includes(value.step as CreationStep) &&
+        isCommunityDraft(value.draft)
+        ? { step: value.step as CreationStep, draft: value.draft }
+        : null
+    );
+  } catch {
+    return null;
   }
-  if (signing) return "awaiting-approval";
-  return simulation ? "simulated" : "draft";
+}
+
+export function readPersistedSubmission(
+  storage: Pick<Storage, "getItem">,
+): CommunitySubmission | null {
+  try {
+    const raw = storage.getItem(CREATION_SUBMISSION_STORAGE_KEY);
+    if (!raw) return null;
+    const value = JSON.parse(raw) as Partial<CommunitySubmission>;
+    return typeof value.networkPassphrase === "string" &&
+      typeof value.transactionHash === "string" &&
+      ["pending", "confirmed", "failed"].includes(value.status ?? "")
+      ? (value as CommunitySubmission)
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 export type CreationBlocker =

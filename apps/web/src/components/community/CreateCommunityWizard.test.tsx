@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { Networks } from "@stellar/stellar-sdk";
 import {
   CreateCommunityWizard,
@@ -78,7 +84,92 @@ async function simulate() {
 }
 
 beforeEach(() => {
+  sessionStorage.clear();
   connectOn(Networks.TESTNET);
+});
+
+describe("discard and restart", () => {
+  it("restarts an empty draft immediately without confirmation", async () => {
+    renderWizard(createPort());
+    goToStep("Governance");
+
+    fireEvent.click(screen.getByRole("button", { name: /discard draft/i }));
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByLabelText("Community name")).toHaveFocus(),
+    );
+    expect(sessionStorage.getItem("stolla.community-creation.draft.v1")).toBeNull();
+  });
+
+  it("leaves a dirty draft unchanged when confirmation is canceled", () => {
+    renderWizard(createPort());
+    fillMetadata();
+    goToStep("Review");
+
+    fireEvent.click(screen.getByRole("button", { name: /discard draft/i }));
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /keep editing/i }));
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.getByText("Stolla Builders")).toBeInTheDocument();
+  });
+
+  it("clears dirty metadata, governance values and persisted state after confirmation", async () => {
+    renderWizard(createPort());
+    fillMetadata();
+    goToStep("Governance");
+    fireEvent.change(screen.getByLabelText(/Quorum/), {
+      target: { value: "42" },
+    });
+
+    await waitFor(() =>
+      expect(
+        sessionStorage.getItem("stolla.community-creation.draft.v1"),
+      ).toContain("Stolla Builders"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /discard draft/i }));
+    fireEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: /discard draft/i,
+      }),
+    );
+
+    expect(screen.getByLabelText("Community name")).toHaveValue("");
+    await waitFor(() =>
+      expect(screen.getByLabelText("Community name")).toHaveFocus(),
+    );
+    expect(sessionStorage.getItem("stolla.community-creation.draft.v1")).toBeNull();
+
+    goToStep("Governance");
+    expect(screen.getByLabelText(/Quorum/)).toHaveValue("1");
+  });
+
+  it("restores a persisted dirty draft and its step", async () => {
+    sessionStorage.setItem(
+      "stolla.community-creation.draft.v1",
+      JSON.stringify({
+        step: "review",
+        draft: {
+          name: "Recovered",
+          symbol: "RCV",
+          metadataUri: "ipfs://recovered",
+          votingDelay: "2",
+          votingPeriod: "200",
+          proposalThreshold: "3",
+          quorum: "4",
+        },
+      }),
+    );
+
+    renderWizard(createPort());
+
+    expect(await screen.findByText("Recovered")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /3\. Review/i })).toHaveAttribute(
+      "aria-current",
+      "step",
+    );
+  });
 });
 
 describe("initial mismatch", () => {
@@ -258,5 +349,29 @@ describe("post-submission network change", () => {
     expect(deployButton()).toBeDisabled();
     expect(simulateButton()).toBeDisabled();
     expect(port.submit).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps submitted transaction recovery data when the draft is discarded", async () => {
+    const port = createPort();
+    await submitDeployment(port);
+
+    await waitFor(() =>
+      expect(
+        sessionStorage.getItem("stolla.community-creation.submission.v1"),
+      ).toContain(TRANSACTION_HASH),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /discard draft/i }));
+    fireEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: /discard draft/i,
+      }),
+    );
+
+    goToStep("Deploy");
+    expect(screen.getByRole("link", { name: TRANSACTION_HASH })).toBeVisible();
+    expect(
+      sessionStorage.getItem("stolla.community-creation.submission.v1"),
+    ).toContain(TRANSACTION_HASH);
+    expect(sessionStorage.getItem("stolla.community-creation.draft.v1")).toBeNull();
   });
 });

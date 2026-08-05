@@ -1,36 +1,65 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { Networks } from "@stellar/stellar-sdk";
+import { afterEach, describe, expect, it } from "vitest";
+import { parseGovernorStartLedger } from "./stellar";
 
-async function loadConfig(network?: string) {
-  vi.resetModules();
-  if (network) vi.stubEnv("NEXT_PUBLIC_STELLAR_NETWORK", network);
-  return import("./stellar");
-}
+const ENV_KEY = "NEXT_PUBLIC_GOVERNOR_START_LEDGER";
 
-afterEach(() => {
-  vi.unstubAllEnvs();
-  vi.resetModules();
-});
+describe("parseGovernorStartLedger", () => {
+  const previous = process.env[ENV_KEY];
 
-describe("active network", () => {
-  it("defaults to testnet", async () => {
-    const { activeNetwork, config } = await loadConfig();
-    expect(activeNetwork.id).toBe("testnet");
-    expect(config.passphrase).toBe(Networks.TESTNET);
+  afterEach(() => {
+    if (previous === undefined) {
+      delete process.env[ENV_KEY];
+    } else {
+      process.env[ENV_KEY] = previous;
+    }
   });
 
-  it("follows NEXT_PUBLIC_STELLAR_NETWORK when set to mainnet", async () => {
-    const { activeNetwork, config } = await loadConfig("mainnet");
-    expect(activeNetwork.id).toBe("mainnet");
-    expect(config.passphrase).toBe(Networks.PUBLIC);
-    expect(config.explorerSegment).toBe("public");
+  it("parses a valid positive integer", () => {
+    expect(parseGovernorStartLedger("12345")).toBe(12345);
   });
 
-  it("keeps the passphrase and explorer segment in step", async () => {
-    const { activeNetwork, config } = await loadConfig("mainnet");
-    expect(activeNetwork).toMatchObject({
-      passphrase: config.passphrase,
-      explorerSegment: config.explorerSegment,
-    });
+  it("trims surrounding whitespace", () => {
+    expect(parseGovernorStartLedger("  42  ")).toBe(42);
+  });
+
+  it("reads from the environment when no argument is passed", () => {
+    process.env[ENV_KEY] = "9001";
+    expect(parseGovernorStartLedger()).toBe(9001);
+  });
+
+  it("rejects a missing value", () => {
+    expect(() => parseGovernorStartLedger(undefined)).toThrow(
+      /Governor start ledger is not configured/,
+    );
+  });
+
+  it("rejects a blank value", () => {
+    expect(() => parseGovernorStartLedger("   ")).toThrow(
+      /Governor start ledger is not configured/,
+    );
+  });
+
+  it("rejects zero", () => {
+    expect(() => parseGovernorStartLedger("0")).toThrow(
+      /expected a positive integer/,
+    );
+  });
+
+  it("rejects a negative value", () => {
+    expect(() => parseGovernorStartLedger("-1")).toThrow(
+      /expected a positive integer/,
+    );
+  });
+
+  it("rejects a non-integer value", () => {
+    expect(() => parseGovernorStartLedger("12.5")).toThrow(
+      /expected a positive integer/,
+    );
+  });
+
+  it("rejects a non-numeric value", () => {
+    expect(() => parseGovernorStartLedger("latest")).toThrow(
+      /expected a positive integer/,
+    );
   });
 });
