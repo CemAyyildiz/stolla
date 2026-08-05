@@ -27,14 +27,18 @@ flowchart TB
     end
 
     subgraph chain [contracts]
+        Factory[community_factory]
         NFT[community_nft]
         Gov[community_governor]
     end
 
     Pages --> Wallet
     Pages --> SDK
+    SDK --> Factory
     SDK --> NFT
     SDK --> Gov
+    Factory -->|"deploy + register"| NFT
+    Factory -->|"deploy + register"| Gov
     Gov -->|"get_votes token"| NFT
 ```
 
@@ -67,11 +71,22 @@ OpenZeppelin `Governor` trait implementation (pattern from `fungible-governor`).
 
 MVP proposals use empty targets (signaling votes only).
 
+### community_factory
+
+The factory deploys deterministic NFT/Governor pairs from owner-approved WASM
+hashes and stores an append-only, paginated registry. Creation and registration
+occur in one atomic Soroban invocation. See the
+[contract API](../contracts/contracts/community-factory/README.md), the
+[metadata and governance schema](community-metadata-governance-schema.md), and
+[ADR-005](adr/005-community-factory-registry.md).
+
 ### Deploy Order
 
-1. Deploy `community_nft` with constructor args
-2. Deploy `community_governor` with NFT address + governance params
-3. Write contract IDs to `apps/web/.env.local`
+1. Upload approved `community_nft` and `community_governor` WASM.
+2. Deploy `community_factory` with the owner and both WASM hashes.
+3. Call `create_community`; the factory atomically deploys and registers the
+   initialized pair.
+4. Discover contract IDs through `get_community` or `list_communities`.
 
 ## Frontend Architecture
 
@@ -130,8 +145,12 @@ complete NFT/Governor inventory, renewal window, and intentional expiry rules.
 
 ## Future Extensions
 
+<<<<<<< HEAD
+- A reviewed creator-policy upgrade for permissionless community creation
+=======
 - `CommunityFactory` and registry for multi-community deployment
   ([ADR-005](adr/005-community-factory-registry.md))
+>>>>>>> origin/main
 - Timelock + on-chain execution
 - Public proposal discovery from Stellar RPC events
 - Persistent event indexer for long-lived proposal history
