@@ -7,6 +7,7 @@ import type { Api } from "@stellar/stellar-sdk/rpc";
 import { config } from "@/lib/stellar";
 import { requireContractIds } from "@/lib/stellar";
 import { decodeProposalEvent } from "@/lib/proposalEvents";
+import { getE2EBridge } from "@/lib/e2eMock";
 
 export type DiscoveredProposal = {
   id: string;
@@ -57,6 +58,12 @@ export function useProposalDiscovery(governorContractId?: string) {
     setEmpty(false);
 
     try {
+      const mocked = getE2EBridge()?.proposals?.[governor];
+      if (mocked) {
+        setProposals(mocked);
+        setEmpty(mocked.length === 0);
+        return true;
+      }
       const discovered: DiscoveredProposal[] = [];
       let cursor: string | undefined = undefined;
 

@@ -48,12 +48,13 @@ export function HeroSection() {
           <p className="landing-hero-desc">
             NFT membership collections and transparent DAO voting for Stellar
             projects. Deploy contracts, mint members, delegate power, and vote
-            from one dashboard.
+            from one dashboard. Contract deployment requires wallet approval
+            and network fees, and confirmation is not instant.
           </p>
           <div className="landing-hero-actions">
-            <LinkButton href="/community">Get started</LinkButton>
-            <LinkButton href="/proposals" variant="ghost">
-              Browse proposals
+            <LinkButton href="/communities/create">Create a community</LinkButton>
+            <LinkButton href="/communities" variant="ghost">
+              Browse communities
             </LinkButton>
           </div>
           <dl className="landing-stats-row">

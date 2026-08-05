@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { CommunityDeploymentPanel } from "@/components/CommunityDeploymentPanel";
 import { LiveStatus } from "@/components/ui/LiveStatus";
 import { useWallet } from "@/context/WalletProvider";
 import {
@@ -21,6 +22,7 @@ import {
   parseCommunityWizardDraft,
   type CommunityWizardStep,
 } from "@/lib/community/wizard";
+import { communityDeploymentRecoveryKey } from "@/lib/community/deployment";
 import { contractIds } from "@/lib/stellar";
 import { resolveStellarNetworkId } from "@/lib/stellarExplorer";
 
@@ -56,6 +58,7 @@ const inputClassName =
 export default function CreateCommunityPage() {
   const network = resolveStellarNetworkId();
   const storageKey = communityWizardStorageKey(network);
+  const recoveryKey = communityDeploymentRecoveryKey(network);
   const { address, connect, isConnecting } = useWallet();
   const [draft, setDraft] =
     useState<CommunityMetadataDraft>(EMPTY_METADATA_DRAFT);
@@ -69,7 +72,9 @@ export default function CreateCommunityPage() {
   const [hydrated, setHydrated] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [accountStatus, setAccountStatus] = useState("");
+  const [hasSubmittedRecovery, setHasSubmittedRecovery] = useState(false);
   const previousAddress = useRef<string | null | undefined>(undefined);
+  const pageTitleRef = useRef<HTMLHeadingElement>(null);
 
   const wizardDraft = {
     version: 1 as const,
@@ -108,6 +113,14 @@ export default function CreateCommunityPage() {
     }, 0);
     return () => window.clearTimeout(timeout);
   }, [network, storageKey]);
+
+  useEffect(() => {
+    const update = () =>
+      setHasSubmittedRecovery(Boolean(sessionStorage.getItem(recoveryKey)));
+    update();
+    window.addEventListener("stolla:deployment-recovery", update);
+    return () => window.removeEventListener("stolla:deployment-recovery", update);
+  }, [recoveryKey]);
 
   useEffect(() => {
     if (hydrated) {
@@ -228,6 +241,14 @@ export default function CreateCommunityPage() {
   }
 
   function discardDraft() {
+    if (
+      dirty &&
+      !window.confirm(
+        "Discard this draft? Metadata, governance values, and validation errors will be cleared.",
+      )
+    ) {
+      return;
+    }
     sessionStorage.removeItem(storageKey);
     setDraft({ ...EMPTY_METADATA_DRAFT });
     setGovernance({ ...DEFAULT_GOVERNANCE_DRAFT });
@@ -235,6 +256,7 @@ export default function CreateCommunityPage() {
     setGovernanceErrors({});
     setConfirmed(false);
     setStep(1);
+    window.setTimeout(() => pageTitleRef.current?.focus(), 0);
   }
 
   return (
@@ -246,13 +268,13 @@ export default function CreateCommunityPage() {
         >
           ← Communities
         </Link>
-        {dirty && (
+        {!hasSubmittedRecovery && (
           <button
             type="button"
             onClick={discardDraft}
             className="min-h-11 rounded-lg px-3 py-2 text-sm text-slate-400 hover:bg-slate-800 hover:text-slate-200"
           >
-            Discard draft
+            {dirty ? "Discard draft" : "Restart wizard"}
           </button>
         )}
       </div>
@@ -261,7 +283,11 @@ export default function CreateCommunityPage() {
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300">
           Community creation
         </p>
-        <h1 className="mt-2 text-2xl font-bold text-slate-100">
+        <h1
+          ref={pageTitleRef}
+          tabIndex={-1}
+          className="mt-2 text-2xl font-bold text-slate-100 outline-none"
+        >
           {step === 1
             ? "Describe your community"
             : step === 2
@@ -474,18 +500,14 @@ export default function CreateCommunityPage() {
             >
               Back to governance
             </button>
-            <button
-              type="button"
-              disabled={!confirmed || !address || !contractIds.communityFactory}
-              className="min-h-11 rounded-lg bg-indigo-500 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-50"
-              aria-describedby="deployment-unavailable"
-            >
-              Continue to deployment
-            </button>
           </div>
-          <p id="deployment-unavailable" className="text-xs text-slate-500">
-            Transaction submission is provided by the CommunityFactory deployment step.
-          </p>
+          <CommunityDeploymentPanel
+            metadata={draft}
+            governance={governance}
+            network={network}
+            factoryId={contractIds.communityFactory}
+            confirmed={confirmed}
+          />
         </section>
       ) : step === 2 ? (
         <form

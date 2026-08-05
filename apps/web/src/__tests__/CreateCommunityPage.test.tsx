@@ -31,10 +31,15 @@ function enterValidMetadata() {
 
 describe("CreateCommunityPage", () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     sessionStorage.clear();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
     wallet.useWallet.mockReturnValue({
       address: null,
+      walletNetwork: null,
+      walletNetworkPassphrase: null,
       connect: vi.fn(),
+      signTransaction: vi.fn(),
       isConnecting: false,
     });
   });
@@ -177,7 +182,7 @@ describe("CreateCommunityPage", () => {
     expect(screen.getByText("Deployment target")).toBeInTheDocument();
     expect(screen.getByText("25 NFT votes")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Continue to deployment" }),
+      screen.getByRole("button", { name: "Simulate deployment" }),
     ).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Edit governance" }));
@@ -187,7 +192,10 @@ describe("CreateCommunityPage", () => {
   it("invalidates review confirmation when the connected account changes", async () => {
     wallet.useWallet.mockReturnValue({
       address: "GOLDACCOUNT",
+      walletNetwork: "testnet",
+      walletNetworkPassphrase: "Test SDF Network ; September 2015",
       connect: vi.fn(),
+      signTransaction: vi.fn(),
       isConnecting: false,
     });
     const { rerender } = render(<CreateCommunityPage />);
@@ -203,7 +211,10 @@ describe("CreateCommunityPage", () => {
 
     wallet.useWallet.mockReturnValue({
       address: "GNEWACCOUNT",
+      walletNetwork: "testnet",
+      walletNetworkPassphrase: "Test SDF Network ; September 2015",
       connect: vi.fn(),
+      signTransaction: vi.fn(),
       isConnecting: false,
     });
     rerender(<CreateCommunityPage />);
@@ -233,5 +244,25 @@ describe("CreateCommunityPage", () => {
         sessionStorage.getItem("stolla:community-wizard:testnet:v1"),
       ).toBeNull(),
     );
+    expect(screen.getByRole("heading", { name: "Describe your community" })).toHaveFocus();
+  });
+
+  it("cancels destructive discard without changing dirty values", async () => {
+    vi.mocked(window.confirm).mockReturnValue(false);
+    render(<CreateCommunityPage />);
+    fireEvent.change(screen.getByLabelText(/Community name/), {
+      target: { value: "Keep this DAO" },
+    });
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Discard draft" }),
+    );
+    expect(screen.getByLabelText(/Community name/)).toHaveValue("Keep this DAO");
+  });
+
+  it("restarts an empty wizard without destructive confirmation", () => {
+    render(<CreateCommunityPage />);
+    fireEvent.click(screen.getByRole("button", { name: "Restart wizard" }));
+    expect(window.confirm).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/Community name/)).toHaveValue("");
   });
 });

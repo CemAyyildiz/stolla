@@ -85,6 +85,9 @@ describe("CommunitiesPage", () => {
         name: "View Builders Guild community details",
       }),
     ).toHaveAttribute("href", `/communities/${"a".repeat(64)}`);
+    expect(
+      screen.getByRole("link", { name: "Create a community" }),
+    ).toHaveAttribute("href", "/communities/create");
   });
 
   it("renders an accessible empty registry state", async () => {
@@ -99,6 +102,9 @@ describe("CommunitiesPage", () => {
     expect(
       await screen.findByText(/No communities are registered yet/),
     ).toHaveAttribute("role", "status");
+    expect(
+      screen.getByRole("link", { name: "Create a community" }),
+    ).toHaveAttribute("href", "/communities/create");
   });
 
   it("shows an RPC error and can retry", async () => {
