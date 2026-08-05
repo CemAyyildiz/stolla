@@ -87,22 +87,26 @@ export default function ProposalDetailPage({
     if (!proposalId || !governorContractId) {
       throw new Error("Proposal unavailable");
     }
-    const client = createGovernorClient({
-      publicKey: address ?? "",
-      signTransaction,
-      contractId: governorContractId,
-    });
+    // Read paths must not depend on a connected wallet; an empty publicKey
+    // breaks AssembledTransaction simulation on some SDK paths.
     const readOnlyClient = createReadOnlyGovernorClient(governorContractId);
+    const client = address
+      ? createGovernorClient({
+          publicKey: address,
+          signTransaction,
+          contractId: governorContractId,
+        })
+      : readOnlyClient;
 
     setSnapshotStatus("loading");
     setDeadlineStatus("loading");
 
     const [stateTx, votedTx, snapshotTx, voteResult] = await Promise.all([
-      client.proposal_state({ proposal_id: proposalId }),
+      readOnlyClient.proposal_state({ proposal_id: proposalId }),
       address
         ? client.has_voted({ proposal_id: proposalId, account: address })
         : Promise.resolve(null),
-      client.proposal_snapshot({ proposal_id: proposalId }).catch(() => null),
+      readOnlyClient.proposal_snapshot({ proposal_id: proposalId }).catch(() => null),
       fetchVoteTotals(proposalIdHex, governorContractId).catch((error: unknown) => ({
         totals: {
           for: BigInt(0),
