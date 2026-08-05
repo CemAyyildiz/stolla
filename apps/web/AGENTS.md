@@ -17,30 +17,18 @@ The landing page uses a **professional light** enterprise SaaS design. It is sep
 |-------|---------|
 | `/` | Marketing landing (route group `(landing)`) |
 | `/community` | NFT collection, mint form |
-| `/community/new` | Community creation wizard |
+| `/community/[communityId]` | Community detail, resolved from the registry (`lib/communities/registry.ts`) |
+| `/community/[communityId]/proposals` | Proposals scoped to that community's Governor contract |
+| `/community/[communityId]/proposals/[proposalId]` | Single scoped proposal detail |
 | `/proposals` | Proposal list and voting |
+
+Multi-community registry is env-driven (`NEXT_PUBLIC_COMMUNITIES_JSON`, see `lib/communities/registry.ts`). Every hook/component under `lib/communities/` and `components/community/` takes its registry, metadata fetcher, and Governor reader as optional parameters, defaulting to production wiring — this is what makes them testable with the fixtures in `src/test/fixtures/communities.ts` and mocks in `src/test/mocks/governor.ts` without hitting the network.
 
 ## Stack
 
 - Next.js App Router, TypeScript, Tailwind CSS v4
 - `@stellar/stellar-sdk` + `@creit.tech/stellar-wallets-kit`
 - Contract IDs in `NEXT_PUBLIC_*` env vars — see `lib/stellar.ts`
-- Vitest + Testing Library — `npm run test --workspace=web`
-
-## Networks
-
-`lib/network.ts` owns the network registry. Two rules hold across the app:
-
-- Anything network specific (a simulation, a submitted transaction) stores the
-  passphrase it belongs to. Gates compare against that stored value, never
-  against whatever is active at use time.
-- Explorer URL builders take a network argument. There is no ambient default, so
-  a link cannot outlive the network it was built for.
-
-`useNetworkGuard()` compares the wallet network with `activeNetwork` and is the
-only thing pages should read for mismatch decisions. `WalletProvider` re-reads
-the wallet network on every signature and throws `NetworkMismatchError` before
-handing over any XDR.
 
 ## Next.js note
 

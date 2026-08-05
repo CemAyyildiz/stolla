@@ -48,12 +48,13 @@ export function HeroSection() {
           <p className="landing-hero-desc">
             NFT membership collections and transparent DAO voting for Stellar
             projects. Deploy contracts, mint members, delegate power, and vote
-            from one dashboard.
+            from one dashboard. Contract deployment requires wallet approval
+            and network fees, and confirmation is not instant.
           </p>
           <div className="landing-hero-actions">
-            <LinkButton href="/community">Get started</LinkButton>
-            <LinkButton href="/proposals" variant="ghost">
-              Browse proposals
+            <LinkButton href="/communities/create">Create a community</LinkButton>
+            <LinkButton href="/communities" variant="ghost">
+              Browse communities
             </LinkButton>
           </div>
           <dl className="landing-stats-row">
@@ -86,14 +87,16 @@ export function HeroSection() {
           <div className="landing-preview-panel">
             <div className="landing-preview-header">
               <p className="landing-preview-header-title">Governance activity</p>
-              <span className="landing-live-dot" aria-hidden="true" />
-              <p className="landing-preview-header-meta">Product preview</p>
+              <p className="landing-preview-header-meta">Demo data</p>
             </div>
             <div className="landing-preview-body">
               {PREVIEW_ITEMS.map((item) => (
                 <PreviewRow key={item.title} {...item} />
               ))}
             </div>
+            <p className="landing-preview-demo-note">
+              Illustrative proposals — not live on-chain data.
+            </p>
             <Link
               href="/proposals"
               className="landing-preview-footer landing-preview-footer-link"

@@ -6,179 +6,279 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { StellarWalletsKit } from "@creit.tech/stellar-wallets-kit/sdk";
-import {
-  KitEventType,
-  type Networks,
-} from "@creit.tech/stellar-wallets-kit/types";
+import { Networks, KitEventType } from "@creit.tech/stellar-wallets-kit/types";
 import { FreighterModule } from "@creit.tech/stellar-wallets-kit/modules/freighter";
-import {
-  NetworkMismatchError,
-  describeNetwork,
-  type DetectedNetwork,
-} from "@/lib/network";
-import { activeNetwork } from "@/lib/stellar";
+import type { SignTransaction } from "@stellar/stellar-sdk/contract";
+import { getE2EBridge } from "@/lib/e2eMock";
+import { config } from "@/lib/stellar";
 
-/** Freighter reports its network only on request, so the wallet is re-read on a timer. */
-const NETWORK_POLL_INTERVAL_MS = 4000;
+export type WalletConnectionError = {
+  code: "request-rejected" | "wallet-unavailable" | "connection-failed";
+  message: string;
+};
 
 type WalletContextValue = {
   address: string | null;
-  walletNetwork: DetectedNetwork | null;
+  walletNetwork?: string | null;
+  walletNetworkPassphrase?: string | null;
   connect: () => Promise<void>;
   disconnect: () => void;
-  signTransaction: (xdr: string) => Promise<{ signedTxXdr: string }>;
+  signTransaction: SignTransaction;
   isConnecting: boolean;
+  connectionError: WalletConnectionError | null;
 };
 
 const WalletContext = createContext<WalletContextValue | null>(null);
 
 let kitInitialized = false;
+const MODAL_DISMISSED_MESSAGE = "The user closed the modal.";
+
+function walletErrorDetails(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return {
+      code: undefined,
+      message: typeof error === "string" ? error : "",
+    };
+  }
+
+  const errorLike = error as {
+    code?: unknown;
+    message?: unknown;
+    error?: { code?: unknown; message?: unknown };
+  };
+  const nestedError =
+    errorLike.error && typeof errorLike.error === "object"
+      ? errorLike.error
+      : undefined;
+
+  return {
+    code:
+      typeof nestedError?.code === "number"
+        ? nestedError.code
+        : typeof errorLike.code === "number"
+          ? errorLike.code
+          : undefined,
+    message:
+      typeof nestedError?.message === "string"
+        ? nestedError.message
+        : typeof errorLike.message === "string"
+          ? errorLike.message
+          : "",
+  };
+}
+
+export function toWalletConnectionError(
+  error: unknown,
+): WalletConnectionError | null {
+  const { code, message } = walletErrorDetails(error);
+
+  if (message === MODAL_DISMISSED_MESSAGE) {
+    return null;
+  }
+
+  if (code === -4 || /reject|declin|denied/i.test(message)) {
+    return {
+      code: "request-rejected",
+      message:
+        "Connection request declined. Approve the request in your wallet to connect.",
+    };
+  }
+
+  if (
+    /not (?:installed|connected|available)|unavailable|unsupported|no wallet/i.test(
+      message,
+    )
+  ) {
+    return {
+      code: "wallet-unavailable",
+      message:
+        "Freighter is unavailable. Install or unlock the wallet, then try again.",
+    };
+  }
+
+  return {
+    code: "connection-failed",
+    message: "We couldn't connect to your wallet. Please try again.",
+  };
+}
 
 function ensureKit() {
   if (!kitInitialized && typeof window !== "undefined") {
     StellarWalletsKit.init({
       modules: [new FreighterModule()],
-      network: activeNetwork.passphrase as Networks,
+      network:
+        config.networkPassphrase === Networks.PUBLIC
+          ? Networks.PUBLIC
+          : Networks.TESTNET,
     });
     kitInitialized = true;
   }
 }
 
-async function readWalletNetwork(): Promise<DetectedNetwork | null> {
-  try {
-    const { network, networkPassphrase } = await StellarWalletsKit.getNetwork();
-    return describeNetwork(networkPassphrase, network);
-  } catch {
-    return null;
-  }
-}
-
-/** Wallets that push state changes are picked up immediately; the rest rely on polling. */
-function subscribeToModuleChanges(
-  handler: (event: { network: string; networkPassphrase: string }) => void,
-) {
-  try {
-    StellarWalletsKit.selectedModule.onChange?.(handler);
-  } catch {
-    // No module is selected yet, so there is nothing to subscribe to.
-  }
-}
-
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [address, setAddress] = useState<string | null>(null);
-  const [detectedNetwork, setDetectedNetwork] =
-    useState<DetectedNetwork | null>(null);
+  const [walletNetwork, setWalletNetwork] = useState<string | null>(null);
+  const [walletNetworkPassphrase, setWalletNetworkPassphrase] = useState<
+    string | null
+  >(null);
   const [isConnecting, setIsConnecting] = useState(false);
-
-  /** A disconnected wallet reports no network, whatever was last read. */
-  const walletNetwork = address ? detectedNetwork : null;
-
-  const syncWalletNetwork = useCallback(async () => {
-    if (!kitInitialized || !address) return;
-    setDetectedNetwork(await readWalletNetwork());
-  }, [address]);
+  const [connectionError, setConnectionError] =
+    useState<WalletConnectionError | null>(null);
+  const connectInFlightRef = useRef(false);
 
   useEffect(() => {
-    if (!kitInitialized) return;
+    const mockedWallet = getE2EBridge()?.wallet;
+    if (mockedWallet) {
+      const initialize = window.setTimeout(() => {
+        setAddress(mockedWallet.address);
+        setWalletNetworkPassphrase(mockedWallet.networkPassphrase);
+        setWalletNetwork(
+          mockedWallet.networkPassphrase === Networks.PUBLIC
+            ? "mainnet"
+            : "testnet",
+        );
+      }, 0);
+      const interval = window.setInterval(() => {
+        const current = getE2EBridge()?.wallet;
+        if (!current) return;
+        setAddress(current.address);
+        setWalletNetworkPassphrase(current.networkPassphrase);
+        setWalletNetwork(
+          current.networkPassphrase === Networks.PUBLIC ? "mainnet" : "testnet",
+        );
+      }, 100);
+      return () => {
+        window.clearTimeout(initialize);
+        window.clearInterval(interval);
+      };
+    }
+    ensureKit();
     const unsubscribe = StellarWalletsKit.on(
       KitEventType.STATE_UPDATED,
       (event) => {
-        setAddress(event.payload.address ?? null);
+        const updatedAddress = event.payload.address ?? null;
+        setAddress(updatedAddress);
+        setWalletNetworkPassphrase(event.payload.networkPassphrase || null);
+        setWalletNetwork(
+          event.payload.networkPassphrase === Networks.PUBLIC
+            ? "mainnet"
+            : event.payload.networkPassphrase === Networks.TESTNET
+              ? "testnet"
+              : "custom",
+        );
+        if (updatedAddress) {
+          setConnectionError(null);
+        }
       },
     );
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (!address) return;
-
-    let cancelled = false;
-    const sync = () => {
-      if (!cancelled) void syncWalletNetwork();
-    };
-
-    sync();
-    const interval = window.setInterval(sync, NETWORK_POLL_INTERVAL_MS);
-    window.addEventListener("focus", sync);
-    document.addEventListener("visibilitychange", sync);
-
-    subscribeToModuleChanges((event) => {
-      if (!cancelled) {
-        setDetectedNetwork(
-          describeNetwork(event.networkPassphrase, event.network),
-        );
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-      window.removeEventListener("focus", sync);
-      document.removeEventListener("visibilitychange", sync);
-    };
-  }, [address, syncWalletNetwork]);
-
   const connect = useCallback(async () => {
-    ensureKit();
+    if (connectInFlightRef.current) return;
+    connectInFlightRef.current = true;
+    setConnectionError(null);
     setIsConnecting(true);
     try {
+      const mockedWallet = getE2EBridge()?.wallet;
+      if (mockedWallet) {
+        setAddress(mockedWallet.address);
+        setWalletNetworkPassphrase(mockedWallet.networkPassphrase);
+        setWalletNetwork(
+          mockedWallet.networkPassphrase === Networks.PUBLIC ? "mainnet" : "testnet",
+        );
+        return;
+      }
+      ensureKit();
       const { address: walletAddress } = await StellarWalletsKit.authModal();
+      const selectedNetwork =
+        typeof StellarWalletsKit.getNetwork === "function"
+          ? await StellarWalletsKit.getNetwork()
+          : {
+              network:
+                config.networkPassphrase === Networks.PUBLIC
+                  ? "mainnet"
+                  : "testnet",
+              networkPassphrase: config.networkPassphrase,
+            };
       setAddress(walletAddress);
+      setWalletNetwork(selectedNetwork.network);
+      setWalletNetworkPassphrase(selectedNetwork.networkPassphrase);
+      setConnectionError(null);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : String(error ?? "");
-      if (message !== "The user closed the modal.") {
-        console.error("Wallet connect failed:", error);
+      const safeError = toWalletConnectionError(error);
+      setConnectionError(safeError);
+      if (safeError) {
+        console.error("Wallet connect failed:", safeError.code);
       }
     } finally {
+      connectInFlightRef.current = false;
       setIsConnecting(false);
     }
   }, []);
-
   const disconnect = useCallback(() => {
+    if (getE2EBridge()?.wallet) {
+      setAddress(null);
+      setWalletNetwork(null);
+      setWalletNetworkPassphrase(null);
+      return;
+    }
     ensureKit();
     void StellarWalletsKit.disconnect();
     setAddress(null);
-    setDetectedNetwork(null);
+    setConnectionError(null);
   }, []);
 
-  /**
-   * The wallet network is read fresh on every signature instead of taken from
-   * state, so a switch between render and click cannot slip a mismatched
-   * passphrase into a signed transaction.
-   */
-  const signTransaction = useCallback(async (xdr: string) => {
-    ensureKit();
-    const detected = await readWalletNetwork();
-    setDetectedNetwork(detected);
-    if (detected?.passphrase !== activeNetwork.passphrase) {
-      throw new NetworkMismatchError(activeNetwork, detected);
+  const signTransaction = useCallback<SignTransaction>(async (xdr, options) => {
+    const mockedWallet = getE2EBridge()?.wallet;
+    if (mockedWallet) {
+      if (mockedWallet.rejected) throw new Error("User rejected the request.");
+      if (
+        options?.networkPassphrase &&
+        options.networkPassphrase !== mockedWallet.networkPassphrase
+      ) {
+        throw new Error("Wallet network does not match the transaction network.");
+      }
+      return { signedTxXdr: xdr, signerAddress: mockedWallet.address };
     }
+    if (
+      walletNetworkPassphrase &&
+      walletNetworkPassphrase !== config.networkPassphrase
+    ) {
+      throw new Error("Wallet network does not match the application network.");
+    }
+    ensureKit();
     return StellarWalletsKit.signTransaction(xdr, {
-      networkPassphrase: activeNetwork.passphrase,
+      ...options,
+      networkPassphrase: config.networkPassphrase,
     });
-  }, []);
+  }, [walletNetworkPassphrase]);
 
   const value = useMemo(
     () => ({
       address,
       walletNetwork,
+      walletNetworkPassphrase,
       connect,
       disconnect,
       signTransaction,
       isConnecting,
+      connectionError,
     }),
     [
       address,
       walletNetwork,
+      walletNetworkPassphrase,
       connect,
       disconnect,
       signTransaction,
       isConnecting,
+      connectionError,
     ],
   );
 

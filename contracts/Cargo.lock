@@ -286,6 +286,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "community-factory"
+version = "0.1.0"
+dependencies = [
+ "community-governor",
+ "community-nft",
+ "soroban-sdk",
+ "stellar-governance",
+]
+
+[[package]]
 name = "community-governor"
 version = "0.1.0"
 dependencies = [
