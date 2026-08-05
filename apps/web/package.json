@@ -35,7 +35,8 @@
     "jsdom": "^30.0.1",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "@testing-library/user-event": "^14.5.2"
   },
   "optionalDependencies": {
     "lightningcss-linux-x64-gnu": "1.32.0",

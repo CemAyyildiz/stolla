@@ -17,7 +17,12 @@ The landing page uses a **professional light** enterprise SaaS design. It is sep
 |-------|---------|
 | `/` | Marketing landing (route group `(landing)`) |
 | `/community` | NFT collection, mint form |
+| `/community/[communityId]` | Community detail, resolved from the registry (`lib/communities/registry.ts`) |
+| `/community/[communityId]/proposals` | Proposals scoped to that community's Governor contract |
+| `/community/[communityId]/proposals/[proposalId]` | Single scoped proposal detail |
 | `/proposals` | Proposal list and voting |
+
+Multi-community registry is env-driven (`NEXT_PUBLIC_COMMUNITIES_JSON`, see `lib/communities/registry.ts`). Every hook/component under `lib/communities/` and `components/community/` takes its registry, metadata fetcher, and Governor reader as optional parameters, defaulting to production wiring — this is what makes them testable with the fixtures in `src/test/fixtures/communities.ts` and mocks in `src/test/mocks/governor.ts` without hitting the network.
 
 ## Stack
 

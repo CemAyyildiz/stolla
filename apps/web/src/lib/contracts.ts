@@ -87,6 +87,15 @@ export function createReadOnlyGovernorClient(contractId?: string) {
 }
 
 
+
+export function createReadOnlyGovernorClientFor(governorContractId: string) {
+  return new GovernorClient({
+    contractId: governorContractId,
+    networkPassphrase: config.networkPassphrase,
+    rpcUrl: config.rpcUrl,
+  });
+}
+
 export function createCommunityFactoryClient({
   publicKey,
   signTransaction,
@@ -137,3 +146,36 @@ export function storeCommunityDeploymentHash(hash: string) {
   if (typeof window === "undefined") return;
   localStorage.setItem(COMMUNITY_DEPLOYMENT_HASH_KEY, hash);
 }
+
+function scopedProposalStorageKey(governorContractId: string): string {
+  return `stolla:proposal-ids:${governorContractId}`;
+}
+
+export function getStoredProposalIdsFor(governorContractId: string): string[] {
+  if (typeof window === "undefined") return [];
+  const raw = localStorage.getItem(scopedProposalStorageKey(governorContractId));
+  if (!raw) return [];
+  try {
+    const proposalIds: unknown = JSON.parse(raw);
+    if (
+      !Array.isArray(proposalIds) ||
+      !proposalIds.every((proposalId) => typeof proposalId === "string")
+    ) {
+      return [];
+    }
+    return proposalIds;
+  } catch {
+    return [];
+  }
+}
+
+export function storeProposalIdFor(governorContractId: string, idHex: string) {
+  const existing = getStoredProposalIdsFor(governorContractId);
+  if (!existing.includes(idHex)) {
+    localStorage.setItem(
+      scopedProposalStorageKey(governorContractId),
+      JSON.stringify([idHex, ...existing]),
+    );
+  }
+}
+
