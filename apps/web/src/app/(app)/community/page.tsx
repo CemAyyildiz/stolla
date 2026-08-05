@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { LiveStatus } from "@/components/ui/LiveStatus";
 import { TransactionLifecycleStatus } from "@/components/TransactionLifecycleStatus";
 import { useOperationLifecycle } from "@/hooks/useOperationLifecycle";
+import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import {
   loadCommunityData,
   runCommunityRefresh,
@@ -34,9 +35,9 @@ export default function CommunityPage() {
   const [status, setStatus] = useState<ActionStatus | null>(null);
   const [dataLoadError, setDataLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(Boolean(contractIds.nft));
   const delegationLifecycle = useOperationLifecycle();
+  const mintGuard = useSubmissionGuard();
 
   const contractsConfigured = Boolean(contractIds.nft);
 
@@ -92,25 +93,25 @@ export default function CommunityPage() {
 
     setRecipientError(null);
     setTokenUriError(null);
-    setLoading(true);
     setStatus({ message: "Submitting mint transaction…", tone: "routine" });
-    try {
-      const client = createNftClient({ publicKey: address, signTransaction });
-      const tx = await client.mint({ to: recipient, token_uri: tokenUri });
-      const result = await tx.signAndSend();
-      setStatus({
-        message: `Minted token #${result.result} successfully.`,
-        tone: "routine",
-      });
-      await refresh();
-    } catch (error: unknown) {
-      setStatus({
-        message: error instanceof Error ? error.message : "Mint failed",
-        tone: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
+
+    await mintGuard.run(async () => {
+      try {
+        const client = createNftClient({ publicKey: address, signTransaction });
+        const tx = await client.mint({ to: recipient, token_uri: tokenUri });
+        const result = await tx.signAndSend();
+        setStatus({
+          message: `Minted token #${result.result} successfully.`,
+          tone: "routine",
+        });
+        await refresh();
+      } catch (error: unknown) {
+        setStatus({
+          message: error instanceof Error ? error.message : "Mint failed",
+          tone: "error",
+        });
+      }
+    });
   }
 
   async function handleDelegate() {
@@ -237,7 +238,11 @@ export default function CommunityPage() {
               <button
                 type="button"
                 onClick={() => void handleDelegate()}
-                disabled={!address || loading || delegationLifecycle.isInFlight}
+                disabled={
+                  !address ||
+                  mintGuard.isPending ||
+                  delegationLifecycle.isInFlight
+                }
                 className="mt-4 rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-50"
               >
                 {delegationLifecycle.isInFlight
@@ -363,10 +368,10 @@ export default function CommunityPage() {
               <button
                 type="button"
                 onClick={handleMint}
-                disabled={!address || loading}
+                disabled={!address || mintGuard.isPending || delegationLifecycle.isInFlight}
                 className="min-h-11 w-full touch-manipulation rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400 disabled:opacity-50 sm:w-auto"
               >
-                {loading ? "Submitting..." : "Mint NFT"}
+                {mintGuard.isPending ? "Submitting..." : "Mint NFT"}
               </button>
             </div>
           </section>

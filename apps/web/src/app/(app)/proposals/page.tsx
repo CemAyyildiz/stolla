@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { ProposalSummaryCard } from "@/components/ProposalSummaryCard";
 import { truncateEnd } from "@/lib/truncate";
 import { LiveStatus } from "@/components/ui/LiveStatus";
+import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 
 type ActionStatus = {
   message: string;
@@ -30,7 +31,7 @@ export default function ProposalsPage() {
   const [description, setDescription] = useState("");
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
   const [status, setStatus] = useState<ActionStatus | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const proposeGuard = useSubmissionGuard();
   const [stateFilter, setStateFilter] = useState<StateFilter>(ALL_FILTER);
   const [states, setStates] = useState<Record<string, ProposalState | "unknown">>(
     {},
@@ -164,40 +165,45 @@ export default function ProposalsPage() {
     }
 
     setDescriptionError(null);
-    setSubmitting(true);
     setStatus({
       message: "Submitting proposal transaction…",
       tone: "routine",
     });
-    try {
-      const client = createGovernorClient({ publicKey: address, signTransaction });
-      const target = address;
-      const tx = await client.propose({
-        targets: [target],
-        functions: ["noop"],
-        args: [[]],
-        description: description.trim(),
-        proposer: address,
-      });
-      const result = await tx.signAndSend();
-      const idHex = Buffer.from(result.result).toString("hex");
-      storeProposalId(idHex);
-      setDescription("");
-      setStatus({
-        message: `Proposal created: ${truncateEnd(idHex, 12)}`,
-        tone: "routine",
-      });
-      await refresh();
-      await loadStates();
-    } catch (createError: unknown) {
-      setStatus({
-        message:
-          createError instanceof Error ? createError.message : "Proposal failed",
-        tone: "error",
-      });
-    } finally {
-      setSubmitting(false);
-    }
+
+    await proposeGuard.run(async () => {
+      try {
+        const client = createGovernorClient({
+          publicKey: address,
+          signTransaction,
+        });
+        const target = address;
+        const tx = await client.propose({
+          targets: [target],
+          functions: ["noop"],
+          args: [[]],
+          description: description.trim(),
+          proposer: address,
+        });
+        const result = await tx.signAndSend();
+        const idHex = Buffer.from(result.result).toString("hex");
+        storeProposalId(idHex);
+        setDescription("");
+        setStatus({
+          message: `Proposal created: ${truncateEnd(idHex, 12)}`,
+          tone: "routine",
+        });
+        await refresh();
+        await loadStates();
+      } catch (createError: unknown) {
+        setStatus({
+          message:
+            createError instanceof Error
+              ? createError.message
+              : "Proposal failed",
+          tone: "error",
+        });
+      }
+    });
   }
 
   return (
@@ -258,10 +264,10 @@ export default function ProposalsPage() {
           <button
             type="button"
             onClick={() => void handleCreateProposal()}
-            disabled={!address || submitting}
+            disabled={!address || proposeGuard.isPending}
             className="mt-3 min-h-11 w-full touch-manipulation rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400 disabled:opacity-50 sm:w-auto"
           >
-            {submitting ? "Submitting..." : "Create proposal"}
+            {proposeGuard.isPending ? "Submitting..." : "Create proposal"}
           </button>
           {status && (
             <LiveStatus

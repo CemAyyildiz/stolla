@@ -69,6 +69,7 @@ function mockLifecycle() {
     },
     execute: vi.fn(),
     reset: vi.fn(),
+    isInFlight: false,
   });
 }
 

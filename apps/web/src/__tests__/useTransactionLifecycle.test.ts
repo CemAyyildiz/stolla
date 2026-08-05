@@ -218,4 +218,34 @@ describe("useTransactionLifecycle", () => {
     expect(result.current.state.stage).toBe("wallet_rejected");
     expect(result.current.state.isTerminal).toBe(true);
   });
+
+  it("ignores a second execute while the first is still in flight", async () => {
+    const gate = (() => {
+      let resolve!: () => void;
+      const promise = new Promise<void>((res) => {
+        resolve = res;
+      });
+      return { promise, resolve };
+    })();
+    const fn = vi.fn().mockReturnValue(gate.promise);
+    const { result } = renderHook(() => useTransactionLifecycle());
+
+    let first!: { started: boolean };
+    let second!: { started: boolean };
+
+    await act(async () => {
+      const firstPromise = result.current.execute(1, "Support", fn);
+      const secondPromise = result.current.execute(0, "Against", fn);
+      second = await secondPromise;
+      gate.resolve();
+      first = await firstPromise;
+    });
+
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(first).toEqual({ started: true });
+    expect(second).toEqual({ started: false });
+    expect(result.current.state.voteType).toBe(1);
+    expect(result.current.state.stage).toBe("confirmed");
+    expect(result.current.isInFlight).toBe(false);
+  });
 });
