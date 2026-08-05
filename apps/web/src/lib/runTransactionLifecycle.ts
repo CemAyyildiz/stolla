@@ -16,13 +16,19 @@ export type RunTransactionLifecycleOptions = {
 };
 
 export type TransactionLifecycleOutcome =
-  | { ok: true; transactionHash: string | null }
+  | { ok: true; transactionHash: string | null; result: unknown }
   | {
       ok: false;
       kind: "wallet_rejected" | "send_failed" | "still_pending" | "simulation_failed";
       message: string;
       transactionHash?: string | null;
     };
+
+function extractResult(value: unknown): unknown {
+  if (!value || typeof value !== "object") return undefined;
+  if ("result" in value) return (value as { result?: unknown }).result;
+  return undefined;
+}
 
 function extractTransactionHash(value: unknown): string | null {
   if (!value || typeof value !== "object") return null;
@@ -66,7 +72,11 @@ export async function runTransactionLifecycle({
     }
 
     onStage("success");
-    return { ok: true, transactionHash: extractTransactionHash(sent) };
+    return {
+      ok: true,
+      transactionHash: extractTransactionHash(sent),
+      result: extractResult(sent),
+    };
   } catch (error: unknown) {
     const mapped = mapTransactionError(error);
     onStage("failure");
