@@ -156,6 +156,26 @@ fn create_deploys_initialized_deterministic_pair_and_emits_event() {
     assert_eq!(record.community_owner, request.community_owner);
     assert_eq!(record.creation_index, 0);
     assert_eq!(record.created_at_ledger, 12_345);
+
+    // Soroban test events are scoped to the latest top-level invocation, so
+    // inspect the creation event before issuing registry or child reads.
+    let expected_event = CommunityCreated {
+        community_id: record.community_id.clone(),
+        nft_contract: record.nft_contract.clone(),
+        governor_contract: record.governor_contract.clone(),
+        creator: fixture.owner.clone(),
+        community_owner: request.community_owner.clone(),
+        creation_index: 0,
+        nft_wasm_hash: fixture.nft_wasm_hash.clone(),
+        governor_wasm_hash: fixture.governor_wasm_hash.clone(),
+        metadata_hash: request.metadata.metadata_hash.clone(),
+    }
+    .to_xdr(&fixture.e, &fixture.factory_id);
+    assert_eq!(
+        fixture.e.events().all().events().last(),
+        Some(&expected_event)
+    );
+
     assert_eq!(client.get_community(&expected_id), Some(record.clone()));
     assert_eq!(client.community_count(), 1);
 
@@ -175,23 +195,6 @@ fn create_deploys_initialized_deterministic_pair_and_emits_event() {
     assert_eq!(
         governor.quorum(&fixture.e.ledger().sequence()),
         request.governance.quorum
-    );
-
-    let expected_event = CommunityCreated {
-        community_id: record.community_id,
-        nft_contract: record.nft_contract,
-        governor_contract: record.governor_contract,
-        creator: fixture.owner,
-        community_owner: request.community_owner,
-        creation_index: 0,
-        nft_wasm_hash: fixture.nft_wasm_hash,
-        governor_wasm_hash: fixture.governor_wasm_hash,
-        metadata_hash: request.metadata.metadata_hash,
-    }
-    .to_xdr(&fixture.e, &fixture.factory_id);
-    assert_eq!(
-        fixture.e.events().all().events().last(),
-        Some(&expected_event)
     );
 }
 
