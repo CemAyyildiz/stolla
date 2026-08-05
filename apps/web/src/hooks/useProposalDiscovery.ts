@@ -116,8 +116,10 @@ export function useProposalDiscovery() {
       discovered.reverse();
       setProposals(discovered);
       setEmpty(discovered.length === 0);
+      return true;
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Discovery failed");
+      return false;
     } finally {
       setLoading(false);
     }

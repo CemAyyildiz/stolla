@@ -15,8 +15,8 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { ProposalSummaryCard } from "@/components/ProposalSummaryCard";
 import { truncateEnd } from "@/lib/truncate";
 import { LiveStatus } from "@/components/ui/LiveStatus";
-import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
-import { mapTransactionError } from "@/lib/transactionErrors";
+import { TransactionLifecycleStatus } from "@/components/TransactionLifecycleStatus";
+import { useOperationLifecycle } from "@/hooks/useOperationLifecycle";
 
 type ActionStatus = {
   message: string;
@@ -32,7 +32,7 @@ export default function ProposalsPage() {
   const [description, setDescription] = useState("");
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
   const [status, setStatus] = useState<ActionStatus | null>(null);
-  const proposeGuard = useSubmissionGuard();
+  const proposeLifecycle = useOperationLifecycle();
   const [stateFilter, setStateFilter] = useState<StateFilter>(ALL_FILTER);
   const [states, setStates] = useState<Record<string, ProposalState | "unknown">>(
     {},
@@ -164,44 +164,67 @@ export default function ProposalsPage() {
       setStatus(null);
       return;
     }
+    if (proposeLifecycle.isInFlight) return;
 
+    const descriptionSnapshot = description.trim();
     setDescriptionError(null);
-    setStatus({
-      message: "Submitting proposal transaction…",
-      tone: "routine",
+    setStatus(null);
+    proposeLifecycle.reset();
+
+    const result = await proposeLifecycle.execute(async () => {
+      const client = createGovernorClient({
+        publicKey: address,
+        signTransaction,
+      });
+      return client.propose({
+        targets: [address],
+        functions: ["noop"],
+        args: [[]],
+        description: descriptionSnapshot,
+        proposer: address,
+      });
     });
 
-    await proposeGuard.run(async () => {
-      try {
-        const client = createGovernorClient({
-          publicKey: address,
-          signTransaction,
-        });
-        const target = address;
-        const tx = await client.propose({
-          targets: [target],
-          functions: ["noop"],
-          args: [[]],
-          description: description.trim(),
-          proposer: address,
-        });
-        const result = await tx.signAndSend();
-        const idHex = Buffer.from(result.result).toString("hex");
-        storeProposalId(idHex);
-        setDescription("");
-        setStatus({
-          message: `Proposal created: ${truncateEnd(idHex, 12)}`,
-          tone: "routine",
-        });
-        await refresh();
-        await loadStates();
-      } catch (createError: unknown) {
-        setStatus({
-          message: mapTransactionError(createError).message,
-          tone: "error",
-        });
-      }
-    });
+    if (!result.ok) {
+      // Preserve entered description on rejection / RPC failure.
+      setDescription(descriptionSnapshot);
+      return;
+    }
+
+    const idBytes = result.result;
+    const idHex =
+      idBytes instanceof Uint8Array || Buffer.isBuffer(idBytes)
+        ? Buffer.from(idBytes).toString("hex")
+        : typeof idBytes === "string"
+          ? idBytes
+          : null;
+
+    if (idHex) {
+      storeProposalId(idHex);
+      setStatus({
+        message: `Proposal created: ${truncateEnd(idHex, 12)}`,
+        tone: "routine",
+      });
+    } else {
+      setStatus({
+        message: "Proposal created successfully.",
+        tone: "routine",
+      });
+    }
+
+    setDescription("");
+    // Discovery delay is indexing lag, not a transaction failure.
+    const refreshed = await refresh();
+    if (!refreshed) {
+      setStatus({
+        message: idHex
+          ? `Proposal confirmed (${truncateEnd(idHex, 12)}). Public history is still indexing.`
+          : "Proposal confirmed. Public history is still indexing.",
+        tone: "routine",
+      });
+      return;
+    }
+    await loadStates();
   }
 
   return (
@@ -262,11 +285,37 @@ export default function ProposalsPage() {
           <button
             type="button"
             onClick={() => void handleCreateProposal()}
-            disabled={!address || proposeGuard.isPending}
+            disabled={!address || proposeLifecycle.isInFlight}
             className="mt-3 min-h-11 w-full touch-manipulation rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400 disabled:opacity-50 sm:w-auto"
           >
-            {proposeGuard.isPending ? "Submitting..." : "Create proposal"}
+            {proposeLifecycle.isInFlight
+              ? "Creating proposal…"
+              : "Create proposal"}
           </button>
+          <TransactionLifecycleStatus
+            stage={proposeLifecycle.stage}
+            operationLabel="Propose"
+            error={proposeLifecycle.error}
+            metadata={{
+              transactionHash: proposeLifecycle.transactionHash,
+              details: proposeLifecycle.outcomeKind
+                ? [
+                    {
+                      label: "Outcome",
+                      value:
+                        proposeLifecycle.outcomeKind === "wallet_rejected"
+                          ? "Wallet rejected"
+                          : proposeLifecycle.outcomeKind === "still_pending"
+                            ? "Still pending"
+                            : proposeLifecycle.outcomeKind ===
+                                "simulation_failed"
+                              ? "Simulation failed"
+                              : "Send failed",
+                    },
+                  ]
+                : undefined,
+            }}
+          />
           {status && (
             <LiveStatus
               tone={status.tone}
