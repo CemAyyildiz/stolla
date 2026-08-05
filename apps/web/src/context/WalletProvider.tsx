@@ -6,10 +6,10 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
-} from "react";
-import { StellarWalletsKit } from "@creit.tech/stellar-wallets-kit/sdk";
+} from "react";import { StellarWalletsKit } from "@creit.tech/stellar-wallets-kit/sdk";
 import { Networks, KitEventType } from "@creit.tech/stellar-wallets-kit/types";
 import { FreighterModule } from "@creit.tech/stellar-wallets-kit/modules/freighter";
 
@@ -116,9 +116,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] =
     useState<WalletConnectionError | null>(null);
+  const connectInFlightRef = useRef(false);
 
   useEffect(() => {
-    if (!kitInitialized) return;
+    ensureKit();
     const unsubscribe = StellarWalletsKit.on(
       KitEventType.STATE_UPDATED,
       (event) => {
@@ -133,6 +134,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const connect = useCallback(async () => {
+    if (connectInFlightRef.current) return;
+    connectInFlightRef.current = true;
     setConnectionError(null);
     setIsConnecting(true);
     try {
@@ -147,10 +150,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         console.error("Wallet connect failed:", safeError.code);
       }
     } finally {
+      connectInFlightRef.current = false;
       setIsConnecting(false);
     }
   }, []);
-
   const disconnect = useCallback(() => {
     ensureKit();
     void StellarWalletsKit.disconnect();
