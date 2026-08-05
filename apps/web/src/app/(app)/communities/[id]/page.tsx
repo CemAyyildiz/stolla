@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { CommunityAvatar } from "@/components/CommunityAvatar";
 import { LiveStatus } from "@/components/ui/LiveStatus";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { getCommunity } from "@/lib/community/registry";
-import { resolveCommunityResourceUrl } from "@/lib/community/schema";
 import type {
   CommunityDetailResult,
   CommunityRegistryRecord,
@@ -101,11 +101,37 @@ export default function CommunityDetailPage() {
     return () => window.clearTimeout(timeout);
   }, [load]);
 
+  async function copyValue(label: string, value: string) {
+    setCopyStatus("");
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopyStatus(`${label} copied.`);
+    } catch {
+      setCopyStatus(`Could not copy ${label.toLowerCase()}.`);
+    }
+  }
+
   function copyAddress(label: string, address: string) {
-    void navigator.clipboard.writeText(address).then(
-      () => setCopyStatus(`${label} address copied.`),
-      () => setCopyStatus(`Could not copy the ${label.toLowerCase()} address.`),
-    );
+    void copyValue(`${label} address`, address);
+  }
+
+  async function shareCommunity(name: string, id: string) {
+    setCopyStatus("");
+    const canonicalUrl = `${window.location.origin}/communities/${id}`;
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          title: `${name} on Stolla`,
+          text: `View ${name} on Stolla.`,
+          url: canonicalUrl,
+        });
+        setCopyStatus("Community page shared.");
+      } catch {
+        setCopyStatus("Could not share the community page.");
+      }
+      return;
+    }
+    await copyValue("Community page link", canonicalUrl);
   }
 
   if (loading && !result) {
@@ -212,21 +238,12 @@ export default function CommunityDetailPage() {
       </Link>
 
       <header className="mt-5 flex min-w-0 items-start gap-4">
-        {metadata?.logo ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={resolveCommunityResourceUrl(metadata.logo)}
-            alt={`${name} logo`}
-            className="h-16 w-16 shrink-0 rounded-xl border border-slate-700 bg-slate-900 object-cover sm:h-20 sm:w-20"
-          />
-        ) : (
-          <div
-            aria-hidden="true"
-            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-indigo-950 text-2xl font-semibold text-indigo-300 sm:h-20 sm:w-20"
-          >
-            {metadata?.name.trim().charAt(0).toUpperCase() || "C"}
-          </div>
-        )}
+        <CommunityAvatar
+          communityId={record.id}
+          name={name}
+          logo={metadata?.logo}
+          size="detail"
+        />
         <div className="min-w-0">
           <h1 className="break-words text-2xl font-bold text-slate-100 [overflow-wrap:anywhere] sm:text-3xl">
             {name}
@@ -234,8 +251,30 @@ export default function CommunityDetailPage() {
           <p className="mt-2 break-all font-mono text-xs text-slate-500">
             {record.id}
           </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void copyValue("Community ID", record.id)}
+              className="min-h-11 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800"
+              aria-label="Copy full community ID"
+            >
+              Copy ID
+            </button>
+            <button
+              type="button"
+              onClick={() => void shareCommunity(name, record.id)}
+              className="min-h-11 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800"
+              aria-label={`Share ${name} community page`}
+            >
+              Share page
+            </button>
+          </div>
         </div>
       </header>
+
+      <LiveStatus className="mt-3 text-sm text-slate-400">
+        {copyStatus}
+      </LiveStatus>
 
       {metadata ? (
         <p className="mt-6 break-words leading-7 text-slate-300 [overflow-wrap:anywhere]">
@@ -274,13 +313,13 @@ export default function CommunityDetailPage() {
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
         <Link
-          href={`/proposals?community=${record.id}`}
+          href={`/communities/${record.id}/proposals`}
           className="inline-flex min-h-11 items-center justify-center rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400"
         >
           View community proposals
         </Link>
         <Link
-          href="/community"
+          href={`/community?community=${record.id}`}
           className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800"
         >
           Membership actions
@@ -308,9 +347,6 @@ export default function CommunityDetailPage() {
             onCopy={copyAddress}
           />
         </dl>
-        <LiveStatus className="mt-3 text-sm text-slate-400">
-          {copyStatus}
-        </LiveStatus>
       </section>
 
       <section

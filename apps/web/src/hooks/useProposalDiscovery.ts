@@ -38,14 +38,14 @@ function extractDescription(event: Api.EventResponse): string | null {
   }
 }
 
-export function useProposalDiscovery() {
+export function useProposalDiscovery(governorContractId?: string) {
   const [proposals, setProposals] = useState<DiscoveredProposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [empty, setEmpty] = useState(false);
 
   const discover = useCallback(async () => {
-    const { governor } = requireContractIds();
+    const governor = governorContractId ?? requireContractIds().governor;
     const server = new RpcServer(config.rpcUrl);
 
     const proposalCreatedTopic = xdr
@@ -123,10 +123,14 @@ export function useProposalDiscovery() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [governorContractId]);
 
   useEffect(() => {
-    discover().catch(() => undefined);
+    const timeout = window.setTimeout(
+      () => void discover().catch(() => undefined),
+      0,
+    );
+    return () => window.clearTimeout(timeout);
   }, [discover]);
 
   const proposalIds = proposals.map((proposal) => proposal.id);

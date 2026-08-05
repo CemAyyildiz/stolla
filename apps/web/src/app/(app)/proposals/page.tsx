@@ -5,8 +5,8 @@ import { Buffer } from "buffer";
 import { useWallet } from "@/context/WalletProvider";
 import { createGovernorClient, storeProposalId } from "@/lib/contracts";
 import { useProposalDiscovery } from "@/hooks/useProposalDiscovery";
-import { ProposalState } from "@/lib/bindings/community-governor/src";
 import {
+  ProposalState,
   PROPOSAL_STATE_LABELS,
   PROPOSAL_STATE_ORDER,
 } from "@/lib/proposalState";
@@ -41,9 +41,29 @@ export default function ProposalsPage() {
   const [retryingIds, setRetryingIds] = useState<string[]>([]);
   const [visibleCount, setVisibleCount] = useState(LOAD_MORE_PAGE_SIZE);
 
-  const { proposals, proposalIds, loading, error, empty, refresh } =
+  const {
+    proposals: discoveredProposals,
+    loading,
+    error,
+    empty,
+    refresh,
+  } =
     useProposalDiscovery();
   const contractsConfigured = Boolean(contractIds.governor);
+
+  const proposals = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          discoveredProposals.map((proposal) => [proposal.id, proposal]),
+        ).values(),
+      ),
+    [discoveredProposals],
+  );
+  const proposalIds = useMemo(
+    () => proposals.map((proposal) => proposal.id),
+    [proposals],
+  );
 
   const descriptionsById = useMemo(() => {
     const map: Record<string, string | null> = {};
@@ -52,9 +72,13 @@ export default function ProposalsPage() {
     }
     return map;
   }, [proposals]);
+  const uniqueProposalIds = useMemo(
+    () => Array.from(new Set(proposalIds)),
+    [proposalIds],
+  );
 
   const loadStates = useCallback(async () => {
-    if (!contractsConfigured || proposalIds.length === 0) {
+    if (!contractsConfigured || uniqueProposalIds.length === 0) {
       setStates({});
       setFailedProposalIds([]);
       return;
@@ -64,7 +88,7 @@ export default function ProposalsPage() {
     const nextStates: Record<string, ProposalState | "unknown"> = {};
     const failedIds: string[] = [];
 
-    for (const idHex of proposalIds) {
+    for (const idHex of uniqueProposalIds) {
       try {
         client ??= createGovernorClient({
           publicKey: address ?? "",
@@ -82,7 +106,7 @@ export default function ProposalsPage() {
 
     setStates(nextStates);
     setFailedProposalIds(failedIds);
-  }, [address, contractsConfigured, proposalIds, signTransaction]);
+  }, [address, contractsConfigured, signTransaction, uniqueProposalIds]);
 
   const retryProposalState = useCallback(
     async (idHex: string) => {
@@ -136,9 +160,9 @@ export default function ProposalsPage() {
   const filteredIds = useMemo(
     () =>
       stateFilter === ALL_FILTER
-        ? proposalIds
-        : proposalIds.filter((id) => states[id] === stateFilter),
-    [proposalIds, states, stateFilter],
+        ? uniqueProposalIds
+        : uniqueProposalIds.filter((id) => states[id] === stateFilter),
+    [stateFilter, states, uniqueProposalIds],
   );
 
   const visibleIds = useMemo(
@@ -336,7 +360,7 @@ export default function ProposalsPage() {
           <h2 className="font-semibold text-slate-100">
             Community governance history
           </h2>
-          {proposalIds.length > 0 && (
+          {uniqueProposalIds.length > 0 && (
             <div className="flex items-center gap-2">
               <label
                 htmlFor="proposal-state-filter"
@@ -380,7 +404,7 @@ export default function ProposalsPage() {
         {loading && (
           <>
             <ul className="mt-3 space-y-2">
-              {Array.from({ length: Math.max(proposalIds.length || 3, 1) }).map(
+              {Array.from({ length: Math.max(uniqueProposalIds.length || 3, 1) }).map(
                 (_, i) => (
                   <li key={i}>
                     <div className="flex items-center justify-between rounded-lg border border-slate-800 bg-[#151b2b] px-4 py-3">
@@ -401,7 +425,9 @@ export default function ProposalsPage() {
             role="alert"
           >
             <p className="font-medium text-rose-200">
-              Proposal history is temporarily unavailable.
+              {uniqueProposalIds.length > 0
+                ? "More proposal history could not be loaded."
+                : "Proposal history is temporarily unavailable."}
             </p>
             <p className="mt-1 text-sm text-rose-300/80">{error}</p>
             <button
@@ -420,13 +446,13 @@ export default function ProposalsPage() {
           </LiveStatus>
         )}
 
-        {!loading && !error && proposalIds.length > 0 && filteredIds.length === 0 && (
+        {!loading && uniqueProposalIds.length > 0 && filteredIds.length === 0 && (
           <p className="mt-2 text-sm text-slate-500">
             No proposals match the selected filter.
           </p>
         )}
 
-        {!loading && !error && visibleIds.length > 0 && (
+        {!loading && visibleIds.length > 0 && (
           <>
             {failedProposalIds.length > 0 && (
               <p

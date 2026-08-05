@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useWallet } from "@/context/WalletProvider";
 import { truncateMiddle } from "@/lib/truncate";
 import { LiveStatus } from "@/components/ui/LiveStatus";
+import { CommunitySwitcher } from "@/components/CommunitySwitcher";
 
 const navItems = [
   { href: "/communities", label: "Communities" },
@@ -84,6 +85,7 @@ export function Header() {
               );
             })}
           </nav>
+          <CommunitySwitcher />
         </div>
 
         <div className="flex shrink-0 flex-col items-end gap-1">

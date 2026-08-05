@@ -1,27 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { LiveStatus } from "@/components/ui/LiveStatus";
+import { useWallet } from "@/context/WalletProvider";
 import {
   COMMUNITY_LIMITS,
+  DEFAULT_GOVERNANCE_DRAFT,
   type CommunityMetadataDraft,
   type CommunityMetadataDraftErrors,
+  type GovernanceDraft,
+  type GovernanceDraftErrors,
   validateCommunityMetadataDraft,
+  validateGovernanceDraft,
 } from "@/lib/community/schema";
-
-const STORAGE_KEY = "stolla:community-wizard:metadata:v1";
-
-const EMPTY_DRAFT: CommunityMetadataDraft = {
-  name: "",
-  symbol: "",
-  description: "",
-  collectionUri: "",
-  metadataUri: "",
-  logo: "",
-  externalLinkLabel: "",
-  externalLinkUrl: "",
-};
+import {
+  communityWizardStorageKey,
+  EMPTY_METADATA_DRAFT,
+  isCommunityWizardDirty,
+  parseCommunityWizardDraft,
+  type CommunityWizardStep,
+} from "@/lib/community/wizard";
+import { contractIds } from "@/lib/stellar";
+import { resolveStellarNetworkId } from "@/lib/stellarExplorer";
 
 const FIELD_ORDER: (keyof CommunityMetadataDraft)[] = [
   "name",
@@ -33,24 +34,6 @@ const FIELD_ORDER: (keyof CommunityMetadataDraft)[] = [
   "externalLinkLabel",
   "externalLinkUrl",
 ];
-
-function readStoredDraft(): CommunityMetadataDraft | null {
-  try {
-    const stored: unknown = JSON.parse(sessionStorage.getItem(STORAGE_KEY) ?? "");
-    if (
-      typeof stored !== "object" ||
-      stored === null ||
-      !FIELD_ORDER.every(
-        (field) => typeof (stored as Record<string, unknown>)[field] === "string",
-      )
-    ) {
-      return null;
-    }
-    return stored as CommunityMetadataDraft;
-  } catch {
-    return null;
-  }
-}
 
 function ErrorMessage({
   field,
@@ -71,23 +54,126 @@ const inputClassName =
   "mt-1 block min-h-11 w-full min-w-0 rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600";
 
 export default function CreateCommunityPage() {
-  const [draft, setDraft] = useState<CommunityMetadataDraft>(EMPTY_DRAFT);
+  const network = resolveStellarNetworkId();
+  const storageKey = communityWizardStorageKey(network);
+  const { address, connect, isConnecting } = useWallet();
+  const [draft, setDraft] =
+    useState<CommunityMetadataDraft>(EMPTY_METADATA_DRAFT);
+  const [governance, setGovernance] = useState<GovernanceDraft>(
+    DEFAULT_GOVERNANCE_DRAFT,
+  );
   const [errors, setErrors] = useState<CommunityMetadataDraftErrors>({});
-  const [step, setStep] = useState<1 | 2>(1);
+  const [governanceErrors, setGovernanceErrors] =
+    useState<GovernanceDraftErrors>({});
+  const [step, setStep] = useState<CommunityWizardStep>(1);
   const [hydrated, setHydrated] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  const [accountStatus, setAccountStatus] = useState("");
+  const previousAddress = useRef<string | null | undefined>(undefined);
+
+  const wizardDraft = {
+    version: 1 as const,
+    network,
+    step,
+    metadata: draft,
+    governance,
+  };
+  const dirty = hydrated && isCommunityWizardDirty(wizardDraft);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      const stored = readStoredDraft();
-      if (stored) setDraft(stored);
+      const stored = parseCommunityWizardDraft(
+        sessionStorage.getItem(storageKey),
+        network,
+      );
+      if (stored) {
+        setDraft(stored.metadata);
+        setGovernance(stored.governance);
+        const metadataValid =
+          Object.keys(validateCommunityMetadataDraft(stored.metadata)).length ===
+          0;
+        const governanceValid =
+          Object.keys(validateGovernanceDraft(stored.governance)).length === 0;
+        setStep(
+          stored.step === 1 || !metadataValid
+            ? 1
+            : stored.step === 2 || !governanceValid
+              ? 2
+              : 3,
+        );
+      } else if (sessionStorage.getItem(storageKey)) {
+        sessionStorage.removeItem(storageKey);
+      }
       setHydrated(true);
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, []);
+  }, [network, storageKey]);
 
   useEffect(() => {
-    if (hydrated) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
-  }, [draft, hydrated]);
+    if (hydrated) {
+      const nextDraft = {
+        version: 1 as const,
+        network,
+        step,
+        metadata: draft,
+        governance,
+      };
+      if (isCommunityWizardDirty(nextDraft)) {
+        sessionStorage.setItem(storageKey, JSON.stringify(nextDraft));
+      } else {
+        sessionStorage.removeItem(storageKey);
+      }
+    }
+  }, [draft, governance, hydrated, step, storageKey, network]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    const warnBeforeNavigation = (event: MouseEvent) => {
+      const link = (event.target as Element | null)?.closest("a");
+      if (
+        !link ||
+        link.target === "_blank" ||
+        link.href === window.location.href ||
+        !link.href.startsWith(window.location.origin)
+      ) {
+        return;
+      }
+      if (!window.confirm("Discard this community draft and leave the wizard?")) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    document.addEventListener("click", warnBeforeNavigation, true);
+    return () => {
+      window.removeEventListener("beforeunload", warnBeforeUnload);
+      document.removeEventListener("click", warnBeforeNavigation, true);
+    };
+  }, [dirty]);
+
+  useEffect(() => {
+    if (previousAddress.current === undefined) {
+      previousAddress.current = address;
+      return;
+    }
+    if (previousAddress.current === address) return;
+    const previous = previousAddress.current;
+    previousAddress.current = address;
+    const nextStatus = !address
+      ? "Wallet disconnected. Your draft is preserved; reconnect before deployment."
+      : previous
+        ? "Connected account changed. Review and confirm the deployment again."
+        : "Wallet connected. Review the deployment before continuing.";
+    const timeout = window.setTimeout(() => {
+      setConfirmed(false);
+      setAccountStatus(nextStatus);
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [address]);
 
   function updateField(field: keyof CommunityMetadataDraft, value: string) {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -108,36 +194,92 @@ export default function CreateCommunityPage() {
       document.getElementById(firstInvalid)?.focus();
       return;
     }
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
     setStep(2);
+  }
+
+  function updateGovernanceField(field: keyof GovernanceDraft, value: string) {
+    setGovernance((current) => ({ ...current, [field]: value }));
+    setGovernanceErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }
+
+  function handleGovernanceSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextErrors = validateGovernanceDraft(governance);
+    setGovernanceErrors(nextErrors);
+    const firstInvalid = (
+      [
+        "proposalThreshold",
+        "quorum",
+        "votingDelay",
+        "votingPeriod",
+      ] as (keyof GovernanceDraft)[]
+    ).find((field) => nextErrors[field]);
+    if (firstInvalid) {
+      document.getElementById(firstInvalid)?.focus();
+      return;
+    }
+    setConfirmed(false);
+    setStep(3);
+  }
+
+  function discardDraft() {
+    sessionStorage.removeItem(storageKey);
+    setDraft({ ...EMPTY_METADATA_DRAFT });
+    setGovernance({ ...DEFAULT_GOVERNANCE_DRAFT });
+    setErrors({});
+    setGovernanceErrors({});
+    setConfirmed(false);
+    setStep(1);
   }
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-3xl px-4 py-10">
-      <Link
-        href="/communities"
-        className="text-sm text-indigo-300 hover:text-indigo-200"
-      >
-        ← Communities
-      </Link>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link
+          href="/communities"
+          className="text-sm text-indigo-300 hover:text-indigo-200"
+        >
+          ← Communities
+        </Link>
+        {dirty && (
+          <button
+            type="button"
+            onClick={discardDraft}
+            className="min-h-11 rounded-lg px-3 py-2 text-sm text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+          >
+            Discard draft
+          </button>
+        )}
+      </div>
 
       <div className="mt-5">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300">
           Community creation
         </p>
         <h1 className="mt-2 text-2xl font-bold text-slate-100">
-          {step === 1 ? "Describe your community" : "Review deployment inputs"}
+          {step === 1
+            ? "Describe your community"
+            : step === 2
+              ? "Configure governance"
+              : "Review deployment inputs"}
         </h1>
         <p className="mt-2 text-slate-400">
           {step === 1
             ? "Step 1 collects version-1 public metadata. No wallet signature or deployment occurs here."
-            : "Your metadata is saved for this browser session. Contract deployment will be added in a later step."}
+            : step === 2
+              ? "Choose the immutable parameters that initialize this community's Governor contract."
+              : "Verify the public, wallet, network, and factory values before deployment."}
         </p>
       </div>
 
       <ol
         aria-label="Community creation progress"
-        className="mt-6 grid grid-cols-2 gap-2 text-sm"
+        className="mt-6 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3"
       >
         <li
           aria-current={step === 1 ? "step" : undefined}
@@ -155,57 +297,288 @@ export default function CreateCommunityPage() {
           className={`rounded-lg border p-3 ${
             step === 2
               ? "border-indigo-500 bg-indigo-950/50 text-indigo-200"
-              : "border-slate-800 bg-[#151b2b] text-slate-400"
+              : step > 2
+                ? "border-emerald-800 bg-emerald-950/30 text-emerald-200"
+                : "border-slate-800 bg-[#151b2b] text-slate-400"
           }`}
         >
           <span className="block text-xs opacity-70">Step 2</span>
           Governance
         </li>
+        <li
+          aria-current={step === 3 ? "step" : undefined}
+          className={`rounded-lg border p-3 ${
+            step === 3
+              ? "border-indigo-500 bg-indigo-950/50 text-indigo-200"
+              : "border-slate-800 bg-[#151b2b] text-slate-400"
+          }`}
+        >
+          <span className="block text-xs opacity-70">Step 3</span>
+          Review
+        </li>
       </ol>
 
-      {step === 2 ? (
-        <section className="mt-6 rounded-xl border border-slate-800 bg-[#151b2b] p-5 sm:p-6">
+      {step === 3 ? (
+        <section className="mt-6 space-y-6 rounded-xl border border-slate-800 bg-[#151b2b] p-4 sm:p-6">
+          {accountStatus && (
+            <LiveStatus className="rounded-lg border border-amber-800/70 bg-amber-950/30 p-4 text-sm text-amber-200">
+              {accountStatus}
+            </LiveStatus>
+          )}
+          <section aria-labelledby="review-metadata-title">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 id="review-metadata-title" className="font-semibold text-slate-100">
+                Public metadata
+              </h2>
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="min-h-11 rounded-lg px-3 py-2 text-sm text-indigo-300 hover:bg-slate-800"
+              >
+                Edit metadata
+              </button>
+            </div>
+            <dl className="mt-3 grid min-w-0 gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-sm text-slate-500">Name</dt>
+                <dd className="mt-1 break-words text-slate-100 [overflow-wrap:anywhere]">
+                  {draft.name}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-slate-500">NFT symbol</dt>
+                <dd className="mt-1 break-words text-slate-100">{draft.symbol}</dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-sm text-slate-500">Description</dt>
+                <dd className="mt-1 break-words text-slate-100 [overflow-wrap:anywhere]">
+                  {draft.description}
+                </dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-sm text-slate-500">Metadata URI</dt>
+                <dd className="mt-1 break-all font-mono text-sm text-slate-100">
+                  {draft.metadataUri}
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <section
+            aria-labelledby="review-governance-title"
+            className="border-t border-slate-800 pt-5"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 id="review-governance-title" className="font-semibold text-slate-100">
+                Governance
+              </h2>
+              <button
+                type="button"
+                onClick={() => setStep(2)}
+                className="min-h-11 rounded-lg px-3 py-2 text-sm text-indigo-300 hover:bg-slate-800"
+              >
+                Edit governance
+              </button>
+            </div>
+            <dl className="mt-3 grid gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-sm text-slate-500">Proposal threshold</dt>
+                <dd className="mt-1 text-slate-100">
+                  {governance.proposalThreshold} NFT votes
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-slate-500">Quorum</dt>
+                <dd className="mt-1 text-slate-100">{governance.quorum} NFT votes</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-slate-500">Voting delay</dt>
+                <dd className="mt-1 text-slate-100">
+                  {governance.votingDelay} Stellar ledgers
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-slate-500">Voting period</dt>
+                <dd className="mt-1 text-slate-100">
+                  {governance.votingPeriod} Stellar ledgers
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <section
+            aria-labelledby="deployment-target-title"
+            className="border-t border-slate-800 pt-5"
+          >
+            <h2 id="deployment-target-title" className="font-semibold text-slate-100">
+              Deployment target
+            </h2>
+            <dl className="mt-3 grid min-w-0 gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-sm text-slate-500">Connected wallet</dt>
+                <dd className="mt-1 break-all font-mono text-sm text-slate-100">
+                  {address ?? "Not connected"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-slate-500">Stellar network</dt>
+                <dd className="mt-1 capitalize text-slate-100">{network}</dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-sm text-slate-500">CommunityFactory contract</dt>
+                <dd className="mt-1 break-all font-mono text-sm text-slate-100">
+                  {contractIds.communityFactory || "Not configured"}
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          {!address && (
+            <div className="rounded-lg border border-amber-800/70 bg-amber-950/30 p-4 text-sm text-amber-200">
+              Connect the wallet that will create this community.
+              <button
+                type="button"
+                onClick={() => void connect()}
+                disabled={isConnecting}
+                className="mt-3 block min-h-11 rounded-lg border border-amber-700 px-4 py-2 font-medium hover:bg-amber-900/50 disabled:opacity-50"
+              >
+                {isConnecting ? "Connecting…" : "Connect wallet"}
+              </button>
+            </div>
+          )}
+          {!contractIds.communityFactory && (
+            <LiveStatus tone="error" className="rounded-lg border border-rose-800/70 bg-rose-950/30 p-4 text-sm text-rose-200">
+              CommunityFactory is not configured for {network}. Set
+              NEXT_PUBLIC_COMMUNITY_FACTORY_CONTRACT_ID before deployment.
+            </LiveStatus>
+          )}
+
+          <label className="flex items-start gap-3 rounded-lg border border-slate-700 bg-[#0b0f19] p-4 text-sm text-slate-300">
+            <input
+              type="checkbox"
+              checked={confirmed}
+              onChange={(event) => setConfirmed(event.target.checked)}
+              className="mt-1 h-4 w-4 shrink-0"
+            />
+            <span>
+              I confirm that these metadata and governance values are correct
+              and will become public when deployed.
+            </span>
+          </label>
+
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              className="min-h-11 rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800"
+            >
+              Back to governance
+            </button>
+            <button
+              type="button"
+              disabled={!confirmed || !address || !contractIds.communityFactory}
+              className="min-h-11 rounded-lg bg-indigo-500 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-50"
+              aria-describedby="deployment-unavailable"
+            >
+              Continue to deployment
+            </button>
+          </div>
+          <p id="deployment-unavailable" className="text-xs text-slate-500">
+            Transaction submission is provided by the CommunityFactory deployment step.
+          </p>
+        </section>
+      ) : step === 2 ? (
+        <form
+          noValidate
+          onSubmit={handleGovernanceSubmit}
+          className="mt-6 space-y-6 rounded-xl border border-slate-800 bg-[#151b2b] p-4 sm:p-6"
+        >
           <LiveStatus className="rounded-lg border border-emerald-800/70 bg-emerald-950/30 p-4 text-sm text-emerald-200">
             Metadata validated and saved for this wizard session.
           </LiveStatus>
-          <dl className="mt-5 grid min-w-0 gap-4 sm:grid-cols-2">
-            <div className="min-w-0">
-              <dt className="text-sm text-slate-500">Name</dt>
-              <dd className="mt-1 break-words text-slate-100 [overflow-wrap:anywhere]">
-                {draft.name}
-              </dd>
-            </div>
-            <div className="min-w-0">
-              <dt className="text-sm text-slate-500">Symbol</dt>
-              <dd className="mt-1 break-words text-slate-100">
-                {draft.symbol}
-              </dd>
-            </div>
-            <div className="min-w-0 sm:col-span-2">
-              <dt className="text-sm text-slate-500">Metadata URI</dt>
-              <dd className="mt-1 break-all font-mono text-sm text-slate-100">
-                {draft.metadataUri}
-              </dd>
-            </div>
-          </dl>
-          <div className="mt-6 rounded-lg border border-slate-700 bg-[#0b0f19] p-4">
-            <h2 className="font-semibold text-slate-100">
-              Governance step placeholder
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-400">
-              Voting delay, voting period, proposal threshold, quorum, owner,
-              and deployment confirmation belong to later steps. Continuing
-              does not submit a transaction.
-            </p>
+          <div className="grid gap-5 sm:grid-cols-2">
+            {(
+              [
+                {
+                  field: "proposalThreshold",
+                  label: "Proposal threshold",
+                  unit: "NFT votes",
+                  help: "Minimum delegated voting power required to create a proposal.",
+                },
+                {
+                  field: "quorum",
+                  label: "Quorum",
+                  unit: "NFT votes",
+                  help: "For and abstain votes required for a proposal to meet quorum.",
+                },
+                {
+                  field: "votingDelay",
+                  label: "Voting delay",
+                  unit: "Stellar ledgers",
+                  help: "Ledgers between proposal creation and the voting snapshot.",
+                },
+                {
+                  field: "votingPeriod",
+                  label: "Voting period",
+                  unit: "Stellar ledgers",
+                  help: "Ledgers voting remains open; this must exceed the voting delay.",
+                },
+              ] as const
+            ).map(({ field, label, unit, help }) => (
+              <div key={field} className="min-w-0">
+                <label htmlFor={field} className="block text-sm text-slate-300">
+                  {label} <span className="text-slate-500">(required)</span>
+                </label>
+                <div className="mt-1 flex min-w-0 rounded-lg border border-slate-700 bg-[#0b0f19] focus-within:border-indigo-500">
+                  <input
+                    id={field}
+                    name={field}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={governance[field]}
+                    onChange={(event) =>
+                      updateGovernanceField(field, event.target.value)
+                    }
+                    required
+                    aria-invalid={Boolean(governanceErrors[field])}
+                    aria-describedby={`${field}-help${governanceErrors[field] ? ` ${field}-error` : ""}`}
+                    className="min-h-11 min-w-0 flex-1 rounded-l-lg bg-transparent px-3 py-2 font-mono text-sm text-slate-100 outline-none"
+                  />
+                  <span className="flex shrink-0 items-center border-l border-slate-700 px-3 text-xs text-slate-500">
+                    {unit}
+                  </span>
+                </div>
+                <p id={`${field}-help`} className="mt-1 text-xs leading-5 text-slate-500">
+                  {help}
+                </p>
+                {governanceErrors[field] && (
+                  <p
+                    id={`${field}-error`}
+                    role="alert"
+                    className="mt-1 text-xs text-rose-300"
+                  >
+                    {governanceErrors[field]}
+                  </p>
+                )}
+              </div>
+            ))}
           </div>
-          <button
-            type="button"
-            onClick={() => setStep(1)}
-            className="mt-6 min-h-11 w-full rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800 sm:w-auto"
-          >
-            Back to metadata
-          </button>
-        </section>
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              className="min-h-11 rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800"
+            >
+              Back to metadata
+            </button>
+            <button
+              type="submit"
+              className="min-h-11 rounded-lg bg-indigo-500 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-400"
+            >
+              Review community
+            </button>
+          </div>
+        </form>
       ) : (
         <form
           noValidate

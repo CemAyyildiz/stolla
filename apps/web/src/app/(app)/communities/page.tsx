@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CommunityCard } from "@/components/CommunityCard";
 import { LiveStatus } from "@/components/ui/LiveStatus";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -9,6 +9,35 @@ import { listCommunities } from "@/lib/community/registry";
 import type { CommunityView } from "@/lib/community/types";
 
 const PAGE_SIZE = 9;
+const MAX_QUERY_LENGTH = 100;
+const MAX_PAGE = 100;
+
+type ListUrlState = { query: string; page: number };
+
+function readListUrlState(): ListUrlState {
+  const parameters = new URLSearchParams(window.location.search);
+  const query = (parameters.get("q") ?? "").trim().slice(0, MAX_QUERY_LENGTH);
+  const rawPage = parameters.get("page");
+  const parsedPage = rawPage && /^\d+$/.test(rawPage) ? Number(rawPage) : 1;
+  const page =
+    Number.isSafeInteger(parsedPage) && parsedPage >= 1 && parsedPage <= MAX_PAGE
+      ? parsedPage
+      : 1;
+  return { query, page };
+}
+
+function writeListUrlState(
+  { query, page }: ListUrlState,
+  mode: "push" | "replace",
+) {
+  const parameters = new URLSearchParams();
+  const normalizedQuery = query.trim().slice(0, MAX_QUERY_LENGTH);
+  if (normalizedQuery) parameters.set("q", normalizedQuery);
+  if (page > 1) parameters.set("page", String(page));
+  const search = parameters.toString();
+  const url = `${window.location.pathname}${search ? `?${search}` : ""}`;
+  window.history[mode === "push" ? "pushState" : "replaceState"]({}, "", url);
+}
 
 export default function CommunitiesPage() {
   const [communities, setCommunities] = useState<CommunityView[]>([]);
@@ -17,12 +46,15 @@ export default function CommunitiesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [skippedRecords, setSkippedRecords] = useState(0);
+  const [query, setQuery] = useState("");
+  const [loadedPages, setLoadedPages] = useState(0);
   const requestSequence = useRef(0);
   const seenIds = useRef(new Set<string>());
   const nextCursorRef = useRef<number | null>(null);
+  const loadedPagesRef = useRef(0);
 
   const loadPage = useCallback(
-    async (replace: boolean) => {
+    async (replace: boolean, updateUrl = true) => {
       const sequence = ++requestSequence.current;
       const cursor = replace ? null : nextCursorRef.current;
       setLoading(true);
@@ -56,6 +88,16 @@ export default function CommunitiesPage() {
         nextCursorRef.current = page.nextCursor;
         setNextCursor(page.nextCursor);
         setHasLoaded(true);
+        const nextPageCount = replace ? 1 : loadedPagesRef.current + 1;
+        loadedPagesRef.current = nextPageCount;
+        setLoadedPages(nextPageCount);
+        if (updateUrl) {
+          writeListUrlState(
+            { query: readListUrlState().query, page: nextPageCount },
+            "push",
+          );
+        }
+        return true;
       } catch (cause) {
         if (sequence !== requestSequence.current) return;
         setError(
@@ -63,6 +105,7 @@ export default function CommunitiesPage() {
             ? cause.message
             : "The community registry could not be loaded.",
         );
+        return false;
       } finally {
         if (sequence === requestSequence.current) setLoading(false);
       }
@@ -71,9 +114,67 @@ export default function CommunitiesPage() {
   );
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => void loadPage(true), 0);
-    return () => window.clearTimeout(timeout);
+    let active = true;
+    const restore = async (mode: "replace" | "pop") => {
+      const state = readListUrlState();
+      setQuery(state.query);
+      if (mode === "replace") writeListUrlState(state, "replace");
+      const firstLoaded = await loadPage(true, false);
+      if (!active || !firstLoaded) return;
+      for (
+        let page = 2;
+        page <= state.page && nextCursorRef.current !== null;
+        page += 1
+      ) {
+        const loaded = await loadPage(false, false);
+        if (!active || !loaded) break;
+      }
+      if (loadedPagesRef.current !== state.page) {
+        writeListUrlState(
+          { query: state.query, page: loadedPagesRef.current || 1 },
+          "replace",
+        );
+      }
+    };
+    const timeout = window.setTimeout(() => void restore("replace"), 0);
+    const onPopState = () => {
+      requestSequence.current += 1;
+      seenIds.current.clear();
+      nextCursorRef.current = null;
+      loadedPagesRef.current = 0;
+      setCommunities([]);
+      setHasLoaded(false);
+      void restore("pop");
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+      window.removeEventListener("popstate", onPopState);
+    };
   }, [loadPage]);
+
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const visibleCommunities = useMemo(
+    () =>
+      normalizedQuery
+        ? communities.filter((community) =>
+            (community.metadata?.name ?? "")
+              .toLocaleLowerCase()
+              .includes(normalizedQuery),
+          )
+        : communities,
+    [communities, normalizedQuery],
+  );
+
+  function updateQuery(value: string) {
+    const nextQuery = value.slice(0, MAX_QUERY_LENGTH);
+    setQuery(nextQuery);
+    writeListUrlState(
+      { query: nextQuery, page: loadedPages || 1 },
+      "push",
+    );
+  }
 
   const metadataFailureCount = communities.filter(
     (community) => community.metadataError,
@@ -102,6 +203,32 @@ export default function CommunitiesPage() {
         >
           Create a community
         </Link>
+      </div>
+
+      <div className="mt-6 max-w-xl">
+        <label htmlFor="community-search" className="text-sm font-medium text-slate-300">
+          Search communities by name
+        </label>
+        <div className="mt-2 flex min-w-0 gap-2">
+          <input
+            id="community-search"
+            type="search"
+            value={query}
+            maxLength={MAX_QUERY_LENGTH}
+            onChange={(event) => updateQuery(event.target.value)}
+            placeholder="Search community names"
+            className="min-h-11 min-w-0 flex-1 rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => updateQuery("")}
+              className="min-h-11 shrink-0 rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800"
+            >
+              Clear
+            </button>
+          )}
+        </div>
       </div>
 
       {hasPartialData && (
@@ -185,9 +312,25 @@ export default function CommunitiesPage() {
           </LiveStatus>
         )}
 
-      {communities.length > 0 && (
+      {!loading &&
+        !error &&
+        communities.length > 0 &&
+        visibleCommunities.length === 0 && (
+          <LiveStatus className="mt-6 rounded-xl border border-dashed border-slate-700 bg-slate-900/40 p-6 text-center text-sm text-slate-400">
+            No communities match “{query.trim()}”.
+            <button
+              type="button"
+              onClick={() => updateQuery("")}
+              className="ml-2 min-h-11 rounded-lg px-3 py-2 text-indigo-300 hover:bg-slate-800"
+            >
+              Clear search
+            </button>
+          </LiveStatus>
+        )}
+
+      {visibleCommunities.length > 0 && (
         <ul className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {communities.map((community) => (
+          {visibleCommunities.map((community) => (
             <li key={community.record.id} className="min-w-0">
               <CommunityCard community={community} />
             </li>

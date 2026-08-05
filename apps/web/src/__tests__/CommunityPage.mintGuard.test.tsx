@@ -41,6 +41,7 @@ function deferred<T>() {
 describe("CommunityPage mint lifecycle", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.replaceState({}, "", "/community");
     mocks.useWallet.mockReturnValue({
       address: "GWALLET",
       signTransaction: vi.fn(),

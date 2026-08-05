@@ -1,5 +1,7 @@
 import { ProposalState } from "@/lib/bindings/community-governor/src";
 
+export { ProposalState };
+
 export const PROPOSAL_STATE_LABELS: Record<ProposalState, string> = {
   [ProposalState.Pending]: "Pending",
   [ProposalState.Active]: "Active",

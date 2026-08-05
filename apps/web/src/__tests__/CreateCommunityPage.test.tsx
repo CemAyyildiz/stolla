@@ -1,5 +1,14 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const wallet = vi.hoisted(() => ({
+  useWallet: vi.fn(),
+}));
+
+vi.mock("@/context/WalletProvider", () => ({
+  useWallet: wallet.useWallet,
+}));
+
 import CreateCommunityPage from "@/app/(app)/communities/create/page";
 
 function enterValidMetadata() {
@@ -23,6 +32,11 @@ function enterValidMetadata() {
 describe("CreateCommunityPage", () => {
   beforeEach(() => {
     sessionStorage.clear();
+    wallet.useWallet.mockReturnValue({
+      address: null,
+      connect: vi.fn(),
+      isConnecting: false,
+    });
   });
 
   it("announces inline errors for every missing required metadata field", async () => {
@@ -85,7 +99,8 @@ describe("CreateCommunityPage", () => {
     expect(
       screen.getByText("Metadata validated and saved for this wizard session."),
     ).toBeInTheDocument();
-    expect(screen.getByText("Governance step placeholder")).toBeInTheDocument();
+    expect(screen.getByLabelText(/Proposal threshold/)).toHaveValue("1");
+    expect(screen.getByLabelText(/Voting period/)).toHaveValue("10000");
 
     fireEvent.click(screen.getByRole("button", { name: "Back to metadata" }));
     expect(screen.getByLabelText(/Community name/)).toHaveValue(
@@ -100,9 +115,9 @@ describe("CreateCommunityPage", () => {
     const { unmount } = render(<CreateCommunityPage />);
     enterValidMetadata();
     await waitFor(() =>
-      expect(sessionStorage.getItem("stolla:community-wizard:metadata:v1")).toContain(
-        "Builders Guild",
-      ),
+      expect(
+        sessionStorage.getItem("stolla:community-wizard:testnet:v1"),
+      ).toContain("Builders Guild"),
     );
     unmount();
 
@@ -115,6 +130,108 @@ describe("CreateCommunityPage", () => {
     );
     expect(screen.getByLabelText(/NFT collection URI/)).toHaveValue(
       "ipfs://bafy/collection.json",
+    );
+  });
+
+  it("rejects governance boundaries and contradictory ledger periods", () => {
+    render(<CreateCommunityPage />);
+    enterValidMetadata();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Continue to governance" }),
+    );
+
+    fireEvent.change(screen.getByLabelText(/Proposal threshold/), {
+      target: { value: "0" },
+    });
+    fireEvent.change(screen.getByLabelText(/Quorum/), {
+      target: { value: "-1" },
+    });
+    fireEvent.change(screen.getByLabelText(/Voting delay/), {
+      target: { value: "20" },
+    });
+    fireEvent.change(screen.getByLabelText(/Voting period/), {
+      target: { value: "20" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Review community" }));
+
+    expect(screen.getAllByText(/maximum u128 value/)).toHaveLength(2);
+    expect(
+      screen.getByText("Voting period must be greater than the voting delay."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Deployment target"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("preserves governance values through review edit navigation", () => {
+    render(<CreateCommunityPage />);
+    enterValidMetadata();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Continue to governance" }),
+    );
+    fireEvent.change(screen.getByLabelText(/Quorum/), {
+      target: { value: "25" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Review community" }));
+
+    expect(screen.getByText("Deployment target")).toBeInTheDocument();
+    expect(screen.getByText("25 NFT votes")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Continue to deployment" }),
+    ).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit governance" }));
+    expect(screen.getByLabelText(/Quorum/)).toHaveValue("25");
+  });
+
+  it("invalidates review confirmation when the connected account changes", async () => {
+    wallet.useWallet.mockReturnValue({
+      address: "GOLDACCOUNT",
+      connect: vi.fn(),
+      isConnecting: false,
+    });
+    const { rerender } = render(<CreateCommunityPage />);
+    enterValidMetadata();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Continue to governance" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Review community" }));
+    fireEvent.click(
+      screen.getByLabelText(/I confirm that these metadata/),
+    );
+    expect(screen.getByLabelText(/I confirm that these metadata/)).toBeChecked();
+
+    wallet.useWallet.mockReturnValue({
+      address: "GNEWACCOUNT",
+      connect: vi.fn(),
+      isConnecting: false,
+    });
+    rerender(<CreateCommunityPage />);
+
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText(/I confirm that these metadata/),
+      ).not.toBeChecked(),
+    );
+    expect(
+      screen.getByText(/Connected account changed. Review and confirm/),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Builders Guild")).toBeInTheDocument();
+  });
+
+  it("discards a dirty session draft explicitly", async () => {
+    render(<CreateCommunityPage />);
+    fireEvent.change(screen.getByLabelText(/Community name/), {
+      target: { value: "Temporary DAO" },
+    });
+    const discard = await screen.findByRole("button", { name: "Discard draft" });
+    fireEvent.click(discard);
+
+    expect(screen.getByLabelText(/Community name/)).toHaveValue("");
+    await waitFor(() =>
+      expect(
+        sessionStorage.getItem("stolla:community-wizard:testnet:v1"),
+      ).toBeNull(),
     );
   });
 });

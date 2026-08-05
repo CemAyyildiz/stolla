@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_GOVERNANCE_DRAFT,
   parseCommunityMetadata,
   validateCommunityMetadataDraft,
+  validateGovernanceDraft,
   type CommunityMetadataDraft,
 } from "./schema";
 
@@ -86,5 +88,25 @@ describe("community metadata schema", () => {
         { nftContract: "CNFT", governorContract: "CGOV" },
       ),
     ).toBeNull();
+  });
+
+  it("accepts explicit governance defaults and rejects numeric boundaries", () => {
+    expect(validateGovernanceDraft(DEFAULT_GOVERNANCE_DRAFT)).toEqual({});
+    expect(
+      validateGovernanceDraft({
+        proposalThreshold: "0",
+        quorum: (BigInt(1) << BigInt(128)).toString(),
+        votingDelay: "4294967296",
+        votingPeriod: "-1",
+      }),
+    ).toEqual({
+      proposalThreshold:
+        "Enter a whole number from 1 through the maximum u128 value.",
+      quorum: "Enter a whole number from 1 through the maximum u128 value.",
+      votingDelay:
+        "Enter a whole number from 1 through 4,294,967,295 ledgers.",
+      votingPeriod:
+        "Enter a whole number from 2 through 4,294,967,295 ledgers.",
+    });
   });
 });

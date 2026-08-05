@@ -6,6 +6,8 @@ import {
   createNftClient,
   createReadOnlyNftClient,
 } from "@/lib/contracts";
+import { getCommunity } from "@/lib/community/registry";
+import type { CommunityView } from "@/lib/community/types";
 import { contractIds } from "@/lib/stellar";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { LiveStatus } from "@/components/ui/LiveStatus";
@@ -34,12 +36,86 @@ export default function CommunityPage() {
   const [status, setStatus] = useState<ActionStatus | null>(null);
   const [dataLoadError, setDataLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(Boolean(contractIds.nft));
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(
+    null,
+  );
+  const [activeCommunity, setActiveCommunity] = useState<CommunityView | null>(
+    null,
+  );
+  const [routeResolved, setRouteResolved] = useState(false);
+  const [communitySelectionError, setCommunitySelectionError] = useState("");
   const refreshSeq = useRef(0);
   const delegationLifecycle = useOperationLifecycle();
   const mintLifecycle = useOperationLifecycle();
+  const resetDelegationLifecycle = delegationLifecycle.reset;
+  const resetMintLifecycle = mintLifecycle.reset;
 
-  const contractsConfigured = Boolean(contractIds.nft);
+  const activeNftContract =
+    activeCommunity?.record.nftContract ??
+    (!selectedCommunityId ? contractIds.nft : "");
+  const contractsConfigured = routeResolved && Boolean(activeNftContract);
+
+  useEffect(() => {
+    let active = true;
+    const timeout = window.setTimeout(() => {
+      const communityId = new URLSearchParams(window.location.search).get(
+        "community",
+      );
+      setSelectedCommunityId(communityId);
+      setRouteResolved(false);
+      setCommunitySelectionError("");
+      setActiveCommunity(null);
+      setName("");
+      setSymbol("");
+      setBalance(null);
+      setVotes(null);
+      setStatus(null);
+      setDataLoadError(null);
+      setRecipient("");
+      setTokenUri("ipfs://");
+      resetDelegationLifecycle();
+      resetMintLifecycle();
+
+      if (!communityId) {
+        setInitialLoading(Boolean(contractIds.nft));
+        setRouteResolved(true);
+        return;
+      }
+
+      setInitialLoading(true);
+      void getCommunity(communityId)
+        .then((result) => {
+          if (!active) return;
+          if (
+            result.status !== "found" ||
+            !/^C[A-Z2-7]{55}$/.test(result.community.record.nftContract)
+          ) {
+            setCommunitySelectionError(
+              "The selected community or its NFT contract is invalid. Choose a registered community before continuing.",
+            );
+            setInitialLoading(false);
+            return;
+          }
+          setActiveCommunity(result.community);
+        })
+        .catch(() => {
+          if (active) {
+            setCommunitySelectionError(
+              "The selected community could not be resolved from the registry.",
+            );
+            setInitialLoading(false);
+          }
+        })
+        .finally(() => {
+          if (active) setRouteResolved(true);
+        });
+    }, 0);
+    return () => {
+      window.clearTimeout(timeout);
+      active = false;
+    };
+  }, [resetDelegationLifecycle, resetMintLifecycle]);
 
   const refresh = useCallback(async () => {
     if (!contractsConfigured) return false;
@@ -50,9 +126,13 @@ export default function CommunityPage() {
       () =>
         loadCommunityData({
           address,
-          collectionClient: createReadOnlyNftClient(),
+          collectionClient: createReadOnlyNftClient(activeNftContract),
           userClient: address
-            ? createNftClient({ publicKey: address, signTransaction })
+            ? createNftClient({
+                publicKey: address,
+                signTransaction,
+                contractId: activeNftContract,
+              })
             : null,
         }),
       {
@@ -78,7 +158,7 @@ export default function CommunityPage() {
         },
       },
     );
-  }, [address, contractsConfigured, signTransaction]);
+  }, [activeNftContract, address, contractsConfigured, signTransaction]);
 
   useEffect(() => {
     void refresh();
@@ -103,7 +183,11 @@ export default function CommunityPage() {
     mintLifecycle.reset();
 
     const result = await mintLifecycle.execute(async () => {
-      const client = createNftClient({ publicKey: address, signTransaction });
+      const client = createNftClient({
+        publicKey: address,
+        signTransaction,
+        contractId: activeNftContract,
+      });
       return client.mint({ to: recipient, token_uri: tokenUri });
     });
 
@@ -130,7 +214,11 @@ export default function CommunityPage() {
     delegationLifecycle.reset();
 
     const result = await delegationLifecycle.execute(async () => {
-      const client = createNftClient({ publicKey: address, signTransaction });
+      const client = createNftClient({
+        publicKey: address,
+        signTransaction,
+        contractId: activeNftContract,
+      });
       return client.delegate({
         account: address,
         delegatee: address,
@@ -153,7 +241,34 @@ export default function CommunityPage() {
         Mint membership NFTs and delegate voting power on testnet.
       </p>
 
-      {!contractsConfigured && (
+      {activeCommunity && (
+        <section className="mt-6 min-w-0 rounded-xl border border-indigo-800/70 bg-indigo-950/30 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-indigo-300">
+            Active community
+          </p>
+          <h2 className="mt-1 break-words font-semibold text-slate-100">
+            {activeCommunity.metadata?.name ?? "Registered community"}
+          </h2>
+          <p className="mt-2 break-all font-mono text-xs text-slate-400">
+            NFT contract: {activeCommunity.record.nftContract}
+          </p>
+          <p className="mt-2 text-xs text-indigo-200">
+            Mint, ownership, delegation, and voting-power requests on this page
+            use this registered contract.
+          </p>
+        </section>
+      )}
+
+      {communitySelectionError && (
+        <p
+          role="alert"
+          className="mt-6 rounded-lg border border-rose-800/70 bg-rose-950/40 p-4 text-sm text-rose-200"
+        >
+          {communitySelectionError}
+        </p>
+      )}
+
+      {routeResolved && !contractsConfigured && !communitySelectionError && (
         <p className="mt-6 break-words rounded-lg border border-amber-800/60 bg-amber-950/50 p-4 text-sm text-amber-200 [overflow-wrap:anywhere]">
           Contract IDs are not set. Deploy contracts and configure{" "}
           <code className="font-mono">NEXT_PUBLIC_NFT_CONTRACT_ID</code> in{" "}
@@ -161,7 +276,7 @@ export default function CommunityPage() {
         </p>
       )}
 
-      {contractsConfigured && (
+      {(contractsConfigured || !routeResolved) && (
         <div className="mt-6 space-y-6">
           {dataLoadError && (
             <section

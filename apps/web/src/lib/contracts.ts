@@ -6,10 +6,15 @@ import { config, requireContractIds } from "./stellar";
 type ClientOptions = {
   publicKey: string;
   signTransaction: SignTransaction;
+  contractId?: string;
 };
 
-export function createNftClient({ publicKey, signTransaction }: ClientOptions) {
-  const { nft } = requireContractIds();
+export function createNftClient({
+  publicKey,
+  signTransaction,
+  contractId,
+}: ClientOptions) {
+  const nft = contractId ?? requireContractIds().nft;
   return new NftClient({
     contractId: nft,
     networkPassphrase: config.networkPassphrase,
@@ -22,8 +27,9 @@ export function createNftClient({ publicKey, signTransaction }: ClientOptions) {
 export function createGovernorClient({
   publicKey,
   signTransaction,
+  contractId,
 }: ClientOptions) {
-  const { governor } = requireContractIds();
+  const governor = contractId ?? requireContractIds().governor;
   return new GovernorClient({
     contractId: governor,
     networkPassphrase: config.networkPassphrase,
@@ -33,8 +39,8 @@ export function createGovernorClient({
   });
 }
 
-export function createReadOnlyNftClient() {
-  const { nft } = requireContractIds();
+export function createReadOnlyNftClient(contractId?: string) {
+  const nft = contractId ?? requireContractIds().nft;
   return new NftClient({
     contractId: nft,
     networkPassphrase: config.networkPassphrase,
@@ -42,8 +48,8 @@ export function createReadOnlyNftClient() {
   });
 }
 
-export function createReadOnlyGovernorClient() {
-  const { governor } = requireContractIds();
+export function createReadOnlyGovernorClient(contractId?: string) {
+  const governor = contractId ?? requireContractIds().governor;
   return new GovernorClient({
     contractId: governor,
     networkPassphrase: config.networkPassphrase,
