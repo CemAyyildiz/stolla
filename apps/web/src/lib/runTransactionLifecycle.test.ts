@@ -30,6 +30,7 @@ describe("runTransactionLifecycle", () => {
       ok: true,
       transactionHash:
         "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0",
+      result: undefined,
     });
     expect(stages).toEqual([
       "simulating",
@@ -116,6 +117,7 @@ describe("runTransactionLifecycle", () => {
     expect(result).toEqual({
       ok: true,
       transactionHash: null,
+      result: undefined,
     });
     expect(signAndSend).toHaveBeenCalledTimes(1);
     expect(stages).toEqual([

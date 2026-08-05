@@ -11,8 +11,6 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { LiveStatus } from "@/components/ui/LiveStatus";
 import { TransactionLifecycleStatus } from "@/components/TransactionLifecycleStatus";
 import { useOperationLifecycle } from "@/hooks/useOperationLifecycle";
-import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
-import { mapTransactionError } from "@/lib/transactionErrors";
 import {
   loadCommunityData,
   runCommunityRefresh,
@@ -38,7 +36,7 @@ export default function CommunityPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [initialLoading, setInitialLoading] = useState(Boolean(contractIds.nft));
   const delegationLifecycle = useOperationLifecycle();
-  const mintGuard = useSubmissionGuard();
+  const mintLifecycle = useOperationLifecycle();
 
   const contractsConfigured = Boolean(contractIds.nft);
 
@@ -91,28 +89,28 @@ export default function CommunityPage() {
       setStatus(null);
       return;
     }
+    if (mintLifecycle.isInFlight) return;
 
     setRecipientError(null);
     setTokenUriError(null);
-    setStatus({ message: "Submitting mint transaction…", tone: "routine" });
+    setStatus(null);
+    mintLifecycle.reset();
 
-    await mintGuard.run(async () => {
-      try {
-        const client = createNftClient({ publicKey: address, signTransaction });
-        const tx = await client.mint({ to: recipient, token_uri: tokenUri });
-        const result = await tx.signAndSend();
-        setStatus({
-          message: `Minted token #${result.result} successfully.`,
-          tone: "routine",
-        });
-        await refresh();
-      } catch (error: unknown) {
-        setStatus({
-          message: mapTransactionError(error).message,
-          tone: "error",
-        });
-      }
+    const result = await mintLifecycle.execute(async () => {
+      const client = createNftClient({ publicKey: address, signTransaction });
+      return client.mint({ to: recipient, token_uri: tokenUri });
     });
+
+    if (result.ok) {
+      setStatus({
+        message:
+          result.result !== undefined && result.result !== null
+            ? `Minted token #${result.result} successfully.`
+            : "Minted NFT successfully.",
+        tone: "routine",
+      });
+      await refresh();
+    }
   }
 
   async function handleDelegate() {
@@ -241,7 +239,7 @@ export default function CommunityPage() {
                 onClick={() => void handleDelegate()}
                 disabled={
                   !address ||
-                  mintGuard.isPending ||
+                  mintLifecycle.isInFlight ||
                   delegationLifecycle.isInFlight
                 }
                 className="mt-4 rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-50"
@@ -368,12 +366,40 @@ export default function CommunityPage() {
               </div>
               <button
                 type="button"
-                onClick={handleMint}
-                disabled={!address || mintGuard.isPending || delegationLifecycle.isInFlight}
+                onClick={() => void handleMint()}
+                disabled={
+                  !address ||
+                  mintLifecycle.isInFlight ||
+                  delegationLifecycle.isInFlight
+                }
                 className="min-h-11 w-full touch-manipulation rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400 disabled:opacity-50 sm:w-auto"
               >
-                {mintGuard.isPending ? "Submitting..." : "Mint NFT"}
+                {mintLifecycle.isInFlight ? "Mint in progress…" : "Mint NFT"}
               </button>
+              <TransactionLifecycleStatus
+                stage={mintLifecycle.stage}
+                operationLabel="Mint"
+                error={mintLifecycle.error}
+                metadata={{
+                  transactionHash: mintLifecycle.transactionHash,
+                  details: mintLifecycle.outcomeKind
+                    ? [
+                        {
+                          label: "Outcome",
+                          value:
+                            mintLifecycle.outcomeKind === "wallet_rejected"
+                              ? "Wallet rejected"
+                              : mintLifecycle.outcomeKind === "still_pending"
+                                ? "Still pending"
+                                : mintLifecycle.outcomeKind ===
+                                    "simulation_failed"
+                                  ? "Simulation failed"
+                                  : "Send failed",
+                        },
+                      ]
+                    : undefined,
+                }}
+              />
             </div>
           </section>
         </div>
