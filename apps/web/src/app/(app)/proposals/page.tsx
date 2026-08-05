@@ -5,8 +5,8 @@ import { Buffer } from "buffer";
 import { useWallet } from "@/context/WalletProvider";
 import { createGovernorClient, storeProposalId } from "@/lib/contracts";
 import { useProposalDiscovery } from "@/hooks/useProposalDiscovery";
-import { ProposalState } from "@/lib/bindings/community-governor/src";
 import {
+  ProposalState,
   PROPOSAL_STATE_LABELS,
   PROPOSAL_STATE_ORDER,
 } from "@/lib/proposalState";
@@ -41,9 +41,29 @@ export default function ProposalsPage() {
   const [retryingIds, setRetryingIds] = useState<string[]>([]);
   const [visibleCount, setVisibleCount] = useState(LOAD_MORE_PAGE_SIZE);
 
-  const { proposals, proposalIds, loading, error, empty, refresh } =
+  const {
+    proposals: discoveredProposals,
+    loading,
+    error,
+    empty,
+    refresh,
+  } =
     useProposalDiscovery();
   const contractsConfigured = Boolean(contractIds.governor);
+
+  const proposals = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          discoveredProposals.map((proposal) => [proposal.id, proposal]),
+        ).values(),
+      ),
+    [discoveredProposals],
+  );
+  const proposalIds = useMemo(
+    () => proposals.map((proposal) => proposal.id),
+    [proposals],
+  );
 
   const descriptionsById = useMemo(() => {
     const map: Record<string, string | null> = {};
@@ -420,13 +440,13 @@ export default function ProposalsPage() {
           </LiveStatus>
         )}
 
-        {!loading && !error && proposalIds.length > 0 && filteredIds.length === 0 && (
+        {!loading && proposalIds.length > 0 && filteredIds.length === 0 && (
           <p className="mt-2 text-sm text-slate-500">
             No proposals match the selected filter.
           </p>
         )}
 
-        {!loading && !error && visibleIds.length > 0 && (
+        {!loading && visibleIds.length > 0 && (
           <>
             {failedProposalIds.length > 0 && (
               <p
