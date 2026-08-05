@@ -5,7 +5,7 @@ mod test;
 
 use soroban_sdk::{
     contract, contracterror, contractevent, contractimpl, contracttype, panic_with_error,
-    xdr::ToXdr, Address, Bytes, BytesN, Env, Event, String, Vec,
+    xdr::ToXdr, Address, Bytes, BytesN, Env, String, Vec,
 };
 
 const DAY_IN_LEDGERS: u32 = 17_280;

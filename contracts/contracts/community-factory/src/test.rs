@@ -189,7 +189,10 @@ fn create_deploys_initialized_deterministic_pair_and_emits_event() {
         metadata_hash: request.metadata.metadata_hash,
     }
     .to_xdr(&fixture.e, &fixture.factory_id);
-    assert_eq!(fixture.e.events().all().last(), Some(&expected_event));
+    assert_eq!(
+        fixture.e.events().all().events().last(),
+        Some(&expected_event)
+    );
 }
 
 #[test]
