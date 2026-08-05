@@ -77,9 +77,12 @@ export default function CreateCommunityPage() {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    const stored = readStoredDraft();
-    if (stored) setDraft(stored);
-    setHydrated(true);
+    const timeout = window.setTimeout(() => {
+      const stored = readStoredDraft();
+      if (stored) setDraft(stored);
+      setHydrated(true);
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, []);
 
   useEffect(() => {

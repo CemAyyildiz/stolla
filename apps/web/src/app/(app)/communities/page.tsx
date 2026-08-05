@@ -19,11 +19,12 @@ export default function CommunitiesPage() {
   const [skippedRecords, setSkippedRecords] = useState(0);
   const requestSequence = useRef(0);
   const seenIds = useRef(new Set<string>());
+  const nextCursorRef = useRef<number | null>(null);
 
   const loadPage = useCallback(
     async (replace: boolean) => {
       const sequence = ++requestSequence.current;
-      const cursor = replace ? null : nextCursor;
+      const cursor = replace ? null : nextCursorRef.current;
       setLoading(true);
       setError(null);
 
@@ -52,6 +53,7 @@ export default function CommunitiesPage() {
         setCommunities((current) =>
           replace ? unique : [...current, ...unique],
         );
+        nextCursorRef.current = page.nextCursor;
         setNextCursor(page.nextCursor);
         setHasLoaded(true);
       } catch (cause) {
@@ -65,14 +67,13 @@ export default function CommunitiesPage() {
         if (sequence === requestSequence.current) setLoading(false);
       }
     },
-    [nextCursor],
+    [],
   );
 
   useEffect(() => {
-    void loadPage(true);
-    // Initial discovery should not repeat when the cursor changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const timeout = window.setTimeout(() => void loadPage(true), 0);
+    return () => window.clearTimeout(timeout);
+  }, [loadPage]);
 
   const metadataFailureCount = communities.filter(
     (community) => community.metadataError,
