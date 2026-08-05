@@ -46,6 +46,7 @@ function deferred<T>() {
 describe("CommunityPage loading and RPC failures", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.replaceState({}, "", "/community");
     mocks.createNftClient.mockReturnValue({});
     mocks.createReadOnlyNftClient.mockReturnValue({});
     mocks.useWallet.mockReturnValue({
