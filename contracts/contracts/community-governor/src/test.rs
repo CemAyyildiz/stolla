@@ -3,8 +3,8 @@
 use soroban_sdk::{
     contract, contractimpl,
     testutils::{
-        Address as _, AuthorizedFunction, AuthorizedInvocation, Events as _, Ledger as _, MockAuth,
-        MockAuthInvoke,
+        storage::Instance as _, Address as _, AuthorizedFunction, AuthorizedInvocation,
+        Events as _, Ledger as _, MockAuth, MockAuthInvoke,
     },
     vec, Address, BytesN, Env, Event, IntoVal, String, Symbol, Val, Vec,
 };
@@ -19,7 +19,9 @@ use stellar_governance::{
 
 use community_nft::{CommunityNft, CommunityNftClient};
 
-use crate::CommunityGovernor;
+use crate::{
+    CommunityGovernor, CommunityGovernorClient, STORAGE_EXTEND_AMOUNT, STORAGE_TTL_THRESHOLD,
+};
 
 #[contract]
 struct GovernorExecutionTarget;
@@ -1393,4 +1395,68 @@ fn executed_proposal_cannot_execute_twice() {
         fixture.governor.proposal_state(&proposal_id),
         ProposalState::Executed
     );
+}
+
+#[test]
+fn governor_storage_survives_advancement_and_instance_ttl_renews_at_boundary() {
+    let e = Env::default();
+    set_ledger_sequence(&e, 100);
+    e.ledger()
+        .with_mut(|ledger| ledger.timestamp = 1_800_000_000);
+    let fixture = setup_governance(&e);
+    let voter = fixture.primary_voter().clone();
+
+    advance_ledger(&e, 1);
+    let proposal_id = fixture.propose_signaling(&voter);
+    let snapshot = fixture.governor.proposal_snapshot(&proposal_id);
+    set_ledger_sequence(&e, snapshot + 1);
+    fixture.governor.cast_vote(
+        &proposal_id,
+        &VOTE_FOR,
+        &String::from_str(&e, "Durability regression"),
+        &voter,
+    );
+
+    let instance_ttl = e.as_contract(&fixture.governor_id, || e.storage().instance().get_ttl());
+    assert!(instance_ttl > STORAGE_TTL_THRESHOLD);
+
+    let advance_by = instance_ttl - STORAGE_TTL_THRESHOLD;
+    e.ledger().with_mut(|ledger| {
+        ledger.sequence_number += advance_by;
+        ledger.timestamp += u64::from(advance_by) * 5;
+    });
+    e.as_contract(&fixture.governor_id, || {
+        assert_eq!(e.storage().instance().get_ttl(), STORAGE_TTL_THRESHOLD);
+    });
+
+    // Configuration (instance storage), proposal core, vote tally, and the
+    // per-voter receipt (persistent storage) all remain readable.
+    assert_eq!(
+        fixture.governor.name(),
+        String::from_str(&e, "StollaGovernor")
+    );
+    assert_eq!(fixture.governor.version(), String::from_str(&e, "1.0.0"));
+    assert_eq!(fixture.governor.get_token_contract(), fixture.nft_id);
+    assert_eq!(fixture.governor.voting_delay(), fixture.params.voting_delay);
+    assert_eq!(
+        fixture.governor.voting_period(),
+        fixture.params.voting_period
+    );
+    assert_eq!(
+        fixture.governor.proposal_threshold(),
+        fixture.params.proposal_threshold
+    );
+    assert_eq!(fixture.governor.proposal_snapshot(&proposal_id), snapshot);
+    assert!(fixture.governor.has_voted(&proposal_id, &voter));
+    let counts = e.as_contract(&fixture.governor_id, || {
+        get_proposal_vote_counts(&e, &proposal_id)
+    });
+    assert_eq!(counts.for_votes, 1);
+    assert_eq!(counts.against_votes, 0);
+    assert_eq!(counts.abstain_votes, 0);
+
+    CommunityGovernorClient::new(&e, &fixture.governor_id).extend_instance_ttl();
+    e.as_contract(&fixture.governor_id, || {
+        assert_eq!(e.storage().instance().get_ttl(), STORAGE_EXTEND_AMOUNT);
+    });
 }

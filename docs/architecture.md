@@ -6,6 +6,7 @@ inputDocuments:
   - docs/adr/002-openzeppelin-compose.md
   - docs/adr/003-ipfs-metadata.md
   - docs/adr/004-proposal-discovery.md
+  - docs/adr/005-community-factory-registry.md
 workflowType: architecture
 project_name: Stolla
 date: 2026-06-24
@@ -131,6 +132,9 @@ export const config = {
 | `Owner` | Address | Mint authority |
 | `TokenUri(token_id)` | String | IPFS metadata URI per token |
 
+See [Contract storage and TTL policy](contract-storage-lifecycle.md) for the
+complete NFT/Governor inventory, renewal window, and intentional expiry rules.
+
 ## Security Considerations
 
 - Owner-only mint (`#[only_owner]`)
@@ -141,7 +145,12 @@ export const config = {
 
 ## Future Extensions
 
+<<<<<<< HEAD
 - A reviewed creator-policy upgrade for permissionless community creation
+=======
+- `CommunityFactory` and registry for multi-community deployment
+  ([ADR-005](adr/005-community-factory-registry.md))
+>>>>>>> origin/main
 - Timelock + on-chain execution
 - Public proposal discovery from Stellar RPC events
 - Persistent event indexer for long-lived proposal history
