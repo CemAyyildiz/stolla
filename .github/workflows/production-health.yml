@@ -3,7 +3,7 @@ name: Production health check
 on:
   schedule:
     # Every 30 minutes, at minutes that avoid the top-of-hour Actions load spike.
-    - cron: "17,47 * * * *"
+    - cron: "0 6 * * *"
   workflow_dispatch:
     inputs:
       health_url:
