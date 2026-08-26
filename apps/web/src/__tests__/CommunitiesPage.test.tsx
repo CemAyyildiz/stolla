@@ -100,9 +100,8 @@ describe("CommunitiesPage", () => {
 
     render(<CommunitiesPage />);
 
-    expect(
-      await screen.findByText(/No communities are registered yet/),
-    ).toHaveAttribute("role", "status");
+    const empty = await screen.findByText(/No communities are registered yet/);
+    expect(empty.closest("[role='status']")).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Create a community" }),
     ).toHaveAttribute("href", "/communities/create");

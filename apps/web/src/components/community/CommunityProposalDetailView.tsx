@@ -9,6 +9,8 @@ import {
 import { ProposalState } from "@/lib/bindings/community-governor/src";
 import { CommunityBreadcrumbs } from "./CommunityBreadcrumbs";
 import { CommunityNotFound } from "./CommunityNotFound";
+import { AsyncState } from "@/components/ui/AsyncState";
+import { ErrorState } from "@/components/ui/ErrorState";
 
 const stateLabels: Record<ProposalState, string> = {
   [ProposalState.Pending]: "Pending",
@@ -76,12 +78,14 @@ function CommunityProposalDetailPanel({
       </h1>
 
       {resolution.status === "loading" && (
-        <p className="mt-6 text-sm text-slate-500">Loading proposal…</p>
+        <AsyncState className="mt-6 text-sm text-slate-500">
+          Loading proposal…
+        </AsyncState>
       )}
       {resolution.status === "error" && (
-        <p className="mt-6 rounded-lg border border-rose-800/60 bg-rose-950/50 p-4 text-sm text-rose-200">
+        <ErrorState className="mt-6" title="Proposal unavailable">
           {resolution.error}
-        </p>
+        </ErrorState>
       )}
       {resolution.status === "ready" && (
         <dl className="mt-6 grid gap-3 rounded-xl border border-slate-800 bg-[#151b2b] p-5 text-sm sm:grid-cols-2">

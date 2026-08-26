@@ -11,6 +11,9 @@ import {
 import { ProposalState } from "@/lib/bindings/community-governor/src";
 import { CommunityBreadcrumbs } from "./CommunityBreadcrumbs";
 import { CommunityNotFound } from "./CommunityNotFound";
+import { AsyncState } from "@/components/ui/AsyncState";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { FreshnessNotice } from "@/components/ui/FreshnessNotice";
 
 const stateLabels: Record<ProposalState, string> = {
   [ProposalState.Pending]: "Pending",
@@ -74,31 +77,43 @@ function CommunityProposalsPanel({
       </h1>
 
       {resolution.status === "loading" && (
-        <p className="mt-6 text-sm text-slate-500">Loading proposals…</p>
+        <AsyncState className="mt-6 text-sm text-slate-500">
+          Loading proposals…
+        </AsyncState>
       )}
 
       {resolution.status === "ready" && proposalIds.length === 0 && (
-        <p className="mt-6 text-sm text-slate-500">No proposals yet.</p>
+        <EmptyState className="mt-6">No proposals yet.</EmptyState>
       )}
 
       {resolution.status === "ready" && proposalIds.length > 0 && (
-        <ul className="mt-6 space-y-2">
-          {resolution.entries.map((entry) => (
-            <li key={entry.id}>
-              <Link
-                href={`/community/${community.id}/proposals/${entry.id}`}
-                className="flex items-center justify-between rounded-lg border border-slate-800 bg-[#151b2b] px-4 py-3 text-sm text-slate-200 hover:bg-slate-800/80"
-              >
-                <span className="truncate font-mono">#{entry.id}</span>
-                <span
-                  className={`ml-3 ${entry.status === "error" ? "text-rose-400" : "text-slate-500"}`}
+        <>
+          {resolution.entries.some((entry) => entry.status === "error") && (
+            <FreshnessNotice className="mt-6">
+              Some proposal states are unavailable. Successful proposals remain
+              visible.
+            </FreshnessNotice>
+          )}
+          <ul className="mt-6 space-y-2">
+            {resolution.entries.map((entry) => (
+              <li key={entry.id}>
+                <Link
+                  href={`/community/${community.id}/proposals/${entry.id}`}
+                  className="flex items-center justify-between rounded-lg border border-slate-800 bg-[#151b2b] px-4 py-3 text-sm text-slate-200 hover:bg-slate-800/80"
                 >
-                  {entry.status === "ready" ? stateLabels[entry.state] : "Unavailable"}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+                  <span className="truncate font-mono">#{entry.id}</span>
+                  <span
+                    className={`ml-3 ${entry.status === "error" ? "text-rose-400" : "text-slate-500"}`}
+                  >
+                    {entry.status === "ready"
+                      ? stateLabels[entry.state]
+                      : "Unavailable"}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </div>
   );

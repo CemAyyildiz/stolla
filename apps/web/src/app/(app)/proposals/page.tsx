@@ -15,6 +15,10 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { ProposalSummaryCard } from "@/components/ProposalSummaryCard";
 import { truncateEnd } from "@/lib/truncate";
 import { LiveStatus } from "@/components/ui/LiveStatus";
+import { AsyncState } from "@/components/ui/AsyncState";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorState } from "@/components/ui/ErrorState";
+import { FreshnessNotice } from "@/components/ui/FreshnessNotice";
 import { TransactionLifecycleStatus } from "@/components/TransactionLifecycleStatus";
 import { useOperationLifecycle } from "@/hooks/useOperationLifecycle";
 
@@ -146,6 +150,8 @@ export default function ProposalsPage() {
   );
 
   useEffect(() => {
+    // The async loader owns its request lifecycle and updates state after I/O.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadStates();
   }, [loadStates]);
 
@@ -173,6 +179,8 @@ export default function ProposalsPage() {
 
   useEffect(() => {
     if (stateFilter !== ALL_FILTER && !availableStates.includes(stateFilter)) {
+      // Keep a removed state option from leaving the control with an invalid value.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStateFilter(ALL_FILTER);
     }
   }, [availableStates, stateFilter]);
@@ -415,35 +423,29 @@ export default function ProposalsPage() {
                 ),
               )}
             </ul>
-            <LiveStatus className="sr-only">Loading proposal history...</LiveStatus>
+            <AsyncState className="sr-only">Loading proposal history...</AsyncState>
           </>
         )}
 
         {!loading && error && (
-          <div
-            className="mt-3 rounded-lg border border-rose-800/70 bg-rose-950/40 p-4"
-            role="alert"
-          >
-            <p className="font-medium text-rose-200">
-              {uniqueProposalIds.length > 0
+          <ErrorState
+            className="mt-3"
+            title={
+              uniqueProposalIds.length > 0
                 ? "More proposal history could not be loaded."
-                : "Proposal history is temporarily unavailable."}
-            </p>
-            <p className="mt-1 text-sm text-rose-300/80">{error}</p>
-            <button
-              type="button"
-              onClick={() => void refresh()}
-              className="mt-3 min-h-11 touch-manipulation rounded-lg border border-rose-600 px-3 py-2 text-sm font-medium text-rose-100 hover:bg-rose-900/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300"
-            >
-              Retry loading proposals
-            </button>
-          </div>
+                : "Proposal history is temporarily unavailable."
+            }
+            onRetry={() => void refresh()}
+            retryLabel="Retry loading proposals"
+          >
+            {error}
+          </ErrorState>
         )}
 
         {!loading && !error && empty && (
-          <LiveStatus className="mt-3 rounded-lg border border-dashed border-slate-700 bg-slate-900/40 p-4 text-sm text-slate-400">
+          <EmptyState className="mt-3">
             No public proposals have been discovered yet.
-          </LiveStatus>
+          </EmptyState>
         )}
 
         {!loading && uniqueProposalIds.length > 0 && filteredIds.length === 0 && (
@@ -455,13 +457,10 @@ export default function ProposalsPage() {
         {!loading && visibleIds.length > 0 && (
           <>
             {failedProposalIds.length > 0 && (
-              <p
-                className="mt-3 rounded-lg border border-amber-800/70 bg-amber-950/40 p-4 text-sm text-amber-200"
-                role="status"
-              >
+              <FreshnessNotice className="mt-3">
                 Some proposal states could not be loaded. Successful entries
                 remain listed; retry state on an affected entry.
-              </p>
+              </FreshnessNotice>
             )}
             <ul className="mt-3 space-y-2">
               {visibleIds.map((id) => {
