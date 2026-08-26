@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createWalletMock } from "@/test-support/stellar";
 
 const mocks = vi.hoisted(() => ({
   getE2EBridge: vi.fn(),
@@ -79,12 +80,11 @@ function adapter() {
 describe("CommunityDeploymentPanel", () => {
   beforeEach(() => {
     sessionStorage.clear();
-    mocks.useWallet.mockReturnValue({
+    mocks.useWallet.mockReturnValue(createWalletMock({
       address,
-      signTransaction: vi.fn(),
       walletNetwork: "testnet",
       walletNetworkPassphrase: "Test SDF Network ; September 2015",
-    });
+    }));
   });
 
   it("shows the exact simulated fee and declares success only after registry verification", async () => {
@@ -111,12 +111,11 @@ describe("CommunityDeploymentPanel", () => {
   it("blocks a mismatched wallet network and preserves draft inputs", () => {
     const deployment = adapter();
     mocks.getE2EBridge.mockReturnValue({ deployment });
-    mocks.useWallet.mockReturnValue({
+    mocks.useWallet.mockReturnValue(createWalletMock({
       address,
-      signTransaction: vi.fn(),
       walletNetwork: "mainnet",
       walletNetworkPassphrase: "Public Global Stellar Network ; September 2015",
-    });
+    }));
     render(<CommunityDeploymentPanel {...props} />);
 
     expect(screen.getByText(/Expected testnet/)).toHaveTextContent(

@@ -10,7 +10,7 @@ import {
   createFetchMetadata,
   driftwoodCommunity,
   multiCommunityRegistry,
-} from "@/test/fixtures/communities";
+} from "@/test-support/stellar";
 
 const fetchMetadata = createFetchMetadata({
   [atlasCommunity.metadataUri!]: atlasMetadata,

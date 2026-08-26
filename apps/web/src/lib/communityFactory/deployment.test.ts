@@ -1,12 +1,10 @@
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "vitest";
+import { createCommunityDeploymentFixture } from "@/test-support/stellar";
 import {
   deployCommunityFromWizard,
   extractTransactionHash,
-  type DeploymentStage,
 } from "./deployment";
-import { CommunityDeploymentError } from "./errors";
-import type { CommunityDeploymentResult, CommunityWizardState } from "./types";
+import type { CommunityWizardState } from "./types";
 
 const state: CommunityWizardState = {
   metadata: {
@@ -24,123 +22,69 @@ const state: CommunityWizardState = {
   },
 };
 
-function dependencies(overrides: {
-  walletNetworkPassphrase?: string | null;
-  deployError?: Error;
-  signError?: Error;
-  signResponse?: {
-    hash?: string;
-    txHash?: string;
-    result?: CommunityDeploymentResult;
-  };
-  stages?: DeploymentStage[];
-  hashes?: string[];
-} = {}) {
-  return {
-    address: "GCREATOR",
-    expectedNetworkPassphrase: "Test SDF Network ; September 2015",
-    walletNetworkPassphrase:
-      overrides.walletNetworkPassphrase ?? "Test SDF Network ; September 2015",
-    createClient: () => ({
-      deploy_community: async () => {
-        if (overrides.deployError) throw overrides.deployError;
-        return {
-          signAndSend: async () => {
-            if (overrides.signError) throw overrides.signError;
-            return overrides.signResponse ?? { hash: "abc123" };
-          },
-        };
-      },
-    }),
-    storeHash: (hash: string) => overrides.hashes?.push(hash),
-    onStage: (stage: DeploymentStage) => overrides.stages?.push(stage),
-  };
-}
-
 describe("deployCommunityFromWizard", () => {
   it("fails before simulation on network mismatch", async () => {
-    await assert.rejects(
-      () =>
-        deployCommunityFromWizard(
-          state,
-          dependencies({ walletNetworkPassphrase: "Public Global Stellar Network ; September 2015" }),
-        ),
-      (error) =>
-        error instanceof CommunityDeploymentError && error.kind === "network",
-    );
+    const fixture = createCommunityDeploymentFixture({
+      walletNetworkPassphrase:
+        "Public Global Stellar Network ; September 2015",
+    });
+
+    await expect(
+      deployCommunityFromWizard(state, fixture.dependencies),
+    ).rejects.toMatchObject({ kind: "network" });
+    expect(fixture.deployCommunity.callCount()).toBe(0);
   });
 
   it("surfaces simulation failures before wallet signing", async () => {
-    const stages: DeploymentStage[] = [];
+    const fixture = createCommunityDeploymentFixture({
+      simulationError: new Error("simulation rejected contract args"),
+    });
 
-    await assert.rejects(
-      () =>
-        deployCommunityFromWizard(
-          state,
-          dependencies({
-            deployError: new Error("simulation rejected contract args"),
-            stages,
-          }),
-        ),
-      (error) =>
-        error instanceof CommunityDeploymentError && error.kind === "simulation",
-    );
-    assert.deepEqual(stages, ["serializing", "simulating"]);
+    await expect(
+      deployCommunityFromWizard(state, fixture.dependencies),
+    ).rejects.toMatchObject({ kind: "simulation" });
+    expect(fixture.stages).toEqual(["serializing", "simulating"]);
+    expect(fixture.signAndSend.callCount()).toBe(0);
   });
 
   it("does not store a hash when the wallet rejects authorization", async () => {
-    const hashes: string[] = [];
+    const fixture = createCommunityDeploymentFixture({
+      submissionError: new Error("User rejected request"),
+    });
 
-    await assert.rejects(
-      () =>
-        deployCommunityFromWizard(
-          state,
-          dependencies({
-            signError: new Error("User rejected request"),
-            hashes,
-          }),
-        ),
-      (error) =>
-        error instanceof CommunityDeploymentError &&
-        error.kind === "wallet_rejection",
-    );
-    assert.deepEqual(hashes, []);
+    await expect(
+      deployCommunityFromWizard(state, fixture.dependencies),
+    ).rejects.toMatchObject({ kind: "wallet_rejection" });
+    expect(fixture.hashes).toEqual([]);
   });
 
   it("fails submission when the wallet response has no hash", async () => {
-    await assert.rejects(
-      () =>
-        deployCommunityFromWizard(
-          state,
-          dependencies({ signResponse: { result: undefined } }),
-        ),
-      (error) =>
-        error instanceof CommunityDeploymentError && error.kind === "submission",
-    );
+    const fixture = createCommunityDeploymentFixture({ response: {} });
+
+    await expect(
+      deployCommunityFromWizard(state, fixture.dependencies),
+    ).rejects.toMatchObject({ kind: "submission" });
   });
 
   it("stores the transaction hash immediately after successful submission", async () => {
-    const stages: DeploymentStage[] = [];
-    const hashes: string[] = [];
+    const fixture = createCommunityDeploymentFixture({
+      response: {
+        txHash: "hash-from-wallet",
+        result: {
+          nft_contract: "CNFT",
+          governor_contract: "CGOV",
+        },
+      },
+    });
 
     const outcome = await deployCommunityFromWizard(
       state,
-      dependencies({
-        stages,
-        hashes,
-        signResponse: {
-          txHash: "hash-from-wallet",
-          result: {
-            nft_contract: "CNFT",
-            governor_contract: "CGOV",
-          },
-        },
-      }),
+      fixture.dependencies,
     );
 
-    assert.equal(outcome.hash, "hash-from-wallet");
-    assert.deepEqual(hashes, ["hash-from-wallet"]);
-    assert.deepEqual(stages, [
+    expect(outcome.hash).toBe("hash-from-wallet");
+    expect(fixture.hashes).toEqual(["hash-from-wallet"]);
+    expect(fixture.stages).toEqual([
       "serializing",
       "simulating",
       "awaiting_wallet",
@@ -152,9 +96,9 @@ describe("deployCommunityFromWizard", () => {
 
 describe("extractTransactionHash", () => {
   it("accepts common wallet hash field names", () => {
-    assert.equal(extractTransactionHash({ hash: "a" }), "a");
-    assert.equal(extractTransactionHash({ txHash: "b" }), "b");
-    assert.equal(extractTransactionHash({ transactionHash: "c" }), "c");
-    assert.equal(extractTransactionHash({ id: "d" }), "d");
+    expect(extractTransactionHash({ hash: "a" })).toBe("a");
+    expect(extractTransactionHash({ txHash: "b" })).toBe("b");
+    expect(extractTransactionHash({ transactionHash: "c" })).toBe("c");
+    expect(extractTransactionHash({ id: "d" })).toBe("d");
   });
 });

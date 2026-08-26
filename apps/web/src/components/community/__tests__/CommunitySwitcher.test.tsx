@@ -6,7 +6,7 @@ import {
   atlasCommunity,
   beaconCommunity,
   multiCommunityRegistry,
-} from "@/test/fixtures/communities";
+} from "@/test-support/stellar";
 
 describe("CommunitySwitcher", () => {
   it("links to every registered community with correct hrefs", () => {

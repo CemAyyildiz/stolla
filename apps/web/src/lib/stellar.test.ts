@@ -28,7 +28,8 @@ describe("parseGovernorStartLedger", () => {
   });
 
   it("rejects a missing value", () => {
-    expect(() => parseGovernorStartLedger(undefined)).toThrow(
+    delete process.env[ENV_KEY];
+    expect(() => parseGovernorStartLedger()).toThrow(
       /Governor start ledger is not configured/,
     );
   });
