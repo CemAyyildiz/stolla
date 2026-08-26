@@ -5,67 +5,37 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { CommunityAvatar } from "@/components/CommunityAvatar";
 import { LiveStatus } from "@/components/ui/LiveStatus";
+import { OnChainIdentifier } from "@/components/ui/OnChainIdentifier";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { getCommunity } from "@/lib/community/registry";
 import type {
   CommunityDetailResult,
   CommunityRegistryRecord,
 } from "@/lib/community/types";
-import {
-  buildStellarExplorerContractUrl,
-  resolveStellarNetworkId,
-} from "@/lib/stellarExplorer";
 import { truncateMiddle } from "@/lib/truncate";
 
 function ContractAddress({
   label,
   record,
   contractId,
-  onCopy,
 }: {
   label: string;
   record: CommunityRegistryRecord;
   contractId: string;
-  onCopy: (label: string, contractId: string) => void;
 }) {
-  const explorerUrl = buildStellarExplorerContractUrl(
-    contractId,
-    resolveStellarNetworkId(),
-  );
-
   return (
     <div className="min-w-0 rounded-lg border border-slate-800 bg-[#0b0f19] p-4">
       <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
         {label}
       </dt>
       <dd className="mt-2 min-w-0">
-        <span
-          className="block break-all font-mono text-sm text-slate-200"
-          title={contractId}
-        >
-          {truncateMiddle(contractId, 12, 10)}
-        </span>
-        <span className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => onCopy(label, contractId)}
-            className="min-h-11 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800"
-            aria-label={`Copy full ${label.toLowerCase()} address`}
-          >
-            Copy address
-          </button>
-          {explorerUrl && (
-            <a
-              href={explorerUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex min-h-11 items-center rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800"
-              aria-label={`View ${label.toLowerCase()} on Stellar Expert`}
-            >
-              Open explorer
-            </a>
-          )}
-        </span>
+        <OnChainIdentifier
+          label={label}
+          value={contractId}
+          kind="contract"
+          truncateStart={12}
+          truncateEnd={10}
+        />
       </dd>
       <span className="sr-only">Community {record.id}</span>
     </div>
@@ -109,10 +79,6 @@ export default function CommunityDetailPage() {
     } catch {
       setCopyStatus(`Could not copy ${label.toLowerCase()}.`);
     }
-  }
-
-  function copyAddress(label: string, address: string) {
-    void copyValue(`${label} address`, address);
   }
 
   async function shareCommunity(name: string, id: string) {
@@ -338,13 +304,11 @@ export default function CommunityDetailPage() {
             label="NFT contract"
             record={record}
             contractId={record.nftContract}
-            onCopy={copyAddress}
           />
           <ContractAddress
             label="Governor contract"
             record={record}
             contractId={record.governorContract}
-            onCopy={copyAddress}
           />
         </dl>
       </section>
@@ -419,11 +383,14 @@ export default function CommunityDetailPage() {
           </div>
           <div className="min-w-0">
             <dt className="text-slate-500">Community owner</dt>
-            <dd
-              title={record.communityOwner}
-              className="mt-1 break-all font-mono text-slate-200"
-            >
-              {truncateMiddle(record.communityOwner, 10, 8)}
+            <dd className="mt-1 min-w-0 text-slate-200">
+              <OnChainIdentifier
+                label="Community owner"
+                value={record.communityOwner}
+                kind="account"
+                truncateStart={10}
+                truncateEnd={8}
+              />
             </dd>
           </div>
           <div className="min-w-0">

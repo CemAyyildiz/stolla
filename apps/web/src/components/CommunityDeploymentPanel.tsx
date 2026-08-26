@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TransactionLifecycleStatus } from "@/components/TransactionLifecycleStatus";
 import { LiveStatus } from "@/components/ui/LiveStatus";
+import { OnChainIdentifier } from "@/components/ui/OnChainIdentifier";
 import { useWallet } from "@/context/WalletProvider";
 import {
   communityDeploymentRecoveryKey,
@@ -21,10 +22,7 @@ import type {
 } from "@/lib/community/schema";
 import { getE2EBridge } from "@/lib/e2eMock";
 import { config } from "@/lib/stellar";
-import {
-  buildStellarExplorerContractUrl,
-  buildStellarExplorerTxUrl,
-} from "@/lib/stellarExplorer";
+import { buildStellarExplorerTxUrl } from "@/lib/stellarExplorer";
 import type { TransactionLifecycleStage } from "@/lib/transactionLifecycle";
 
 type Props = {
@@ -468,28 +466,15 @@ export function CommunityDeploymentPanel({
                 ["Governor", expected.governorContract],
               ] as const
             ).map(([label, contractId]) => (
-              <div key={label} className="rounded-lg bg-slate-950/50 p-3">
+              <div key={label} className="min-w-0 rounded-lg bg-slate-950/50 p-3">
                 <p className="text-xs text-slate-400">{label} contract</p>
-                <p className="mt-1 break-all font-mono text-xs text-slate-100">
-                  {contractId}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={() => void navigator.clipboard.writeText(contractId)}
-                    className="min-h-11 text-sm text-indigo-300"
-                    aria-label={`Copy full ${label} contract address`}
-                  >
-                    Copy address
-                  </button>
-                  <a
-                    href={buildStellarExplorerContractUrl(contractId, network) ?? "#"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex min-h-11 items-center text-sm text-indigo-300"
-                  >
-                    Open explorer
-                  </a>
+                <div className="mt-1">
+                  <OnChainIdentifier
+                    label={`${label} contract`}
+                    value={contractId}
+                    kind="contract"
+                    network={network}
+                  />
                 </div>
               </div>
             ))}

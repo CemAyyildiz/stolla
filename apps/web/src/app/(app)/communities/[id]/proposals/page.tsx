@@ -225,9 +225,6 @@ function ScopedProposalHistory({ community }: { community: CommunityView }) {
                         : undefined
                     }
                     isRetryingState={retrying.includes(proposal.id)}
-                    onCopyId={() =>
-                      void navigator.clipboard.writeText(proposal.id)
-                    }
                   />
                 </li>
               );

@@ -493,7 +493,6 @@ export default function ProposalsPage() {
                           : undefined
                       }
                       isRetryingState={isRetrying}
-                      onCopyId={() => void navigator.clipboard.writeText(id)}
                     />
                   </li>
                 );
