@@ -4,7 +4,7 @@ import {
   getLegacyLocalProposalIds,
   type DiscoveredProposal,
   type PublicProposalSummary,
-} from "./discovery";
+} from "./discovery-merge";
 
 // ---------------------------------------------------------------------------
 // Test helpers

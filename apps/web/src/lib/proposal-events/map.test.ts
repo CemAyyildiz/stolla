@@ -19,7 +19,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { mapProposalCreatedEvent } from "./mapper";
+import { mapProposalCreatedEvent } from "./map";
 import type {
   ProposalCreatedEventData,
   ProposalEventRpcMetadata,

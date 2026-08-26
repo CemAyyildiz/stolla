@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { rpc } from "@stellar/stellar-sdk";
-import { fetchGovernorEvents } from "./governorEvents";
+import { fetchGovernorEvents } from "./paginate";
 
 const CONTRACT = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM";
 const START_LEDGER = 1000;

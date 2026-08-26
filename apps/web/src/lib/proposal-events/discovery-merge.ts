@@ -41,7 +41,7 @@
  * @module discovery
  */
 
-import { getStoredProposalIds } from "./contracts";
+import { getStoredProposalIds } from "../contracts";
 
 // ---------------------------------------------------------------------------
 // Types

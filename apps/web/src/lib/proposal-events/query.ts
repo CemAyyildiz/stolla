@@ -1,16 +1,6 @@
 import { rpc, xdr } from "@stellar/stellar-sdk";
-import {
-  config,
-  contractIds,
-  requireGovernorStartLedger,
-} from "./stellar";
-
-export const PROPOSAL_EVENT_NAMES = [
-  "proposal_created",
-  "proposal_executed",
-  "proposal_cancelled",
-  "vote_cast",
-] as const;
+import { config, requireGovernorStartLedger } from "../stellar";
+import { PROPOSAL_EVENT_NAMES } from "./kinds";
 
 const PROPOSAL_EVENT_TOPIC_FILTERS = PROPOSAL_EVENT_NAMES.map((name) => [
   xdr.ScVal.scvSymbol(name).toXDR("base64"),
@@ -23,20 +13,23 @@ export type ProposalEventsPage = {
 };
 
 /**
- * Queries the Soroban RPC for proposal events.
+ * Queries the Soroban RPC for proposal events for an explicit Governor.
  *
  * Uses `NEXT_PUBLIC_GOVERNOR_START_LEDGER` as the lower ledger boundary.
+ * Callers must pass the selected Governor contract id — never rely on a
+ * silent env fallback when Community scoping is in effect.
  *
+ * @param governorContractId - Governor contract to filter events by.
  * @param cursor - Optional cursor for pagination.
  * @returns A page of proposal events, the latest ledger, and a response cursor.
  */
 export async function getProposalEvents(
+  governorContractId: string,
   cursor?: string,
 ): Promise<ProposalEventsPage> {
-  const { governor } = contractIds;
   const startLedger = requireGovernorStartLedger();
 
-  if (!governor) {
+  if (!governorContractId) {
     throw new Error(
       "Governor contract ID is not configured. Set NEXT_PUBLIC_GOVERNOR_CONTRACT_ID.",
     );
@@ -48,7 +41,7 @@ export async function getProposalEvents(
   const filters = [
     {
       type: "contract" as const,
-      contractIds: [governor],
+      contractIds: [governorContractId],
       topics: PROPOSAL_EVENT_TOPIC_FILTERS,
     },
   ];

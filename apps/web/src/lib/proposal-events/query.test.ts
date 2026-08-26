@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getProposalEvents } from "./proposal-events";
-import { contractIds } from "./stellar";
+import { getProposalEvents } from "./query";
+
+const GOVERNOR = "C123456789";
 
 const { mockGetEvents, mockServerConstructor } = vi.hoisted(() => {
   const getEvents = vi.fn();
@@ -28,12 +29,9 @@ vi.mock("@stellar/stellar-sdk", async () => {
   };
 });
 
-vi.mock("./stellar", () => ({
+vi.mock("../stellar", () => ({
   config: {
     rpcUrl: "https://test.rpc.url",
-  },
-  contractIds: {
-    governor: "C123456789",
   },
   requireGovernorStartLedger: () => 12345,
 }));
@@ -44,20 +42,18 @@ describe("getProposalEvents", () => {
   });
 
   it("throws if governor contract ID is not configured", async () => {
-    contractIds.governor = "";
-    await expect(getProposalEvents()).rejects.toThrow(
+    await expect(getProposalEvents("")).rejects.toThrow(
       "Governor contract ID is not configured. Set NEXT_PUBLIC_GOVERNOR_CONTRACT_ID.",
     );
-    contractIds.governor = "C123456789";
   });
 
-  it("calls getEvents with the configured start ledger", async () => {
+  it("calls getEvents with the explicit governor and configured start ledger", async () => {
     mockGetEvents.mockResolvedValue({
       events: [],
       latestLedger: 456,
       cursor: "nextCursor",
     });
-    await getProposalEvents("cursor123");
+    await getProposalEvents(GOVERNOR, "cursor123");
 
     expect(mockServerConstructor).toHaveBeenCalledWith(
       "https://test.rpc.url",
@@ -69,7 +65,7 @@ describe("getProposalEvents", () => {
         filters: [
           {
             type: "contract",
-            contractIds: ["C123456789"],
+            contractIds: [GOVERNOR],
             topics: [
               ["AAAADwAAABBwcm9wb3NhbF9jcmVhdGVk"],
               ["AAAADwAAABFwcm9wb3NhbF9leGVjdXRlZAAAAA=="],
@@ -96,7 +92,7 @@ describe("getProposalEvents", () => {
     };
     mockGetEvents.mockResolvedValue(mockResponse);
 
-    const result = await getProposalEvents();
+    const result = await getProposalEvents(GOVERNOR);
 
     expect(result.events).toHaveLength(2);
     expect(result.events[0].topic[0]).toBe("proposal_created");
@@ -112,7 +108,7 @@ describe("getProposalEvents", () => {
     };
     mockGetEvents.mockResolvedValue(mockResponse);
 
-    const result = await getProposalEvents();
+    const result = await getProposalEvents(GOVERNOR);
 
     expect(result.events).toHaveLength(0);
     expect(result.latestLedger).toBe(101);
@@ -126,7 +122,7 @@ describe("getProposalEvents", () => {
     };
     mockGetEvents.mockResolvedValue(mockResponse);
 
-    const result = await getProposalEvents();
+    const result = await getProposalEvents(GOVERNOR);
 
     expect(result.events).toHaveLength(0);
     expect(result.latestLedger).toBe(102);
@@ -136,7 +132,7 @@ describe("getProposalEvents", () => {
   it("normalizes RPC failures", async () => {
     mockGetEvents.mockRejectedValue(new Error("startLedger is invalid"));
 
-    await expect(getProposalEvents()).rejects.toThrow(
+    await expect(getProposalEvents(GOVERNOR)).rejects.toThrow(
       "Failed to query governor proposal events: startLedger is invalid",
     );
   });

@@ -26,7 +26,7 @@ function shortenAddress(addr: string): string {
   if (addr.length <= 12) return addr;
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
-import { fetchVoteTotals, type VoteTotals } from "@/lib/voteAggregation";
+import { fetchVoteTotals, type VoteTotals } from "@/lib/proposal-events";
 import { fmt, pct } from "@/lib/voteDisplay";
 
 

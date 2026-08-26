@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ProposalSummary } from "@/lib/proposal/types";
+import type { ProposalSummary } from "@/lib/proposal-events";
 import { truncateMiddle } from "@/lib/truncate";
 
 export type ProposalSummaryCardStateStatus =
