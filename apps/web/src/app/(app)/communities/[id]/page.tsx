@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CommunityAvatar } from "@/components/CommunityAvatar";
 import { LiveStatus } from "@/components/ui/LiveStatus";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { getCommunity } from "@/lib/community/registry";
+import { useCommunityRegistry } from "@/lib/community/CommunityRegistryProvider";
 import type {
   CommunityDetailResult,
   CommunityRegistryRecord,
@@ -75,6 +75,7 @@ function ContractAddress({
 export default function CommunityDetailPage() {
   const params = useParams<{ id: string }>();
   const communityId = params.id;
+  const registry = useCommunityRegistry();
   const [result, setResult] = useState<CommunityDetailResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -84,7 +85,7 @@ export default function CommunityDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      setResult(await getCommunity(communityId));
+      setResult(await registry.get(communityId));
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -94,7 +95,7 @@ export default function CommunityDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [communityId]);
+  }, [communityId, registry]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => void load(), 0);

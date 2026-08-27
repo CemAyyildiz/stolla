@@ -8,8 +8,8 @@ import { ProposalSummaryCard } from "@/components/ProposalSummaryCard";
 import { LiveStatus } from "@/components/ui/LiveStatus";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useProposalDiscovery } from "@/hooks/useProposalDiscovery";
-import { getCommunity } from "@/lib/community/registry";
-import type { CommunityView } from "@/lib/community/types";
+import { useCommunityRegistry } from "@/lib/community/CommunityRegistryProvider";
+import type { Community } from "@/lib/community/types";
 import { createReadOnlyGovernorClient } from "@/lib/contracts";
 import {
   ProposalState,
@@ -20,7 +20,7 @@ import {
 const PAGE_SIZE = 10;
 const ALL_STATES = "all";
 
-function ScopedProposalHistory({ community }: { community: CommunityView }) {
+function ScopedProposalHistory({ community }: { community: Community }) {
   const governorContract = community.record.governorContract;
   const { proposals: discovered, loading, error, empty, refresh } =
     useProposalDiscovery(governorContract);
@@ -251,7 +251,8 @@ function ScopedProposalHistory({ community }: { community: CommunityView }) {
 
 export default function CommunityProposalHistoryPage() {
   const { id = "" } = useParams<{ id: string }>();
-  const [community, setCommunity] = useState<CommunityView | null>(null);
+  const registry = useCommunityRegistry();
+  const [community, setCommunity] = useState<Community | null>(null);
   const [status, setStatus] = useState<"loading" | "not-found" | "error">(
     "loading",
   );
@@ -261,7 +262,7 @@ export default function CommunityProposalHistoryPage() {
     const timeout = window.setTimeout(() => {
       setStatus("loading");
       setCommunity(null);
-      void getCommunity(id)
+      void registry.get(id)
         .then((result) => {
           if (!active) return;
           if (result.status !== "found") {
@@ -278,7 +279,7 @@ export default function CommunityProposalHistoryPage() {
       active = false;
       window.clearTimeout(timeout);
     };
-  }, [id]);
+  }, [id, registry]);
 
   if (community) return <ScopedProposalHistory community={community} />;
 
