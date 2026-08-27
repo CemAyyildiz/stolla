@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Server as RpcServer } from "@stellar/stellar-sdk/rpc";
 import type { Api } from "@stellar/stellar-sdk/rpc";
-import { config, requireContractIds, requireGovernorStartLedger } from "@/lib/stellar";
+import {
+  requireContractIds,
+  requireGovernorStartLedger,
+  requireRpcConfig,
+} from "@/lib/stellar";
 import { decodeProposalEvent } from "@/lib/proposalEvents";
 import { getE2EBridge } from "@/lib/e2eMock";
 
@@ -45,7 +49,8 @@ export function useProposalDiscovery(governorContractId?: string) {
 
   const discover = useCallback(async () => {
     const governor = governorContractId ?? requireContractIds().governor;
-    const server = new RpcServer(config.rpcUrl);
+    const rpc = requireRpcConfig();
+    const server = new RpcServer(rpc.rpcUrl);
     const startLedger = requireGovernorStartLedger();
 
     setLoading(true);

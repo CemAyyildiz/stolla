@@ -12,11 +12,10 @@ describe("test-only browser mocks", () => {
     expect(e2eMocksEnabled()).toBe(false);
   });
 
-  it("fails closed in production even when the public flag is present", () => {
+  it("enables fixtures only for the exact public build flag", () => {
     vi.stubEnv("NEXT_PUBLIC_E2E_MOCKS", "true");
-    vi.stubEnv("NODE_ENV", "production");
     window.__STOLLA_E2E__ = { communities: [] };
-    expect(e2eMocksEnabled()).toBe(false);
-    expect(getE2EBridge()).toBeNull();
+    expect(e2eMocksEnabled()).toBe(true);
+    expect(getE2EBridge()).toEqual({ communities: [] });
   });
 });

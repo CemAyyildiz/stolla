@@ -7,7 +7,7 @@ import {
   getStoredCommunityDeploymentHash,
   storeCommunityDeploymentHash,
 } from "@/lib/contracts";
-import { config } from "@/lib/stellar";
+import { activeCapabilities } from "@/lib/stellar";
 import {
   deployCommunityFromWizard,
   type DeploymentStage,
@@ -27,7 +27,7 @@ const stageLabels: Record<DeploymentStage, string> = {
 };
 
 export function useCommunityDeployment() {
-  const { address, networkPassphrase, signTransaction } = useWallet();
+  const { address, walletNetworkPassphrase, signTransaction } = useWallet();
   const activeSubmissionRef = useRef(false);
   const [stage, setStage] = useState<DeploymentStage>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -54,8 +54,9 @@ export function useCommunityDeployment() {
       try {
         const nextOutcome = await deployCommunityFromWizard(state, {
           address,
-          expectedNetworkPassphrase: config.networkPassphrase,
-          walletNetworkPassphrase: networkPassphrase,
+          expectedNetworkPassphrase:
+            activeCapabilities.network.networkPassphrase,
+          walletNetworkPassphrase,
           createClient: () =>
             createCommunityFactoryClient({
               publicKey: address ?? "",
@@ -78,7 +79,7 @@ export function useCommunityDeployment() {
         activeSubmissionRef.current = false;
       }
     },
-    [address, isSubmitting, networkPassphrase, signTransaction],
+    [address, isSubmitting, walletNetworkPassphrase, signTransaction],
   );
 
   return {

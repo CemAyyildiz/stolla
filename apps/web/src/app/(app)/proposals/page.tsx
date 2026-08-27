@@ -146,7 +146,9 @@ export default function ProposalsPage() {
   );
 
   useEffect(() => {
-    void loadStates();
+    // Defer state initialization out of the effect body. The loader also runs
+    // after proposal creation and owns the asynchronous RPC boundary.
+    void Promise.resolve().then(loadStates);
   }, [loadStates]);
 
   const availableStates = useMemo(
@@ -157,12 +159,17 @@ export default function ProposalsPage() {
     [states],
   );
 
+  const effectiveStateFilter =
+    stateFilter !== ALL_FILTER && !availableStates.includes(stateFilter)
+      ? ALL_FILTER
+      : stateFilter;
+
   const filteredIds = useMemo(
     () =>
-      stateFilter === ALL_FILTER
+      effectiveStateFilter === ALL_FILTER
         ? uniqueProposalIds
-        : uniqueProposalIds.filter((id) => states[id] === stateFilter),
-    [stateFilter, states, uniqueProposalIds],
+        : uniqueProposalIds.filter((id) => states[id] === effectiveStateFilter),
+    [effectiveStateFilter, states, uniqueProposalIds],
   );
 
   const visibleIds = useMemo(
@@ -170,13 +177,6 @@ export default function ProposalsPage() {
     [filteredIds, visibleCount],
   );
   const canLoadMore = visibleCount < filteredIds.length;
-
-  useEffect(() => {
-    if (stateFilter !== ALL_FILTER && !availableStates.includes(stateFilter)) {
-      setStateFilter(ALL_FILTER);
-    }
-  }, [availableStates, stateFilter]);
-
 
   async function handleCreateProposal() {
     if (!address) {
@@ -372,7 +372,9 @@ export default function ProposalsPage() {
                 id="proposal-state-filter"
                 aria-label="Filter proposals by state"
                 value={
-                  stateFilter === ALL_FILTER ? ALL_FILTER : String(stateFilter)
+                  effectiveStateFilter === ALL_FILTER
+                    ? ALL_FILTER
+                    : String(effectiveStateFilter)
                 }
                 onChange={(e) => {
                   setStateFilter(

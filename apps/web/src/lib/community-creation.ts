@@ -294,7 +294,8 @@ function isSimulationStale(
 ): boolean {
   return (
     state.simulation !== null &&
-    state.simulation.networkPassphrase !== context.comparison.expected.passphrase
+    state.simulation.networkPassphrase !==
+      context.comparison.expected.networkPassphrase
   );
 }
 

@@ -27,8 +27,14 @@ const wizard = (page: Page) => page.getByRole("main");
 async function connectWallet(page: Page) {
   const header = page.getByRole("banner");
   await page.goto("/community/new");
-  await header.getByRole("button", { name: "Connect Wallet" }).click();
-  await expect(header.getByRole("button", { name: "Disconnect" })).toBeVisible();
+  // The deterministic bridge restores its configured account on hydration.
+  // Waiting for the stable connected state avoids racing the transient
+  // server-rendered Connect button as React replaces it.
+  const connectedControl =
+    (page.viewportSize()?.width ?? 1280) < 640
+      ? header.getByRole("button", { name: /^Account / })
+      : header.getByRole("button", { name: "Disconnect" });
+  await expect(connectedControl).toBeVisible();
 }
 
 async function completeDraftSteps(page: Page) {
