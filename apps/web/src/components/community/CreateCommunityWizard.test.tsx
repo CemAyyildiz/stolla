@@ -11,17 +11,17 @@ import {
   CreateCommunityWizard,
   type CommunityDeploymentPort,
 } from "./CreateCommunityWizard";
-import { describeNetwork } from "@/lib/network";
-
 const wallet = vi.hoisted(() => ({
   address: "GADMIN" as string | null,
-  walletNetwork: null as ReturnType<typeof describeNetwork> | null,
+  walletNetwork: null as string | null,
+  walletNetworkPassphrase: null as string | null,
 }));
 
 vi.mock("@/context/WalletProvider", () => ({
   useWallet: () => ({
     address: wallet.address,
     walletNetwork: wallet.walletNetwork,
+    walletNetworkPassphrase: wallet.walletNetworkPassphrase,
     signTransaction: vi.fn(),
   }),
 }));
@@ -45,7 +45,9 @@ function createPort(): CommunityDeploymentPort {
 
 function connectOn(passphrase: string) {
   wallet.address = "GADMIN";
-  wallet.walletNetwork = describeNetwork(passphrase);
+  wallet.walletNetworkPassphrase = passphrase;
+  wallet.walletNetwork =
+    passphrase === Networks.PUBLIC ? "mainnet" : "testnet";
 }
 
 function renderWizard(port: CommunityDeploymentPort) {
@@ -193,6 +195,7 @@ describe("initial mismatch", () => {
 
   it("locks deployment while the wallet network is still unreadable", () => {
     wallet.walletNetwork = null;
+    wallet.walletNetworkPassphrase = null;
     renderWizard(createPort());
 
     fillMetadata();
