@@ -12,11 +12,14 @@ import {
   fetchGovernorEvents,
 } from "@/lib/proposal-events";
 import { getE2EBridge } from "@/lib/e2eMock";
+import { parseProposalDescription, type ProposalMetadataV1 } from "@/lib/proposal-metadata";
 
 export type DiscoveredProposal = {
   id: string;
   /** Proposal description from the created event, or null when unavailable. */
   description: string | null;
+  /** Parsed v1 metadata, or null for legacy / unavailable descriptions. */
+  metadata: ProposalMetadataV1 | null;
 };
 
 /**
@@ -56,7 +59,15 @@ export function useProposalDiscovery(governorContractId?: string) {
     try {
       const mocked = getE2EBridge()?.proposals?.[governor];
       if (mocked) {
-        setProposals(mocked);
+        setProposals(mocked.map((proposal) => ({
+          ...proposal,
+          metadata: proposal.description
+            ? (() => {
+                const parsed = parseProposalDescription(proposal.description);
+                return parsed.kind === "versioned" ? parsed.metadata : null;
+              })()
+            : null,
+        })));
         setEmpty(mocked.length === 0);
         return true;
       }
@@ -81,9 +92,11 @@ export function useProposalDiscovery(governorContractId?: string) {
           if (!decoded.ok || decoded.event.kind !== "proposal_created") {
             continue;
           }
+          const parsed = parseProposalDescription(decoded.event.description);
           discovered.push({
             id: decoded.event.proposalId,
             description: decoded.event.description,
+            metadata: parsed.kind === "versioned" ? parsed.metadata : null,
           });
         }
       }

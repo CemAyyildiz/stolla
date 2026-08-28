@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { serializeProposalMetadata } from "../src/lib/proposal-metadata";
 
 export const TESTNET_PASSPHRASE = "Test SDF Network ; September 2015";
 export const FACTORY_ID = `C${"A".repeat(55)}`;
@@ -10,6 +11,12 @@ export const BETA_GOVERNOR = `C${"C".repeat(55)}`;
 export const ALPHA_NFT = `C${"D".repeat(55)}`;
 export const BETA_NFT = `C${"E".repeat(55)}`;
 export const PROPOSAL_ID = "11".repeat(32);
+export const ALPHA_PROPOSAL_DESCRIPTION = serializeProposalMetadata({
+  title: "Fund Alpha treasury observability",
+  summary: "Add public dashboards for community treasury decisions.",
+  body: "Publish transaction-level dashboards and monthly governance reports.",
+  discussionUrl: "https://forum.example.org/t/alpha-observability",
+});
 
 function community(
   id: string,
@@ -64,7 +71,7 @@ export async function installPublicFixtures(page: Page) {
       ],
       proposals: {
         [ALPHA_GOVERNOR]: [
-          { id: PROPOSAL_ID, description: "Alpha treasury proposal", state: 1 },
+          { id: PROPOSAL_ID, description: ALPHA_PROPOSAL_DESCRIPTION, state: 1 },
         ],
         [BETA_GOVERNOR]: [
           { id: PROPOSAL_ID, description: "Beta grants proposal", state: 1 },

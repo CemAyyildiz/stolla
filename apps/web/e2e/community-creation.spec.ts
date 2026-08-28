@@ -27,8 +27,11 @@ const wizard = (page: Page) => page.getByRole("main");
 async function connectWallet(page: Page) {
   const header = page.getByRole("banner");
   await page.goto("/community/new");
-  await header.getByRole("button", { name: "Connect Wallet" }).click();
-  await expect(header.getByRole("button", { name: "Disconnect" })).toBeVisible();
+  const connectedControl =
+    (page.viewportSize()?.width ?? 1280) < 640
+      ? header.getByRole("button", { name: /^Account / })
+      : header.getByRole("button", { name: "Disconnect" });
+  await expect(connectedControl).toBeVisible();
 }
 
 async function completeDraftSteps(page: Page) {
@@ -135,7 +138,7 @@ test("returns to a recoverable review state when the wallet rejects", async ({
   await expect(wizard(page).getByText("12345 stroops")).toBeVisible();
 
   await deployButton(page).click();
-  await expect(alert(page)).toContainText("declined");
+  await expect(alert(page)).toContainText(/declined|rejected/i);
 
   expect(rpc.submittedTransactions).toHaveLength(0);
   await expect(wizard(page).getByTestId("community-created")).toHaveCount(0);

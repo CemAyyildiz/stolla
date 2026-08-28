@@ -83,7 +83,7 @@ describe("community-scoped proposal history", () => {
         : communityResult(SECOND_ID, SECOND_GOVERNOR, "Second DAO"),
     );
     mocks.useProposalDiscovery.mockReturnValue({
-      proposals: [{ id: PROPOSAL_ID, description: "Shared numeric ID" }],
+      proposals: [{ id: PROPOSAL_ID, description: "Shared numeric ID", metadata: null }],
       loading: false,
       error: null,
       empty: false,

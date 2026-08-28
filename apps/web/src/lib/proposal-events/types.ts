@@ -66,6 +66,9 @@ export interface ProposalSummary {
    * Free-text description supplied by the proposer.
    */
   description: string;
+
+  /** Parsed structured metadata when the description contains a valid v1 envelope. */
+  metadata?: import("@/lib/proposal-metadata").ProposalMetadataV1 | null;
 }
 
 // ---------------------------------------------------------------------------

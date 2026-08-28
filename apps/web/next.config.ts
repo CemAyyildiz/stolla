@@ -12,6 +12,7 @@ if (process.env.NODE_ENV === "production" && process.env.NEXT_PUBLIC_E2E_WALLET)
 }
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["127.0.0.1"],
   turbopack: {
     root: repositoryRoot,
   },

@@ -244,6 +244,20 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       ) {
         throw new Error("Wallet network does not match the transaction network.");
       }
+      if (mockedWallet.secretKey) {
+        const networkPassphrase =
+          options?.networkPassphrase ?? mockedWallet.networkPassphrase;
+        const { Keypair, TransactionBuilder } = await import(
+          "@stellar/stellar-sdk"
+        );
+        const transaction = TransactionBuilder.fromXDR(xdr, networkPassphrase);
+        transaction.sign(Keypair.fromSecret(mockedWallet.secretKey));
+        (mockedWallet.signedNetworkPassphrases ??= []).push(networkPassphrase);
+        return {
+          signedTxXdr: transaction.toXDR(),
+          signerAddress: mockedWallet.address,
+        };
+      }
       return { signedTxXdr: xdr, signerAddress: mockedWallet.address };
     }
     if (

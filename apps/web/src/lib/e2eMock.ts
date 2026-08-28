@@ -12,6 +12,8 @@ export type StollaE2EBridge = {
     address: string;
     networkPassphrase: string;
     rejected?: boolean;
+    secretKey?: string;
+    signedNetworkPassphrases?: string[];
   };
   communities?: CommunityRegistryPage["communities"];
   proposals?: Record<string, E2EProposal[]>;

@@ -24,6 +24,7 @@ import type {
   ProposalCreatedEventData,
   ProposalEventRpcMetadata,
 } from "./types";
+import { VERSIONED_PROPOSAL_DESCRIPTION } from "@/lib/proposal-metadata/fixtures";
 
 // ---------------------------------------------------------------------------
 // Shared test fixtures
@@ -242,5 +243,15 @@ describe("mapProposalCreatedEvent", () => {
     expect(summary.proposer).toBeNull();
     expect(summary.creationLedger).toBe(8_999_999);
     expect(summary.cursor).toBe("0000000055000000-1");
+  });
+
+  it("maps valid v1 metadata while preserving the original description", () => {
+    const summary = mapProposalCreatedEvent(
+      GOVERNOR_CONTRACT_ID,
+      { ...completeEventData, description: VERSIONED_PROPOSAL_DESCRIPTION },
+      completeRpcMeta,
+    );
+    expect(summary.description).toBe(VERSIONED_PROPOSAL_DESCRIPTION);
+    expect(summary.metadata?.title).toBe("Fund Unicode governance tooling 🚀");
   });
 });
