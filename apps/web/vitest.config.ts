@@ -5,6 +5,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
+    pool: "threads",
     setupFiles: ["./src/__tests__/setup.ts", "./vitest.setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
     env: {
