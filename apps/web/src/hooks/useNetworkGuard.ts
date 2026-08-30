@@ -8,7 +8,7 @@ import {
   type DetectedNetwork,
   type NetworkComparison,
 } from "@/lib/network";
-import { activeNetwork } from "@/lib/stellar";
+import { activeCapabilities } from "@/lib/stellar";
 
 /**
  * Reconciles the network the wallet reports with the one the application is
@@ -19,10 +19,11 @@ export function useNetworkGuard(): NetworkComparison {
   const { walletNetwork, walletNetworkPassphrase } = useWallet();
   return useMemo(
     () => {
-      const reported: unknown = walletNetwork;
+      // Older test/E2E adapters supplied the already-detected object. Keep the
+      // transition safe while production wallet state uses the passphrase.
       const legacyDetected =
-        typeof reported === "object" && reported !== null
-          ? (reported as DetectedNetwork)
+        typeof walletNetwork === "object" && walletNetwork !== null
+          ? (walletNetwork as DetectedNetwork)
           : null;
       const detected = walletNetworkPassphrase
         ? describeNetwork(
@@ -30,7 +31,7 @@ export function useNetworkGuard(): NetworkComparison {
             typeof walletNetwork === "string" ? walletNetwork : undefined,
           )
         : legacyDetected;
-      return compareNetworks(activeNetwork, detected);
+      return compareNetworks(activeCapabilities.network, detected);
     },
     [walletNetwork, walletNetworkPassphrase],
   );

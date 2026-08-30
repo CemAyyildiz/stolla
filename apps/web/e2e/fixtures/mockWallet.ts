@@ -47,9 +47,11 @@ export async function configureMockWallet(
 
 /** The passphrases the application actually handed to the wallet for signing. */
 export function signedNetworkPassphrases(page: Page): Promise<string[]> {
-  return page.evaluate(() =>
-    window.__STOLLA_E2E__?.wallet?.signedNetworkPassphrases?.length
-      ? window.__STOLLA_E2E__.wallet.signedNetworkPassphrases
-      : window.__stollaMockWalletRecord?.signedNetworkPassphrases ?? [],
-  );
+  return page.evaluate(() => {
+    const bridgeRecord =
+      window.__STOLLA_E2E__?.wallet?.signedNetworkPassphrases;
+    return bridgeRecord?.length
+      ? bridgeRecord
+      : window.__stollaMockWalletRecord?.signedNetworkPassphrases ?? [];
+  });
 }
