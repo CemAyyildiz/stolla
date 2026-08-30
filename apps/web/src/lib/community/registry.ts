@@ -1,18 +1,17 @@
 import { Buffer } from "buffer";
 import { AssembledTransaction } from "@stellar/stellar-sdk/contract";
 import { nativeToScVal, scValToNative, xdr } from "@stellar/stellar-sdk";
-import { config, requireCommunityFactoryId } from "@/lib/stellar";
-import { getE2ECommunityRegistry } from "@/lib/e2eMock";
+import { requireCommunityFactoryId, requireRpcConfig } from "@/lib/stellar";
+import { e2eGetCommunity, e2eListCommunities } from "@/lib/e2eMock";
 import {
   parseCommunityMetadata,
   resolveCommunityResourceUrl,
 } from "./schema";
 import type {
   CommunityDetailResult,
-  CommunityRegistry,
   CommunityRegistryPage,
   CommunityRegistryRecord,
-  Community,
+  CommunityView,
   GovernanceSnapshot,
 } from "./types";
 
@@ -34,12 +33,13 @@ async function readContract(
   method: string,
   args: xdr.ScVal[] = [],
 ): Promise<unknown> {
+  const rpc = requireRpcConfig();
   const transaction = await AssembledTransaction.build<unknown>({
     contractId,
     method,
     args,
-    networkPassphrase: config.networkPassphrase,
-    rpcUrl: config.rpcUrl,
+    networkPassphrase: rpc.networkPassphrase,
+    rpcUrl: rpc.rpcUrl,
     parseResultXdr: (value) => scValToNative(value),
   });
   return transaction.result;
@@ -220,7 +220,7 @@ async function loadGovernance(
 
 async function hydrateRecord(
   record: CommunityRegistryRecord,
-): Promise<Community> {
+): Promise<CommunityView> {
   const [metadataResult, governanceResult] = await Promise.allSettled([
     loadMetadata(record),
     loadGovernance(record),
@@ -243,12 +243,12 @@ async function hydrateRecord(
   };
 }
 
-async function listCommunities(
+export async function listCommunities(
   cursor: number | null,
   limit: number,
 ): Promise<CommunityRegistryPage> {
-  const mocked = getE2ECommunityRegistry();
-  if (mocked) return mocked.list(cursor, limit);
+  const mocked = e2eListCommunities(cursor, limit);
+  if (mocked) return mocked;
   const factoryId = requireCommunityFactoryId();
   const rawPage = asObject(
     await readContract(factoryId, "list_communities", [
@@ -295,12 +295,12 @@ async function listCommunities(
   };
 }
 
-async function getCommunity(
+export async function getCommunity(
   communityId: string,
 ): Promise<CommunityDetailResult> {
   if (!isCommunityId(communityId)) return { status: "not-found" };
-  const mocked = getE2ECommunityRegistry();
-  if (mocked) return mocked.get(communityId);
+  const mocked = e2eGetCommunity(communityId);
+  if (mocked) return mocked;
 
   const rawRecord = await readContract(
     requireCommunityFactoryId(),
@@ -321,9 +321,3 @@ async function getCommunity(
 
   return { status: "found", community: await hydrateRecord(record) };
 }
-
-/** The sole production registry adapter, backed by CommunityFactory. */
-export const communityRegistry: CommunityRegistry = {
-  list: listCommunities,
-  get: getCommunity,
-};

@@ -6,7 +6,7 @@ import {
 } from "@stellar/stellar-sdk";
 import { AssembledTransaction } from "@stellar/stellar-sdk/contract";
 import { Api, Server as RpcServer } from "@stellar/stellar-sdk/rpc";
-import { config } from "@/lib/stellar";
+import { activeCapabilities, requireRpcConfig } from "@/lib/stellar";
 import type { SignTransaction } from "@stellar/stellar-sdk/contract";
 import {
   parseCommunityMetadata,
@@ -164,7 +164,10 @@ export async function serializeCommunityFactoryInvocation(
   input: CommunityDeploymentInput,
   metadataHashOverride?: Uint8Array,
 ): Promise<CommunityFactoryInvocation> {
-  if (input.networkPassphrase !== config.networkPassphrase) {
+  if (
+    input.networkPassphrase !==
+    activeCapabilities.network.networkPassphrase
+  ) {
     throw new Error("The deployment network passphrase does not match the application network.");
   }
   const metadataHash =
@@ -285,13 +288,14 @@ export function parseCommunityDeploymentRecovery(
 
 export const defaultCommunityDeploymentAdapter: CommunityDeploymentAdapter = {
   async simulate(input) {
+    const rpc = requireRpcConfig();
     const invocation = await serializeCommunityFactoryInvocation(input);
     const transaction = await AssembledTransaction.build<unknown>({
       contractId: invocation.contractId,
       method: invocation.method,
       args: invocation.args,
       networkPassphrase: invocation.networkPassphrase,
-      rpcUrl: config.rpcUrl,
+      rpcUrl: rpc.rpcUrl,
       publicKey: invocation.sourceAccount,
       timeoutInSeconds: COMMUNITY_DEPLOYMENT_TIMEOUT_SECONDS,
       parseResultXdr: scValToNative,
@@ -320,7 +324,9 @@ export const defaultCommunityDeploymentAdapter: CommunityDeploymentAdapter = {
 
   async transactionStatus(hash) {
     try {
-      const response = await new RpcServer(config.rpcUrl).getTransaction(hash);
+      const response = await new RpcServer(
+        requireRpcConfig().rpcUrl,
+      ).getTransaction(hash);
       switch (response.status) {
         case Api.GetTransactionStatus.SUCCESS:
           return "success";
