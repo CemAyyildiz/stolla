@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { ProposalSummary } from "@/lib/proposal/types";
+import { OnChainIdentifier } from "@/components/ui/OnChainIdentifier";
 import { truncateMiddle } from "@/lib/truncate";
 
 export type ProposalSummaryCardStateStatus =
@@ -31,7 +32,6 @@ export type ProposalSummaryCardProps = {
   showDescription?: boolean;
   onRetryState?: () => void;
   isRetryingState?: boolean;
-  onCopyId?: () => void;
   href?: string;
 };
 
@@ -89,7 +89,6 @@ export function ProposalSummaryCard({
   showDescription = false,
   onRetryState,
   isRetryingState = false,
-  onCopyId,
   href,
 }: ProposalSummaryCardProps) {
   const { proposalId } = summary;
@@ -140,17 +139,7 @@ export function ProposalSummaryCard({
             {isRetryingState ? "Retrying…" : "Retry state"}
           </button>
         )}
-        {onCopyId && (
-          <button
-            type="button"
-            onClick={onCopyId}
-            className="rounded px-2 py-1 text-xs text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"
-            title="Copy proposal ID"
-            aria-label={`Copy proposal ID ${proposalId}`}
-          >
-            Copy
-          </button>
-        )}
+        <OnChainIdentifier label="Proposal ID" value={proposalId} kind="opaque" hideValue />
       </div>
     </div>
   );

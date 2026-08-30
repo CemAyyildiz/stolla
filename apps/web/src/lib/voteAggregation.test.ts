@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { xdr } from "@stellar/stellar-sdk";
+import { Address, xdr } from "@stellar/stellar-sdk";
+import { Buffer } from "buffer";
 import { fetchVoteTotals } from "./voteAggregation";
+
+const GOVERNOR =
+  "CDJZ4QTYXZ5YKHRXRBCOXQDZI5TUE5QLODC5IJFYDXQMQJFP5PFRMPHY";
+const DEFAULT_PROPOSAL =
+  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const VOTER = "GAZSOBEW6H374SOMTQIRC432JXTA4VPSG6P3ADA35TRQIYT3WTVQWFE5";
 
 // vi.mock is hoisted – use vi.hoisted() so factory closures can reference them
 const { mockScValToNative, mockGetEvents } = vi.hoisted(() => ({
@@ -24,28 +31,36 @@ vi.mock("@stellar/stellar-sdk", async (importOriginal) => {
 
 vi.mock("./stellar", () => ({
   config: { rpcUrl: "https://soroban-testnet.stellar.org" },
-  requireGovernorStartLedger: () => 1,
   contractIds: {
     governor: "CDJZ4QTYXZ5YKHRXRBCOXQDZI5TUE5QLODC5IJFYDXQMQJFP5PFRMPHY",
   },
+  requireGovernorStartLedger: () => 1_500_000,
+}));
+
+vi.mock("./e2eMock", () => ({
+  getE2EBridge: () => undefined,
 }));
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Create a minimal mock event matching the shape the code expects. */
-function makeEvent(id: string): Record<string, unknown> {
+/** Create a minimal mock vote_cast event matching the shape the code expects. */
+function makeEvent(
+  id: string,
+  options: { contractId?: string; proposalHex?: string } = {},
+): Record<string, unknown> {
+  const proposalHex = options.proposalHex ?? DEFAULT_PROPOSAL;
   return {
     id,
     type: "contract",
     ledger: 100,
     ledgerClosedAt: "2024-01-01T00:00:00Z",
-    contractId: "CDJZ4QTYXZ5YKHRXRBCOXQDZI5TUE5QLODC5IJFYDXQMQJFP5PFRMPHY",
+    contractId: options.contractId ?? GOVERNOR,
     topic: [
       xdr.ScVal.scvSymbol("vote_cast"),
-      xdr.ScVal.scvSymbol("voter"),
-      xdr.ScVal.scvBytes(Buffer.from("aa".repeat(32), "hex")),
+      Address.fromString(VOTER).toScVal(),
+      xdr.ScVal.scvBytes(Buffer.from(proposalHex, "hex")),
     ],
     value: xdr.ScVal.scvVoid(),
     inSuccessfulContractCall: true,

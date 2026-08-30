@@ -46,3 +46,14 @@ vi.mock("next/link", () => ({
     },
   ),
 }));
+
+// Unit tests must opt into an explicit fetch double. This fails closed if a
+// page or helper accidentally reaches Horizon, Soroban RPC, or metadata URLs.
+vi.stubGlobal(
+  "fetch",
+  vi.fn(() =>
+    Promise.reject(
+      new Error("Unexpected network request in unit test; inject a test double."),
+    ),
+  ),
+);

@@ -14,7 +14,7 @@ import {
   type CommunityMetadataDraft,
   type GovernanceDraft,
 } from "./schema";
-import { getCommunity, parseRegistryRecord } from "./registry";
+import { communityRegistry, parseRegistryRecord } from "./registry";
 import type { CommunityRegistryRecord } from "./types";
 
 export const COMMUNITY_DEPLOYMENT_RECOVERY_VERSION = 1 as const;
@@ -344,7 +344,7 @@ export const defaultCommunityDeploymentAdapter: CommunityDeploymentAdapter = {
 
   async verifyRegistry(expected) {
     try {
-      const result = await getCommunity(expected.id);
+      const result = await communityRegistry.get(expected.id);
       if (result.status === "not-found") return "missing";
       if (result.status !== "found") return "mismatch";
       return result.community.record.nftContract === expected.nftContract &&

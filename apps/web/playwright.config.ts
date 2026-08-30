@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const PORT = process.env.PLAYWRIGHT_PORT ?? "3100";
 const baseURL = `http://127.0.0.1:${PORT}`;
+const FACTORY_ID = `C${"A".repeat(55)}`;
 
 export default defineConfig({
   testDir: "./e2e",
@@ -31,25 +32,24 @@ export default defineConfig({
     },
   ],
   webServer: {
-    // Browser fixtures are deliberately development-only; e2eMock refuses to
-    // expose them from a production bundle. Production compilation is covered
-    // independently by the build gate.
-    command: `npm --prefix ../.. run clean && npm run dev -- --port ${PORT}`,
+    /**
+     * Dev server keeps `NODE_ENV !== "production"` so `NEXT_PUBLIC_E2E_MOCKS`
+     * can unlock the browser `__STOLLA_E2E__` bridge used by creation and
+     * multi-community fixtures. Production builds intentionally fail closed.
+     */
+    command: `npx next dev --port ${PORT} --hostname 127.0.0.1`,
     url: baseURL,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 180_000,
     env: {
       NEXT_PUBLIC_E2E_MOCKS: "true",
-      NEXT_PUBLIC_E2E_WALLET: "mock",
       NEXT_PUBLIC_STELLAR_NETWORK: "testnet",
-      NEXT_PUBLIC_STELLAR_RPC_URL: "https://soroban-rpc.invalid/",
-      NEXT_PUBLIC_COMMUNITY_FACTORY_CONTRACT_ID:
-        "CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE",
-      NEXT_PUBLIC_NFT_CONTRACT_ID:
-        "CBQHNAXSI55GX2GN6D67GK7BHVPSLJUGZQEU7WJ5LKR5PNUCGLIMAO4K",
-      NEXT_PUBLIC_GOVERNOR_CONTRACT_ID:
-        "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
-      NEXT_PUBLIC_GOVERNOR_START_LEDGER: "1",
+      NEXT_PUBLIC_STELLAR_RPC_URL: "https://soroban-testnet.stellar.org",
+      NEXT_PUBLIC_E2E_MOCKS: "true",
+      NEXT_PUBLIC_COMMUNITY_FACTORY_CONTRACT_ID: FACTORY_ID,
+      NEXT_PUBLIC_NFT_CONTRACT_ID: `C${"B".repeat(55)}`,
+      NEXT_PUBLIC_GOVERNOR_CONTRACT_ID: `C${"C".repeat(55)}`,
+      NEXT_PUBLIC_GOVERNOR_START_LEDGER: "1500000",
     },
   },
 });

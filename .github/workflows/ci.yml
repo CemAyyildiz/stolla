@@ -11,15 +11,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          target: wasm32v1-none
       - name: Install Stellar CLI
-        run: |
-          curl -fsSL \
-            https://github.com/stellar/stellar-cli/releases/download/v28.0.0/stellar-cli-28.0.0-x86_64-unknown-linux-gnu.tar.gz \
-            -o /tmp/stellar-cli.tar.gz
-          sudo tar -xzf /tmp/stellar-cli.tar.gz -C /usr/local/bin stellar
-          stellar --version
+        run: cargo install --locked stellar-cli
       - name: Test contracts
         run: cd contracts && cargo test
       - name: Build contracts

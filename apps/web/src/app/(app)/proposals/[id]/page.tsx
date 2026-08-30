@@ -20,12 +20,8 @@ import { useTransactionLifecycle } from "@/hooks/useTransactionLifecycle";
 import { TransactionLifecycleDisplay } from "@/components/TransactionLifecycleDisplay";
 import { truncateMiddle } from "@/lib/truncate";
 import { LiveStatus } from "@/components/ui/LiveStatus";
-import type { CommunityView } from "@/lib/community/types";
-
-function shortenAddress(addr: string): string {
-  if (addr.length <= 12) return addr;
-  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-}
+import { OnChainIdentifier } from "@/components/ui/OnChainIdentifier";
+import type { Community } from "@/lib/community/types";
 import { fetchVoteTotals, type VoteTotals } from "@/lib/voteAggregation";
 import { fmt, pct } from "@/lib/voteDisplay";
 
@@ -44,7 +40,7 @@ export default function ProposalDetailPage({
   community,
 }: {
   proposalId?: string;
-  community?: CommunityView;
+  community?: Community;
 } = {}) {
   const params = useParams<{ id?: string; proposalId?: string }>();
   const proposalIdHex = proposalId ?? params.proposalId ?? params.id ?? "";
@@ -64,7 +60,6 @@ export default function ProposalDetailPage({
   const [reason, setReason] = useState("Support");
   const [status, setStatus] = useState<string | null>(null);
   const [proposer, setProposer] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [totals, setTotals] = useState<VoteTotals | null>(null);
   const [quorum, setQuorum] = useState<bigint | null>(null);
   const [totalsError, setTotalsError] = useState<string | null>(null);
@@ -340,13 +335,8 @@ export default function ProposalDetailPage({
       <div className="mx-auto max-w-3xl px-4 py-10">
         <LiveStatus className="sr-only">Loading proposal…</LiveStatus>
         <h1 className="text-2xl font-bold text-slate-100">Proposal</h1>
-        <div className="mt-2 flex items-center gap-2">
-          <p
-            className="truncate font-mono text-sm text-slate-400"
-            title={proposalIdHex}
-          >
-            {truncateMiddle(proposalIdHex)}
-          </p>
+        <div className="mt-2">
+          <OnChainIdentifier label="Proposal ID" value={proposalIdHex} kind="opaque" />
         </div>
         <div className="mt-6 grid gap-3 rounded-xl border border-slate-800 bg-[#151b2b] p-5 text-sm sm:grid-cols-2">
           <div>
@@ -385,22 +375,8 @@ export default function ProposalDetailPage({
         </nav>
       )}
       <h1 className="text-2xl font-bold text-slate-100">Proposal</h1>
-      <div className="mt-2 flex items-center gap-2">
-        <p
-          className="truncate font-mono text-sm text-slate-400"
-          title={proposalIdHex}
-        >
-          {truncateMiddle(proposalIdHex)}
-        </p>
-        <button
-          type="button"
-          onClick={() => navigator.clipboard.writeText(proposalIdHex)}
-          className="shrink-0 rounded px-2 py-0.5 text-xs text-slate-500 transition hover:bg-slate-800 hover:text-slate-300"
-          title="Copy proposal ID"
-          aria-label={`Copy proposal ID ${proposalIdHex}`}
-        >
-          Copy
-        </button>
+      <div className="mt-2">
+        <OnChainIdentifier label="Proposal ID" value={proposalIdHex} kind="opaque" />
       </div>
 
       <dl className="mt-6 grid gap-3 rounded-xl border border-slate-800 bg-[#151b2b] p-5 text-sm sm:grid-cols-2">
@@ -467,39 +443,13 @@ export default function ProposalDetailPage({
           <dt className="text-slate-500">Proposer</dt>
           <dd className="mt-1">
             {proposer ? (
-              <span className="inline-flex items-center gap-2">
-                <span
-                  className="font-mono text-sm text-slate-200"
-                  title={proposer}
-                >
-                  {shortenAddress(proposer)}
-                </span>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(proposer);
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 2000);
-                    } catch {
-                      // Clipboard API unavailable
-                    }
-                  }}
-                  aria-label={`Copy full proposer address ${proposer}`}
-                  className="rounded-md border border-slate-700 bg-slate-800 px-2 py-0.5 text-xs text-slate-400 transition hover:border-slate-600 hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-                >
-                  {copied ? "Copied!" : "Copy"}
-                </button>
-              </span>
+              <OnChainIdentifier label="Proposer" value={proposer} kind="account" />
             ) : (
               <span className="text-slate-600">Unknown</span>
             )}
           </dd>
         </div>
       </dl>
-      <div aria-live="polite" className="sr-only">
-        {copied ? "Proposer address copied to clipboard" : null}
-      </div>
 
 
       <section className="mt-6 rounded-xl border border-slate-800 bg-[#151b2b] p-5">

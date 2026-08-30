@@ -69,11 +69,11 @@ function mockVoteTotals() {
 function mockReadOnly(overrides: Record<string, unknown> = {}) {
   mocks.createReadOnlyGovernorClient.mockReturnValue({
     proposal_state: vi.fn().mockResolvedValue({ result: ProposalState.Active }),
-    has_voted: vi.fn().mockResolvedValue({ result: false }),
     proposal_snapshot: vi.fn().mockResolvedValue({ result: 1_500_000 }),
-    quorum: vi.fn().mockResolvedValue({ result: BigInt(100) }),
     proposal_proposer: vi.fn().mockResolvedValue({ result: "GPROPOSER" }),
     proposal_deadline: vi.fn().mockResolvedValue({ result: 2_000_000 }),
+    quorum: vi.fn().mockResolvedValue({ result: BigInt(100) }),
+    has_voted: vi.fn().mockResolvedValue({ result: false }),
     ...overrides,
   });
 }
