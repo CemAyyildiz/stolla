@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Server as RpcServer } from "@stellar/stellar-sdk/rpc";
 import type { Api } from "@stellar/stellar-sdk/rpc";
-import { config, requireContractIds, requireGovernorStartLedger } from "@/lib/stellar";
+import { config, requireGovernorStartLedger } from "@/lib/stellar";
 import { decodeProposalEvent } from "@/lib/proposalEvents";
 import { getE2EBridge } from "@/lib/e2eMock";
 
@@ -44,7 +44,16 @@ export function useProposalDiscovery(governorContractId?: string) {
   const [empty, setEmpty] = useState(false);
 
   const discover = useCallback(async () => {
-    const governor = governorContractId ?? requireContractIds().governor;
+    // Community-scoped: require an explicit governor id — never fall back to a
+    // global contract id, which could target the wrong Community.
+    const governor = governorContractId;
+    if (!governor) {
+      setLoading(false);
+      setError("community_unavailable");
+      setEmpty(true);
+      setProposals([]);
+      return false;
+    }
     const server = new RpcServer(config.rpcUrl);
     const startLedger = requireGovernorStartLedger();
 

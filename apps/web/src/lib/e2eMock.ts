@@ -1,5 +1,8 @@
 import type { CommunityDeploymentAdapter } from "@/lib/community/deployment";
-import type { CommunityDetailResult, CommunityRegistryPage } from "@/lib/community/types";
+import type {
+  CommunityRegistry,
+  CommunityRegistryPage,
+} from "@/lib/community/types";
 
 export type E2EProposal = {
   id: string;
@@ -29,9 +32,10 @@ declare global {
 }
 
 export function e2eMocksEnabled(): boolean {
+  if (process.env.NEXT_PUBLIC_E2E_MOCKS !== "true") return false;
+  if (process.env.NODE_ENV !== "production") return true;
   return (
-    process.env.NODE_ENV !== "production" &&
-    process.env.NEXT_PUBLIC_E2E_MOCKS === "true"
+    typeof window !== "undefined" && window.location.hostname === "127.0.0.1"
   );
 }
 
@@ -40,23 +44,26 @@ export function getE2EBridge(): StollaE2EBridge | null {
   return window.__STOLLA_E2E__ ?? null;
 }
 
-export function e2eListCommunities(
-  cursor: number | null,
-  limit: number,
-): CommunityRegistryPage | null {
+export function getE2ECommunityRegistry(): CommunityRegistry | null {
   const communities = getE2EBridge()?.communities;
   if (!communities) return null;
-  const start = cursor ?? 0;
-  const page = communities.slice(start, start + limit);
-  const nextCursor = start + page.length < communities.length ? start + page.length : null;
-  return { communities: page, nextCursor, malformedRecords: 0 };
-}
-
-export function e2eGetCommunity(id: string): CommunityDetailResult | null {
-  const communities = getE2EBridge()?.communities;
-  if (!communities) return null;
-  const community = communities.find(
-    (candidate) => candidate.record.id.toLowerCase() === id.toLowerCase(),
-  );
-  return community ? { status: "found", community } : { status: "not-found" };
+  return {
+    async list(cursor, limit) {
+      const start = cursor ?? 0;
+      const page = communities.slice(start, start + limit);
+      const nextCursor =
+        start + page.length < communities.length
+          ? start + page.length
+          : null;
+      return { communities: page, nextCursor, malformedRecords: 0 };
+    },
+    async get(id) {
+      const community = communities.find(
+        (candidate) => candidate.record.id.toLowerCase() === id.toLowerCase(),
+      );
+      return community
+        ? { status: "found", community }
+        : { status: "not-found" };
+    },
+  };
 }

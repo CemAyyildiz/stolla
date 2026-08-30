@@ -21,7 +21,7 @@ import { TransactionLifecycleDisplay } from "@/components/TransactionLifecycleDi
 import { truncateMiddle } from "@/lib/truncate";
 import { LiveStatus } from "@/components/ui/LiveStatus";
 import { OnChainIdentifier } from "@/components/ui/OnChainIdentifier";
-import type { CommunityView } from "@/lib/community/types";
+import type { Community } from "@/lib/community/types";
 import { fetchVoteTotals, type VoteTotals } from "@/lib/voteAggregation";
 import { fmt, pct } from "@/lib/voteDisplay";
 
@@ -40,7 +40,7 @@ export default function ProposalDetailPage({
   community,
 }: {
   proposalId?: string;
-  community?: CommunityView;
+  community?: Community;
 } = {}) {
   const params = useParams<{ id?: string; proposalId?: string }>();
   const proposalIdHex = proposalId ?? params.proposalId ?? params.id ?? "";

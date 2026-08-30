@@ -74,6 +74,7 @@ export function CommunityDeploymentPanel({
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
   const previousInput = useRef("");
+  const simulationGeneration = useRef(0);
 
   const inputSignature = useMemo(
     () =>
@@ -108,8 +109,11 @@ export function CommunityDeploymentPanel({
     if (previousInput.current === inputSignature) return;
     previousInput.current = inputSignature;
     if (!transactionHash) {
+      simulationGeneration.current += 1;
+      inFlight.current = false;
       const timeout = window.setTimeout(() => {
         setSimulation(null);
+        setBusy(false);
         setStage("idle");
         setMessage(
           networkMismatch
@@ -221,6 +225,7 @@ export function CommunityDeploymentPanel({
     ) {
       return;
     }
+    const generation = ++simulationGeneration.current;
     inFlight.current = true;
     setBusy(true);
     setStage("simulating");
@@ -236,17 +241,25 @@ export function CommunityDeploymentPanel({
         metadata,
         governance,
       });
+      if (generation !== simulationGeneration.current) {
+        return;
+      }
       setSimulation(result);
       setStage("idle");
       setMessage(
         "Simulation succeeded. Review the estimated resource fee before requesting wallet approval.",
       );
     } catch (error) {
+      if (generation !== simulationGeneration.current) {
+        return;
+      }
       setStage("failure");
       setMessage(friendlyError(error));
     } finally {
-      inFlight.current = false;
-      setBusy(false);
+      if (generation === simulationGeneration.current) {
+        inFlight.current = false;
+        setBusy(false);
+      }
     }
   }
 

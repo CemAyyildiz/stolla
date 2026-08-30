@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { CommunityAvatar } from "@/components/CommunityAvatar";
 import { OnChainIdentifier } from "@/components/ui/OnChainIdentifier";
-import type { CommunityView } from "@/lib/community/types";
+import type { Community } from "@/lib/community/types";
 import { truncateMiddle } from "@/lib/truncate";
+import { FreshnessNotice } from "@/components/ui/FreshnessNotice";
 
-export function CommunityCard({ community }: { community: CommunityView }) {
+export function CommunityCard({ community }: { community: Community }) {
   const { metadata, metadataError, record, governance } = community;
   const name = metadata?.name ?? `Community ${truncateMiddle(record.id, 8, 6)}`;
 
@@ -40,12 +41,12 @@ export function CommunityCard({ community }: { community: CommunityView }) {
           {metadata.description}
         </p>
       ) : (
-        <p className="mt-4 text-sm text-amber-300" role="status">
+        <FreshnessNotice className="mt-4 p-3">
           Metadata unavailable. The verified registry record is still shown.
           {metadataError ? (
             <span className="sr-only"> {metadataError}</span>
           ) : null}
-        </p>
+        </FreshnessNotice>
       )}
 
       <dl className="mt-5 grid grid-cols-2 gap-3 border-t border-slate-800 pt-4 text-sm">

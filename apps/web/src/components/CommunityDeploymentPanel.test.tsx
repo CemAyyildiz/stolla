@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createWalletMock } from "@/test-support/stellar";
 
 const mocks = vi.hoisted(() => ({
   getE2EBridge: vi.fn(),
@@ -79,12 +80,11 @@ function adapter() {
 describe("CommunityDeploymentPanel", () => {
   beforeEach(() => {
     sessionStorage.clear();
-    mocks.useWallet.mockReturnValue({
+    mocks.useWallet.mockReturnValue(createWalletMock({
       address,
-      signTransaction: vi.fn(),
       walletNetwork: "testnet",
       walletNetworkPassphrase: "Test SDF Network ; September 2015",
-    });
+    }));
   });
 
   it("shows the exact simulated fee and declares success only after registry verification", async () => {
@@ -111,12 +111,11 @@ describe("CommunityDeploymentPanel", () => {
   it("blocks a mismatched wallet network and preserves draft inputs", () => {
     const deployment = adapter();
     mocks.getE2EBridge.mockReturnValue({ deployment });
-    mocks.useWallet.mockReturnValue({
+    mocks.useWallet.mockReturnValue(createWalletMock({
       address,
-      signTransaction: vi.fn(),
       walletNetwork: "mainnet",
       walletNetworkPassphrase: "Public Global Stellar Network ; September 2015",
-    });
+    }));
     render(<CommunityDeploymentPanel {...props} />);
 
     expect(screen.getByText(/Expected testnet/)).toHaveTextContent(
@@ -194,5 +193,149 @@ describe("CommunityDeploymentPanel", () => {
       screen.getByRole("button", { name: "Simulate deployment" }),
     ).toBeEnabled();
     expect(deployment.signAndSubmit).not.toHaveBeenCalled();
+  });
+
+  it("invalidates a completed simulation when the wallet network changes mid-flow", async () => {
+    const deployment = adapter();
+    mocks.getE2EBridge.mockReturnValue({ deployment });
+    const { rerender } = render(<CommunityDeploymentPanel {...props} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Simulate deployment" }));
+    expect(await screen.findByText(/12345678 stroops/)).toBeInTheDocument();
+
+    mocks.useWallet.mockReturnValue({
+      address,
+      signTransaction: vi.fn(),
+      walletNetwork: "mainnet",
+      walletNetworkPassphrase: "Public Global Stellar Network ; September 2015",
+    });
+    rerender(<CommunityDeploymentPanel {...props} />);
+
+    await waitFor(() =>
+      expect(screen.queryByText(/12345678 stroops/)).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByText(/Network changed. The previous simulation was invalidated/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Simulate deployment" }),
+    ).toBeDisabled();
+    expect(deployment.signAndSubmit).not.toHaveBeenCalled();
+  });
+
+  it("requires a fresh simulation after restoring the expected network", async () => {
+    const deployment = adapter();
+    mocks.getE2EBridge.mockReturnValue({ deployment });
+    const { rerender } = render(<CommunityDeploymentPanel {...props} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Simulate deployment" }));
+    await screen.findByText(/12345678 stroops/);
+
+    mocks.useWallet.mockReturnValue({
+      address,
+      signTransaction: vi.fn(),
+      walletNetwork: "mainnet",
+      walletNetworkPassphrase: "Public Global Stellar Network ; September 2015",
+    });
+    rerender(<CommunityDeploymentPanel {...props} />);
+    await waitFor(() =>
+      expect(screen.queryByText(/12345678 stroops/)).not.toBeInTheDocument(),
+    );
+
+    mocks.useWallet.mockReturnValue({
+      address,
+      signTransaction: vi.fn(),
+      walletNetwork: "testnet",
+      walletNetworkPassphrase: "Test SDF Network ; September 2015",
+    });
+    rerender(<CommunityDeploymentPanel {...props} />);
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Simulate deployment" }),
+      ).toBeEnabled(),
+    );
+    expect(screen.queryByRole("button", { name: "Approve and deploy" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Simulate deployment" }));
+    await waitFor(() => expect(deployment.simulate).toHaveBeenCalledTimes(2));
+    expect(await screen.findByRole("button", { name: "Approve and deploy" })).toBeEnabled();
+  });
+
+  it("drops a simulation that resolves after the wallet network moved", async () => {
+    const deployment = adapter();
+    let resolveSimulation: (() => void) | undefined;
+    deployment.simulate.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSimulation = () =>
+            resolve({
+              invocation: {
+                contractId: props.factoryId,
+                method: "create_community",
+                sourceAccount: address,
+                networkPassphrase: "Test SDF Network ; September 2015",
+                metadataHash: "12".repeat(32),
+                externalKey: "12".repeat(32),
+                args: [],
+              },
+              feeStroops: "12345678",
+              expectedRecord,
+              sequence: "2",
+              expiresAt: 999,
+              prepared: {},
+            });
+        }),
+    );
+    mocks.getE2EBridge.mockReturnValue({ deployment });
+    const { rerender } = render(<CommunityDeploymentPanel {...props} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Simulate deployment" }));
+    mocks.useWallet.mockReturnValue({
+      address,
+      signTransaction: vi.fn(),
+      walletNetwork: "mainnet",
+      walletNetworkPassphrase: "Public Global Stellar Network ; September 2015",
+    });
+    rerender(<CommunityDeploymentPanel {...props} />);
+    resolveSimulation?.();
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Simulate deployment" }),
+      ).toBeDisabled(),
+    );
+    expect(screen.queryByText(/12345678 stroops/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Approve and deploy" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the submitted transaction explorer link on the network it was submitted to", async () => {
+    const deployment = adapter();
+    mocks.getE2EBridge.mockReturnValue({ deployment });
+    const { rerender } = render(<CommunityDeploymentPanel {...props} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Simulate deployment" }));
+    await screen.findByText(/12345678 stroops/);
+    fireEvent.click(screen.getByRole("button", { name: "Approve and deploy" }));
+    expect(
+      await screen.findByRole("heading", {
+        name: "Community verified in the registry",
+      }),
+    ).toBeInTheDocument();
+
+    mocks.useWallet.mockReturnValue({
+      address,
+      signTransaction: vi.fn(),
+      walletNetwork: "mainnet",
+      walletNetworkPassphrase: "Public Global Stellar Network ; September 2015",
+    });
+    rerender(<CommunityDeploymentPanel {...props} />);
+
+    expect(
+      screen.getByRole("heading", {
+        name: "Community verified in the registry",
+      }),
+    ).toBeInTheDocument();
+    expect(deployment.signAndSubmit).toHaveBeenCalledTimes(1);
   });
 });
