@@ -55,7 +55,7 @@ export function useCommunityDeployment() {
         const nextOutcome = await deployCommunityFromWizard(state, {
           address,
           expectedNetworkPassphrase: config.networkPassphrase,
-          walletNetworkPassphrase: walletNetworkPassphrase,
+          walletNetworkPassphrase,
           createClient: () =>
             createCommunityFactoryClient({
               publicKey: address ?? "",

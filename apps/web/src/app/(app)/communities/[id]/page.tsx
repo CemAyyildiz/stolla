@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { CommunityAvatar } from "@/components/CommunityAvatar";
+import { AsyncState } from "@/components/ui/AsyncState";
+import { ErrorState } from "@/components/ui/ErrorState";
+import { FreshnessNotice } from "@/components/ui/FreshnessNotice";
 import { LiveStatus } from "@/components/ui/LiveStatus";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useCommunityRegistry } from "@/lib/community/CommunityRegistryProvider";
@@ -138,7 +141,7 @@ export default function CommunityDetailPage() {
   if (loading && !result) {
     return (
       <div className="mx-auto w-full min-w-0 max-w-4xl px-4 py-10">
-        <LiveStatus className="sr-only">Loading community details…</LiveStatus>
+        <AsyncState className="sr-only">Loading community details…</AsyncState>
         <Skeleton className="h-8 w-56" />
         <Skeleton className="mt-3 h-5 w-full max-w-xl" />
         <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -152,32 +155,21 @@ export default function CommunityDetailPage() {
   if (error) {
     return (
       <div className="mx-auto w-full min-w-0 max-w-4xl px-4 py-10">
-        <section
-          role="alert"
-          className="rounded-xl border border-rose-800/70 bg-rose-950/40 p-5"
-        >
-          <h1 className="text-xl font-semibold text-rose-100">
-            Community could not be loaded
-          </h1>
-          <p className="mt-2 break-words text-sm text-rose-200 [overflow-wrap:anywhere]">
-            {error}
-          </p>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() => void load()}
-              className="min-h-11 rounded-lg border border-rose-700 px-4 py-2 text-sm font-medium text-rose-100 hover:bg-rose-900/60"
-            >
-              Retry community request
-            </button>
+        <ErrorState
+          title="Community could not be loaded"
+          onRetry={() => void load()}
+          retryLabel="Retry community request"
+          action={
             <Link
               href="/communities"
               className="inline-flex min-h-11 items-center rounded-lg px-4 py-2 text-sm text-slate-300 hover:bg-slate-800"
             >
               Back to communities
             </Link>
-          </div>
-        </section>
+          }
+        >
+          {error}
+        </ErrorState>
       </div>
     );
   }
@@ -282,18 +274,15 @@ export default function CommunityDetailPage() {
           {metadata.description}
         </p>
       ) : (
-        <section
-          role="status"
-          className="mt-6 rounded-lg border border-amber-800/70 bg-amber-950/40 p-4"
+        <FreshnessNotice
+          title="Community metadata is unavailable"
+          className="mt-6"
         >
-          <h2 className="font-semibold text-amber-100">
-            Community metadata is unavailable
-          </h2>
-          <p className="mt-1 break-words text-sm text-amber-200 [overflow-wrap:anywhere]">
+          <p className="break-words [overflow-wrap:anywhere]">
             {metadataError} The verified on-chain registry details remain
             available below.
           </p>
-        </section>
+        </FreshnessNotice>
       )}
 
       {metadata && metadata.externalLinks.length > 0 && (
@@ -358,11 +347,11 @@ export default function CommunityDetailPage() {
           Governance configuration
         </h2>
         {governance.unavailableFields.length > 0 && (
-          <LiveStatus className="mt-3 rounded-lg border border-amber-800/70 bg-amber-950/40 p-3 text-sm text-amber-200">
+          <FreshnessNotice className="mt-3 p-3">
             Some Governor reads failed:{" "}
             {governance.unavailableFields.join(", ")}. Available values remain
             visible.
-          </LiveStatus>
+          </FreshnessNotice>
         )}
         <dl className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>

@@ -178,4 +178,3 @@ export function storeProposalIdFor(governorContractId: string, idHex: string) {
     );
   }
 }
-
