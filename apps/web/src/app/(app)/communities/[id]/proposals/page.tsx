@@ -45,7 +45,7 @@ function ScopedProposalHistory({ community }: { community: Community }) {
       try {
         const client = createReadOnlyGovernorClient(governorContract);
         const transaction = await client.proposal_state({
-          proposal_id: Uint8Array.from(Buffer.from(proposalId, "hex")),
+          proposal_id: Buffer.from(proposalId, "hex"),
         });
         setStates((current) => ({
           ...current,
