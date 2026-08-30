@@ -109,11 +109,14 @@ describe("CommunityDetailPage", () => {
       `/communities/${COMMUNITY_ID}/proposals`,
     );
     expect(
-      screen.getAllByRole("button", { name: /Copy full .* address/ }),
+      screen.getAllByRole("button", { name: /^Copy .* contract$/ }),
     ).toHaveLength(2);
     expect(
-      screen.getAllByRole("link", { name: /on Stellar Expert/ }),
+      screen.getAllByRole("link", { name: /Open .* contract in explorer/ }),
     ).toHaveLength(2);
+    expect(
+      screen.getByRole("button", { name: "Copy Community owner" }),
+    ).toBeInTheDocument();
   });
 
   it("renders malformed and unknown IDs as clear not-found states", async () => {

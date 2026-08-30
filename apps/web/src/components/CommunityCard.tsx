@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CommunityAvatar } from "@/components/CommunityAvatar";
+import { OnChainIdentifier } from "@/components/ui/OnChainIdentifier";
 import type { Community } from "@/lib/community/types";
 import { truncateMiddle } from "@/lib/truncate";
 import { FreshnessNotice } from "@/components/ui/FreshnessNotice";
@@ -20,12 +21,15 @@ export function CommunityCard({ community }: { community: Community }) {
           <h2 className="break-words text-lg font-semibold text-slate-100 [overflow-wrap:anywhere]">
             {name}
           </h2>
-          <p
-            className="mt-0.5 break-all font-mono text-xs text-slate-500"
-            title={record.id}
-          >
-            {truncateMiddle(record.id, 10, 8)}
-          </p>
+          <div className="mt-0.5 text-xs text-slate-500">
+            <OnChainIdentifier
+              label="Community ID"
+              value={record.id}
+              kind="opaque"
+              truncateStart={10}
+              truncateEnd={8}
+            />
+          </div>
         </div>
       </div>
 
