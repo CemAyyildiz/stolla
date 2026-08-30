@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseGovernorStartLedger } from "./stellar";
 
 const ENV_KEY = "NEXT_PUBLIC_GOVERNOR_START_LEDGER";
@@ -28,7 +28,7 @@ describe("parseGovernorStartLedger", () => {
   });
 
   it("rejects a missing value", () => {
-    delete process.env[ENV_KEY];
+    vi.stubEnv(ENV_KEY, "");
     expect(() => parseGovernorStartLedger()).toThrow(
       /Governor start ledger is not configured/,
     );

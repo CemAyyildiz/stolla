@@ -16,14 +16,10 @@ import { activeNetwork } from "@/lib/stellar";
  */
 export function useNetworkGuard(): NetworkComparison {
   const { walletNetwork, walletNetworkPassphrase } = useWallet();
-  return useMemo(
-    () =>
-      compareNetworks(
-        activeNetwork,
-        walletNetworkPassphrase
-          ? describeNetwork(walletNetworkPassphrase, walletNetwork ?? undefined)
-          : null,
-      ),
-    [walletNetwork, walletNetworkPassphrase],
-  );
+  return useMemo(() => {
+    const detected = walletNetworkPassphrase
+      ? describeNetwork(walletNetworkPassphrase, walletNetwork ?? undefined)
+      : null;
+    return compareNetworks(activeNetwork, detected);
+  }, [walletNetwork, walletNetworkPassphrase]);
 }

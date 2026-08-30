@@ -8,8 +8,8 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { FreshnessNotice } from "@/components/ui/FreshnessNotice";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { listCommunities } from "@/lib/community/registry";
-import type { CommunityView } from "@/lib/community/types";
+import { useCommunityRegistry } from "@/lib/community/CommunityRegistryProvider";
+import type { Community } from "@/lib/community/types";
 
 const PAGE_SIZE = 9;
 const MAX_QUERY_LENGTH = 100;
@@ -43,7 +43,8 @@ function writeListUrlState(
 }
 
 export default function CommunitiesPage() {
-  const [communities, setCommunities] = useState<CommunityView[]>([]);
+  const registry = useCommunityRegistry();
+  const [communities, setCommunities] = useState<Community[]>([]);
   const [nextCursor, setNextCursor] = useState<number | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -64,7 +65,7 @@ export default function CommunitiesPage() {
       setError(null);
 
       try {
-        const page = await listCommunities(cursor, PAGE_SIZE);
+        const page = await registry.list(cursor, PAGE_SIZE);
         if (sequence !== requestSequence.current) return;
         if (page.nextCursor !== null && page.nextCursor === cursor) {
           throw new Error(
@@ -113,7 +114,7 @@ export default function CommunitiesPage() {
         if (sequence === requestSequence.current) setLoading(false);
       }
     },
-    [],
+    [registry],
   );
 
   useEffect(() => {

@@ -33,8 +33,6 @@ export const contractIds = {
   governor: process.env.NEXT_PUBLIC_GOVERNOR_CONTRACT_ID ?? "",
   communityFactory:
     process.env.NEXT_PUBLIC_COMMUNITY_FACTORY_CONTRACT_ID ?? "",
-  /** Alias used by assignee community-creation wizard modules. */
-  factory: process.env.NEXT_PUBLIC_COMMUNITY_FACTORY_CONTRACT_ID ?? "",
 };
 
 export function requireContractIds(): { nft: string; governor: string } {

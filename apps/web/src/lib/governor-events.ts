@@ -1,4 +1,4 @@
-import { config, requireContractIds } from "./stellar";
+import { config } from "./stellar";
 
 export interface GovernorEventQueryOptions {
   startLedger: number;
@@ -12,11 +12,10 @@ export interface GovernorEventPage<T = unknown> {
 }
 
 export async function queryGovernorEvents(
+  governorContractId: string,
   options: GovernorEventQueryOptions,
 ): Promise<GovernorEventPage> {
-  const { governor } = requireContractIds();
-
-  if (!governor) {
+  if (!governorContractId) {
     throw new Error("Governor contract ID is not configured.");
   }
 

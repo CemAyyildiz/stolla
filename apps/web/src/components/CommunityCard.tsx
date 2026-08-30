@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { CommunityAvatar } from "@/components/CommunityAvatar";
-import type { CommunityView } from "@/lib/community/types";
+import type { Community } from "@/lib/community/types";
 import { truncateMiddle } from "@/lib/truncate";
 import { FreshnessNotice } from "@/components/ui/FreshnessNotice";
 
-export function CommunityCard({ community }: { community: CommunityView }) {
+export function CommunityCard({ community }: { community: Community }) {
   const { metadata, metadataError, record, governance } = community;
   const name = metadata?.name ?? `Community ${truncateMiddle(record.id, 8, 6)}`;
 

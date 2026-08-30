@@ -1,60 +1,85 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { xdr } from "@stellar/stellar-sdk";
-import {
-  createEventPage,
-  createEventsRpcMock,
-  createVoteEvent,
-  type EventsRpcMock,
-} from "@/test-support/stellar";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { Address, xdr } from "@stellar/stellar-sdk";
+import { Buffer } from "buffer";
 import { fetchVoteTotals } from "./voteAggregation";
 
-let eventsRpc: EventsRpcMock;
-const PROPOSAL_ID = "aa".repeat(32);
+const GOVERNOR =
+  "CDJZ4QTYXZ5YKHRXRBCOXQDZI5TUE5QLODC5IJFYDXQMQJFP5PFRMPHY";
+const DEFAULT_PROPOSAL =
+  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const VOTER = "GAZSOBEW6H374SOMTQIRC432JXTA4VPSG6P3ADA35TRQIYT3WTVQWFE5";
+
+// vi.mock is hoisted – use vi.hoisted() so factory closures can reference them
+const { mockScValToNative, mockGetEvents } = vi.hoisted(() => ({
+  mockScValToNative: vi.fn(),
+  mockGetEvents: vi.fn(),
+}));
 
 vi.mock("@stellar/stellar-sdk", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@stellar/stellar-sdk")>();
   return {
     ...actual,
+    scValToNative: mockScValToNative,
     rpc: {
       ...actual.rpc,
       Server: vi.fn(function (this: Record<string, unknown>) {
-        this.getEvents = (request: Parameters<EventsRpcMock["getEvents"]>[0]) =>
-          eventsRpc.getEvents(request);
+        this.getEvents = mockGetEvents;
       }),
     },
   };
 });
 
-vi.mock("./stellar", async () => {
-  const { createNetworkFixture } = await import(
-    "@/test-support/stellar/network"
-  );
-  return createNetworkFixture();
-});
+vi.mock("./stellar", () => ({
+  config: { rpcUrl: "https://soroban-testnet.stellar.org" },
+  contractIds: {
+    governor: "CDJZ4QTYXZ5YKHRXRBCOXQDZI5TUE5QLODC5IJFYDXQMQJFP5PFRMPHY",
+  },
+  requireGovernorStartLedger: () => 1_500_000,
+}));
+
+vi.mock("./e2eMock", () => ({
+  getE2EBridge: () => undefined,
+}));
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** Create a minimal mock vote_cast event matching the shape the code expects. */
+function makeEvent(
+  id: string,
+  options: { contractId?: string; proposalHex?: string } = {},
+): Record<string, unknown> {
+  const proposalHex = options.proposalHex ?? DEFAULT_PROPOSAL;
+  return {
+    id,
+    type: "contract",
+    ledger: 100,
+    ledgerClosedAt: "2024-01-01T00:00:00Z",
+    contractId: options.contractId ?? GOVERNOR,
+    topic: [
+      xdr.ScVal.scvSymbol("vote_cast"),
+      Address.fromString(VOTER).toScVal(),
+      xdr.ScVal.scvBytes(Buffer.from(proposalHex, "hex")),
+    ],
+    value: xdr.ScVal.scvVoid(),
+    inSuccessfulContractCall: true,
+  };
+}
 
 /** Set up a page of getEvents returning the given events with their native values. */
 function setupPage(
   events: Array<{ id: string; native: [number, bigint, string] }>,
   cursor?: string,
 ) {
-  eventsRpc.setOutcomes(
-    createEventPage(
-      events.map(({ id, native: [voteType, weight, reason] }) =>
-        createVoteEvent({
-          id,
-          proposalId: PROPOSAL_ID,
-          voteType,
-          weight,
-          reason,
-        }),
-      ),
-      { cursor },
-    ),
-  );
+  for (const e of events) {
+    mockScValToNative.mockReturnValueOnce(e.native);
+  }
+  mockGetEvents.mockResolvedValueOnce({
+    events: events.map((e) => makeEvent(e.id)),
+    latestLedger: 200,
+    cursor,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -63,7 +88,7 @@ function setupPage(
 
 describe("fetchVoteTotals", () => {
   beforeEach(() => {
-    eventsRpc = createEventsRpcMock();
+    vi.resetAllMocks();
   });
 
   describe("mixed weighted votes", () => {
@@ -93,9 +118,7 @@ describe("fetchVoteTotals", () => {
     it("uses bigint without precision loss for large weights", async () => {
       const proposalHex =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-      const hugeWeight = BigInt(
-        "340282366920938463463374607431768211455",
-      );
+      const hugeWeight = BigInt(340282366920938463463374607431768211455);
 
       setupPage([{ id: "1-0", native: [1, hugeWeight, ""] }]);
 
@@ -108,7 +131,10 @@ describe("fetchVoteTotals", () => {
 
   describe("no votes", () => {
     it("returns zero totals when there are no events", async () => {
-      eventsRpc.setOutcomes(createEventPage([]));
+      mockGetEvents.mockResolvedValueOnce({
+        events: [],
+        latestLedger: 200,
+      });
 
       const result = await fetchVoteTotals(
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -144,21 +170,15 @@ describe("fetchVoteTotals", () => {
       const proposalHex =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
-      eventsRpc.setOutcomes(
-        createEventPage([
-          createVoteEvent({
-            id: "1-0",
-            proposalId: PROPOSAL_ID,
-            value: xdr.ScVal.scvVoid(),
-          }),
-          createVoteEvent({
-            id: "1-1",
-            proposalId: PROPOSAL_ID,
-            voteType: 1,
-            weight: BigInt(200),
-          }),
-        ]),
-      );
+      mockScValToNative.mockImplementationOnce(() => {
+        throw new Error("XDR decode failed");
+      });
+      mockScValToNative.mockReturnValueOnce([1, BigInt(200), ""]);
+
+      mockGetEvents.mockResolvedValueOnce({
+        events: [makeEvent("1-0"), makeEvent("1-1")],
+        latestLedger: 200,
+      });
 
       const result = await fetchVoteTotals(proposalHex);
 
@@ -190,32 +210,22 @@ describe("fetchVoteTotals", () => {
       const proposalHex =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
-      // Events: "1-0" appears twice (only first counted), "1-1" is new.
-      eventsRpc.setOutcomes(
-        createEventPage([
-          createVoteEvent({
-            id: "1-0",
-            proposalId: PROPOSAL_ID,
-            voteType: 1,
-            weight: BigInt(100),
-          }),
-          createVoteEvent({
-            id: "1-0",
-            proposalId: PROPOSAL_ID,
-            voteType: 1,
-            weight: BigInt(999),
-          }),
-          createVoteEvent({
-            id: "1-1",
-            proposalId: PROPOSAL_ID,
-            voteType: 0,
-            weight: BigInt(50),
-          }),
-        ]),
-      );
+      // Events: "1-0" appears twice (only first counted), "1-1" is new
+      mockScValToNative.mockReturnValueOnce([1, BigInt(100), ""]);
+      mockScValToNative.mockReturnValueOnce([0, BigInt(50), ""]);
+
+      mockGetEvents.mockResolvedValueOnce({
+        events: [
+          makeEvent("1-0"),
+          makeEvent("1-0"), // deduplicated — scValToNative NOT called
+          makeEvent("1-1"),
+        ],
+        latestLedger: 200,
+      });
 
       const result = await fetchVoteTotals(proposalHex);
 
+      expect(mockScValToNative).toHaveBeenCalledTimes(2);
       expect(result.totals.for).toBe(BigInt(100));
       expect(result.totals.against).toBe(BigInt(50));
       expect(result.totals.total).toBe(BigInt(150));
@@ -224,7 +234,7 @@ describe("fetchVoteTotals", () => {
 
   describe("RPC errors", () => {
     it("returns incomplete with error message when getEvents throws", async () => {
-      eventsRpc.setOutcomes(new Error("Network timeout"));
+      mockGetEvents.mockRejectedValueOnce(new Error("Network timeout"));
 
       const result = await fetchVoteTotals(
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -241,7 +251,7 @@ describe("fetchVoteTotals", () => {
     });
 
     it("handles non-Error thrown objects", async () => {
-      eventsRpc.setOutcomes("string error");
+      mockGetEvents.mockRejectedValueOnce("string error");
 
       const result = await fetchVoteTotals(
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -257,26 +267,30 @@ describe("fetchVoteTotals", () => {
       const proposalHex =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
+      // Page 1: 100 For votes
+      for (let i = 0; i < 100; i++) {
+        mockScValToNative.mockReturnValueOnce([1, BigInt(1), ""]);
+      }
       const page1Events = Array.from({ length: 100 }, (_, i) =>
-        createVoteEvent({
-          id: `1-${i}`,
-          proposalId: PROPOSAL_ID,
-          voteType: 1,
-          weight: BigInt(1),
-        }),
+        makeEvent(`1-${i}`),
       );
+      mockGetEvents.mockResolvedValueOnce({
+        events: page1Events,
+        latestLedger: 200,
+        cursor: "cursor-2",
+      });
+
+      // Page 2: 50 Against votes
+      for (let i = 0; i < 50; i++) {
+        mockScValToNative.mockReturnValueOnce([0, BigInt(1), ""]);
+      }
       const page2Events = Array.from({ length: 50 }, (_, i) =>
-        createVoteEvent({
-          id: `2-${i}`,
-          proposalId: PROPOSAL_ID,
-          voteType: 0,
-          weight: BigInt(1),
-        }),
+        makeEvent(`2-${i}`),
       );
-      eventsRpc.setOutcomes(
-        createEventPage(page1Events, { cursor: "cursor-2" }),
-        createEventPage(page2Events),
-      );
+      mockGetEvents.mockResolvedValueOnce({
+        events: page2Events,
+        latestLedger: 200,
+      });
 
       const result = await fetchVoteTotals(proposalHex);
 
@@ -290,20 +304,22 @@ describe("fetchVoteTotals", () => {
       const proposalHex =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
+      // 30 Abstain votes, weight 2 each
+      for (let i = 0; i < 30; i++) {
+        mockScValToNative.mockReturnValueOnce([2, BigInt(2), ""]);
+      }
       const page1Events = Array.from({ length: 30 }, (_, i) =>
-        createVoteEvent({
-          id: `1-${i}`,
-          proposalId: PROPOSAL_ID,
-          voteType: 2,
-          weight: BigInt(2),
-        }),
+        makeEvent(`1-${i}`),
       );
-      eventsRpc.setOutcomes(createEventPage(page1Events));
+      mockGetEvents.mockResolvedValueOnce({
+        events: page1Events,
+        latestLedger: 200,
+      });
 
       const result = await fetchVoteTotals(proposalHex);
 
       expect(result.totals.abstain).toBe(BigInt(60));
-      expect(eventsRpc.getEvents.callCount()).toBe(1);
+      expect(mockGetEvents).toHaveBeenCalledTimes(1);
     });
   });
 });

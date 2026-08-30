@@ -1,17 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ProposalState } from "@/lib/bindings/community-governor/src";
-import {
-  clearStellarMockRegistry,
-  createGovernorClientMock,
-  createNftClientMock,
-  createWalletMock,
-  rejected,
-  resolved,
-  sequence,
-  type GovernorClientMock,
-  type NftClientMock,
-} from "@/test-support/stellar";
 
 const mocks = vi.hoisted(() => ({
   useParams: vi.fn(),
@@ -32,15 +21,16 @@ vi.mock("@/lib/contracts", () => ({
 vi.mock("@/lib/voteAggregation", () => ({
   fetchVoteTotals: mocks.fetchVoteTotals,
 }));
-vi.mock("@/lib/stellar", async () => {
-  const { createNetworkFixture } = await import(
-    "@/test-support/stellar/network"
-  );
-  return createNetworkFixture({
-    governorContractId: "CGOV",
-    nftContractId: "CNFT",
-  });
-});
+vi.mock("@/lib/stellar", () => ({
+  contractIds: { nft: "CNFT", governor: "CGOV" },
+  config: {
+    networkPassphrase: "Test SDF Network ; September 2015",
+    rpcUrl: "https://rpc",
+    horizonUrl: "https://horizon",
+    friendbotUrl: null,
+  },
+  stellarConfig: { testnet: {}, mainnet: {} },
+}));
 
 import ProposalDetailPage from "@/app/(app)/proposals/[id]/page";
 
@@ -54,12 +44,14 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-let readOnlyGovernor: GovernorClientMock;
-let walletGovernor: GovernorClientMock;
-let nft: NftClientMock;
-
 function mockWallet() {
-  mocks.useWallet.mockReturnValue(createWalletMock());
+  mocks.useWallet.mockReturnValue({
+    address: null,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    signTransaction: vi.fn(),
+    isConnecting: false,
+  });
 }
 
 function mockVoteTotals() {
@@ -74,31 +66,57 @@ function mockVoteTotals() {
   });
 }
 
+function mockReadOnly(overrides: Record<string, unknown> = {}) {
+  mocks.createReadOnlyGovernorClient.mockReturnValue({
+    proposal_state: vi.fn().mockResolvedValue({ result: ProposalState.Active }),
+    proposal_snapshot: vi.fn().mockResolvedValue({ result: 1_500_000 }),
+    proposal_proposer: vi.fn().mockResolvedValue({ result: "GPROPOSER" }),
+    proposal_deadline: vi.fn().mockResolvedValue({ result: 2_000_000 }),
+    quorum: vi.fn().mockResolvedValue({ result: BigInt(100) }),
+    has_voted: vi.fn().mockResolvedValue({ result: false }),
+    ...overrides,
+  });
+}
+
+function mockGovernor(overrides: Record<string, unknown> = {}) {
+  mocks.createGovernorClient.mockReturnValue({
+    proposal_state: vi.fn().mockResolvedValue({ result: ProposalState.Active }),
+    has_voted: vi.fn().mockResolvedValue({ result: false }),
+    proposal_snapshot: vi.fn().mockResolvedValue({ result: 1_500_000 }),
+    quorum: vi.fn().mockResolvedValue({ result: BigInt(100) }),
+    cast_vote: vi.fn().mockResolvedValue({
+      signAndSend: vi.fn().mockResolvedValue(undefined),
+    }),
+    ...overrides,
+  });
+}
+
+function mockNft(overrides: Record<string, unknown> = {}) {
+  mocks.createReadOnlyNftClient.mockReturnValue({
+    get_votes: vi.fn().mockResolvedValue({ result: BigInt(3) }),
+    ...overrides,
+  });
+}
+
 function mockConnectedWallet(address = "GWALLET") {
-  mocks.useWallet.mockReturnValue(createWalletMock({ address }));
+  mocks.useWallet.mockReturnValue({
+    address,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    signTransaction: vi.fn(),
+    isConnecting: false,
+  });
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  clearStellarMockRegistry();
-  readOnlyGovernor = createGovernorClientMock({
-    proposal_state: resolved(ProposalState.Active),
-    proposal_snapshot: resolved(1_500_000),
-    proposal_deadline: resolved(2_000_000),
-    proposal_proposer: resolved("GPROPOSER"),
-    quorum: resolved(BigInt(100)),
-  });
-  walletGovernor = createGovernorClientMock({
-    has_voted: resolved(false),
-    quorum: resolved(BigInt(100)),
-  });
-  nft = createNftClientMock({ get_votes: resolved(BigInt(3)) });
-  mocks.createReadOnlyGovernorClient.mockImplementation(() => readOnlyGovernor);
-  mocks.createGovernorClient.mockImplementation(() => walletGovernor);
-  mocks.createReadOnlyNftClient.mockImplementation(() => nft);
   mockWallet();
   mockVoteTotals();
+  mockReadOnly();
+  mockGovernor();
+  mockNft();
 });
+
 
 describe("ProposalDetailPage", () => {
   it("rejects non-hexadecimal IDs before any RPC request", async () => {
@@ -142,7 +160,9 @@ describe("ProposalDetailPage", () => {
 
   it("renders an unavailable state for well-formed unknown IDs", async () => {
     mocks.useParams.mockReturnValue({ id: VALID_ID });
-    readOnlyGovernor.set("proposal_state", rejected("Contract error"));
+    mockReadOnly({
+      proposal_state: vi.fn().mockRejectedValue(new Error("Contract error")),
+    });
 
     render(<ProposalDetailPage />);
 
@@ -172,17 +192,21 @@ describe("ProposalDetailPage", () => {
 
   it("shows snapshot and deadline ledger numbers for a valid proposal", async () => {
     mocks.useParams.mockReturnValue({ id: VALID_ID });
-    readOnlyGovernor.set("proposal_snapshot", resolved(1_500_000));
-    readOnlyGovernor.set("proposal_deadline", resolved(2_000_000));
+    const snapshot = vi.fn().mockResolvedValue({ result: 1_500_000 });
+    const deadline = vi.fn().mockResolvedValue({ result: 2_000_000 });
+    mockReadOnly({
+      proposal_snapshot: snapshot,
+      proposal_deadline: deadline,
+    });
 
     render(<ProposalDetailPage />);
 
     expect(await screen.findByText("1500000")).toBeInTheDocument();
     expect(screen.getByText("2000000")).toBeInTheDocument();
-    expect(readOnlyGovernor.proposal_snapshot.callCount()).toBe(1);
-    expect(readOnlyGovernor.proposal_deadline.callCount()).toBe(1);
-    const snapshotArg = readOnlyGovernor.proposal_snapshot.lastArgs()!;
-    const deadlineArg = readOnlyGovernor.proposal_deadline.lastArgs()!;
+    expect(snapshot).toHaveBeenCalledTimes(1);
+    expect(deadline).toHaveBeenCalledTimes(1);
+    const snapshotArg = snapshot.mock.calls[0][0];
+    const deadlineArg = deadline.mock.calls[0][0];
     // Vitest/jsdom can expose Buffer instances that fail Buffer.isBuffer across realms.
     expect(snapshotArg.proposal_id).toBeInstanceOf(Uint8Array);
     expect(deadlineArg.proposal_id).toBeInstanceOf(Uint8Array);
@@ -192,7 +216,9 @@ describe("ProposalDetailPage", () => {
 
   it("keeps proposal state visible when deadline read fails", async () => {
     mocks.useParams.mockReturnValue({ id: VALID_ID });
-    readOnlyGovernor.set("proposal_deadline", rejected("deadline boom"));
+    mockReadOnly({
+      proposal_deadline: vi.fn().mockRejectedValue(new Error("deadline boom")),
+    });
 
     render(<ProposalDetailPage />);
 
@@ -205,29 +231,29 @@ describe("ProposalDetailPage", () => {
     const firstId = "ab".repeat(32);
     const secondId = "cd".repeat(32);
     let currentId = firstId;
-    const firstResponse = deferred<ProposalState>();
-    const secondResponse = deferred<ProposalState>();
+    const firstResponse = deferred<{ result: ProposalState }>();
+    const secondResponse = deferred<{ result: ProposalState }>();
+    const proposalState = vi
+      .fn()
+      .mockReturnValueOnce(firstResponse.promise)
+      .mockReturnValueOnce(secondResponse.promise);
 
     mocks.useParams.mockImplementation(() => ({ id: currentId }));
-    readOnlyGovernor.set(
-      "proposal_state",
-      sequence(
-        () => firstResponse.promise,
-        () => secondResponse.promise,
-      ),
-    );
+    mockReadOnly({
+      proposal_state: proposalState,
+    });
 
     const { rerender } = render(<ProposalDetailPage />);
     currentId = secondId;
     rerender(<ProposalDetailPage />);
 
     await act(async () => {
-      secondResponse.resolve(ProposalState.Active);
+      secondResponse.resolve({ result: ProposalState.Active });
     });
     expect(await screen.findByText("Active")).toBeInTheDocument();
 
     await act(async () => {
-      firstResponse.resolve(ProposalState.Pending);
+      firstResponse.resolve({ result: ProposalState.Pending });
     });
     expect(screen.getByText("Active")).toBeInTheDocument();
     expect(screen.queryByText("Loading proposal…")).not.toBeInTheDocument();
@@ -247,8 +273,8 @@ describe("ProposalDetailPage", () => {
   it("shows a loading state while voting power is fetched", async () => {
     mocks.useParams.mockReturnValue({ id: VALID_ID });
     mockConnectedWallet();
-    const pending = deferred<bigint>();
-    nft.set("get_votes", () => pending.promise);
+    const pending = deferred<{ result: bigint }>();
+    mockNft({ get_votes: vi.fn().mockReturnValue(pending.promise) });
 
     render(<ProposalDetailPage />);
 
@@ -262,7 +288,7 @@ describe("ProposalDetailPage", () => {
     expect(votingPowerValue?.querySelector("[aria-hidden='true']")).toBeTruthy();
 
     await act(async () => {
-      pending.resolve(BigInt(7));
+      pending.resolve({ result: BigInt(7) });
     });
     expect(await screen.findByText("7")).toBeInTheDocument();
   });
@@ -271,7 +297,9 @@ describe("ProposalDetailPage", () => {
     mocks.useParams.mockReturnValue({ id: VALID_ID });
     mockConnectedWallet();
     const power = BigInt("9007199254740993");
-    nft.set("get_votes", resolved(power));
+    mockNft({
+      get_votes: vi.fn().mockResolvedValue({ result: power }),
+    });
 
     render(<ProposalDetailPage />);
 
@@ -281,7 +309,9 @@ describe("ProposalDetailPage", () => {
   it("guides users when voting power is zero", async () => {
     mocks.useParams.mockReturnValue({ id: VALID_ID });
     mockConnectedWallet();
-    nft.set("get_votes", resolved(BigInt(0)));
+    mockNft({
+      get_votes: vi.fn().mockResolvedValue({ result: BigInt(0) }),
+    });
 
     render(<ProposalDetailPage />);
 
@@ -297,7 +327,9 @@ describe("ProposalDetailPage", () => {
   it("keeps proposal details visible when voting power read fails", async () => {
     mocks.useParams.mockReturnValue({ id: VALID_ID });
     mockConnectedWallet();
-    nft.set("get_votes", rejected("votes boom"));
+    mockNft({
+      get_votes: vi.fn().mockRejectedValue(new Error("votes boom")),
+    });
 
     render(<ProposalDetailPage />);
 
@@ -312,10 +344,11 @@ describe("ProposalDetailPage", () => {
   it("refreshes voting power when the connected address changes", async () => {
     mocks.useParams.mockReturnValue({ id: VALID_ID });
     mockConnectedWallet("GWALLET1");
-    nft.set(
-      "get_votes",
-      sequence(resolved(BigInt(1)), resolved(BigInt(4))),
-    );
+    const getVotes = vi
+      .fn()
+      .mockResolvedValueOnce({ result: BigInt(1) })
+      .mockResolvedValueOnce({ result: BigInt(4) });
+    mockNft({ get_votes: getVotes });
 
     const { rerender } = render(<ProposalDetailPage />);
     expect(await screen.findByText("1")).toBeInTheDocument();
@@ -324,23 +357,27 @@ describe("ProposalDetailPage", () => {
     rerender(<ProposalDetailPage />);
 
     expect(await screen.findByText("4")).toBeInTheDocument();
-    expect(nft.get_votes.callCount()).toBe(2);
-    expect(nft.get_votes.argsAt(0)).toEqual({ account: "GWALLET1" });
-    expect(nft.get_votes.argsAt(1)).toEqual({ account: "GWALLET2" });
+    expect(getVotes).toHaveBeenCalledTimes(2);
+    expect(getVotes.mock.calls[0][0]).toEqual({ account: "GWALLET1" });
+    expect(getVotes.mock.calls[1][0]).toEqual({ account: "GWALLET2" });
   });
 
   it("requests has_voted only when a wallet is connected", async () => {
     mocks.useParams.mockReturnValue({ id: VALID_ID });
+    const hasVoted = vi.fn().mockResolvedValue({ result: false });
+    mockGovernor({ has_voted: hasVoted });
+
     render(<ProposalDetailPage />);
     expect(await screen.findByText("Active")).toBeInTheDocument();
-    expect(walletGovernor.has_voted.callCount()).toBe(0);
+    expect(hasVoted).not.toHaveBeenCalled();
 
     mockConnectedWallet("GWALLET");
+    mockGovernor({ has_voted: hasVoted });
     const { unmount } = render(<ProposalDetailPage />);
     unmount();
     render(<ProposalDetailPage />);
-    await waitFor(() => expect(walletGovernor.has_voted.callCount()).toBeGreaterThan(0));
-    expect(walletGovernor.has_voted.argsAt(0)?.account).toBe("GWALLET");
+    await waitFor(() => expect(hasVoted).toHaveBeenCalled());
+    expect(hasVoted.mock.calls[0][0].account).toBe("GWALLET");
   });
 
   it.each([
@@ -352,6 +389,11 @@ describe("ProposalDetailPage", () => {
     async (label, voteType) => {
       mocks.useParams.mockReturnValue({ id: VALID_ID });
       mockConnectedWallet("GVOTER");
+      const castVote = vi.fn().mockResolvedValue({
+        signAndSend: vi.fn().mockResolvedValue(undefined),
+      });
+      mockGovernor({ cast_vote: castVote });
+
       render(<ProposalDetailPage />);
       expect(await screen.findByRole("heading", { name: "Cast vote" })).toBeInTheDocument();
 
@@ -360,8 +402,8 @@ describe("ProposalDetailPage", () => {
       });
       fireEvent.click(screen.getByRole("button", { name: label }));
 
-      await waitFor(() => expect(walletGovernor.cast_vote.callCount()).toBe(1));
-      const args = walletGovernor.cast_vote.lastArgs()!;
+      await waitFor(() => expect(castVote).toHaveBeenCalledTimes(1));
+      const args = castVote.mock.calls[0][0];
       expect(args.vote_type).toBe(voteType);
       expect(args.reason).toBe("My reason");
       expect(args.voter).toBe("GVOTER");
@@ -373,37 +415,39 @@ describe("ProposalDetailPage", () => {
   it("refreshes proposal state after a confirmed vote", async () => {
     mocks.useParams.mockReturnValue({ id: VALID_ID });
     mockConnectedWallet();
-    readOnlyGovernor.set(
-      "proposal_state",
-      sequence(
-        resolved(ProposalState.Active),
-        resolved(ProposalState.Succeeded),
-      ),
-    );
-    walletGovernor.set(
-      "has_voted",
-      sequence(resolved(false), resolved(true)),
-    );
+    const proposalState = vi
+      .fn()
+      .mockResolvedValueOnce({ result: ProposalState.Active })
+      .mockResolvedValueOnce({ result: ProposalState.Succeeded });
+    const hasVoted = vi
+      .fn()
+      .mockResolvedValueOnce({ result: false })
+      .mockResolvedValueOnce({ result: true });
+    mockReadOnly({
+      proposal_state: proposalState,
+    });
+    mockGovernor({
+      has_voted: hasVoted,
+      cast_vote: vi.fn().mockResolvedValue({
+        signAndSend: vi.fn().mockResolvedValue(undefined),
+      }),
+    });
 
     render(<ProposalDetailPage />);
     expect(await screen.findByText("Active")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "For" }));
     expect(await screen.findByText("Vote confirmed!")).toBeInTheDocument();
-    await waitFor(() =>
-      expect(readOnlyGovernor.proposal_state.callCount()).toBeGreaterThan(1),
-    );
-    await waitFor(() =>
-      expect(walletGovernor.has_voted.callCount()).toBeGreaterThan(1),
-    );
+    await waitFor(() => expect(proposalState.mock.calls.length).toBeGreaterThan(1));
+    await waitFor(() => expect(hasVoted.mock.calls.length).toBeGreaterThan(1));
   });
 
   it("does not report success after wallet rejection", async () => {
     mocks.useParams.mockReturnValue({ id: VALID_ID });
     mockConnectedWallet();
-    walletGovernor.setTransactionOptions({
-      outcome: "failure",
-      rejectOnSubmit: true,
-      failureMessage: "User rejected the request",
+    mockGovernor({
+      cast_vote: vi.fn().mockResolvedValue({
+        signAndSend: vi.fn().mockRejectedValue(new Error("User rejected the request")),
+      }),
     });
 
     render(<ProposalDetailPage />);
@@ -419,10 +463,12 @@ describe("ProposalDetailPage", () => {
   it("does not report success after a duplicate vote", async () => {
     mocks.useParams.mockReturnValue({ id: VALID_ID });
     mockConnectedWallet();
-    walletGovernor.setTransactionOptions({
-      outcome: "failure",
-      rejectOnSubmit: true,
-      failureMessage: "HostError: Error(Contract, #5016)",
+    mockGovernor({
+      cast_vote: vi.fn().mockResolvedValue({
+        signAndSend: vi
+          .fn()
+          .mockRejectedValue(new Error("HostError: Error(Contract, #5016)")),
+      }),
     });
 
     render(<ProposalDetailPage />);

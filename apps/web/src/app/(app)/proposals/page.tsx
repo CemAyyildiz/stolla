@@ -163,12 +163,19 @@ export default function ProposalsPage() {
     [states],
   );
 
+  const activeStateFilter = useMemo(() => {
+    if (stateFilter !== ALL_FILTER && !availableStates.includes(stateFilter)) {
+      return ALL_FILTER;
+    }
+    return stateFilter;
+  }, [availableStates, stateFilter]);
+
   const filteredIds = useMemo(
     () =>
-      stateFilter === ALL_FILTER
+      activeStateFilter === ALL_FILTER
         ? uniqueProposalIds
-        : uniqueProposalIds.filter((id) => states[id] === stateFilter),
-    [stateFilter, states, uniqueProposalIds],
+        : uniqueProposalIds.filter((id) => states[id] === activeStateFilter),
+    [activeStateFilter, states, uniqueProposalIds],
   );
 
   const visibleIds = useMemo(
@@ -176,15 +183,6 @@ export default function ProposalsPage() {
     [filteredIds, visibleCount],
   );
   const canLoadMore = visibleCount < filteredIds.length;
-
-  useEffect(() => {
-    if (stateFilter !== ALL_FILTER && !availableStates.includes(stateFilter)) {
-      // Keep a removed state option from leaving the control with an invalid value.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setStateFilter(ALL_FILTER);
-    }
-  }, [availableStates, stateFilter]);
-
 
   async function handleCreateProposal() {
     if (!address) {

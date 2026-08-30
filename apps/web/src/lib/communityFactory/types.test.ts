@@ -33,11 +33,9 @@ describe("serializeCommunityFactoryArgs", () => {
     });
     expect(args.governance.voting_delay).toBe(1);
     expect(args.governance.voting_period).toBe(17280);
-    expect(args.governance.proposal_threshold).toBe(
-      BigInt("900719925474099312345"),
-    );
+    expect(args.governance.proposal_threshold).toBe(900719925474099312345n);
     expect(args.governance.quorum).toBe(
-      BigInt("340282366920938463463374607431768211455"),
+      340282366920938463463374607431768211455n,
     );
   });
 
@@ -58,10 +56,7 @@ describe("serializeCommunityFactoryArgs", () => {
       serializeCommunityFactoryArgs(
         {
           ...validState,
-          governance: {
-            ...validState.governance,
-            votingDelay: "4294967296",
-          },
+          governance: { ...validState.governance, votingDelay: "4294967296" },
         },
         "GCREATOR",
       ),

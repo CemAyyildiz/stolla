@@ -1,7 +1,7 @@
 "use client";
 
-import { getCommunityById } from "@/lib/communities/registry";
-import type { CommunityRecord } from "@/lib/communities/types";
+import type { Community, CommunityRegistry } from "@/lib/community/types";
+import { useRegistryCommunity } from "@/lib/community/useRegistryCommunity";
 import {
   useCommunityProposal,
   type ProposalReaderFactory,
@@ -26,7 +26,7 @@ const stateLabels: Record<ProposalState, string> = {
 export type CommunityProposalDetailViewProps = {
   communityId: string;
   proposalId: string;
-  registry?: CommunityRecord[];
+  registry?: CommunityRegistry;
   getReader?: ProposalReaderFactory;
 };
 
@@ -36,11 +36,23 @@ export function CommunityProposalDetailView({
   registry,
   getReader,
 }: CommunityProposalDetailViewProps) {
-  const community = getCommunityById(communityId, registry);
+  const resolution = useRegistryCommunity(communityId, registry);
 
-  if (!community) {
+  if (resolution.status === "loading") {
+    return <p className="p-6 text-sm text-slate-400">Loading community…</p>;
+  }
+  if (resolution.status === "error") {
+    return (
+      <p role="alert" className="p-6 text-sm text-rose-300">
+        {resolution.error}
+      </p>
+    );
+  }
+  if (resolution.result.status !== "found") {
     return <CommunityNotFound communityId={communityId} />;
   }
+
+  const community = resolution.result.community;
 
   return (
     <CommunityProposalDetailPanel
@@ -56,12 +68,12 @@ function CommunityProposalDetailPanel({
   proposalId,
   getReader,
 }: {
-  community: CommunityRecord;
+  community: Community;
   proposalId: string;
   getReader?: ProposalReaderFactory;
 }) {
   const resolution = useCommunityProposal(
-    community.governorContractId,
+    community.record.governorContract,
     proposalId,
     getReader,
   );
@@ -69,8 +81,8 @@ function CommunityProposalDetailPanel({
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
       <CommunityBreadcrumbs
-        communityId={community.id}
-        communityName={community.name}
+        communityId={community.record.id}
+        communityName={community.metadata?.name ?? community.record.id}
         proposalId={proposalId}
       />
       <h1 className="mt-4 text-2xl font-bold text-slate-100">
@@ -97,7 +109,9 @@ function CommunityProposalDetailPanel({
           </div>
           <div>
             <dt className="text-slate-500">Community</dt>
-            <dd className="font-medium text-slate-100">{community.name}</dd>
+            <dd className="font-medium text-slate-100">
+              {community.metadata?.name ?? community.record.id}
+            </dd>
           </div>
         </dl>
       )}
