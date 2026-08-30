@@ -7,7 +7,7 @@ import {
   getStoredCommunityDeploymentHash,
   storeCommunityDeploymentHash,
 } from "@/lib/contracts";
-import { config } from "@/lib/stellar";
+import { activeCapabilities } from "@/lib/stellar";
 import {
   deployCommunityFromWizard,
   type DeploymentStage,
@@ -54,8 +54,9 @@ export function useCommunityDeployment() {
       try {
         const nextOutcome = await deployCommunityFromWizard(state, {
           address,
-          expectedNetworkPassphrase: config.networkPassphrase,
-          walletNetworkPassphrase: walletNetworkPassphrase,
+          expectedNetworkPassphrase:
+            activeCapabilities.network.networkPassphrase,
+          walletNetworkPassphrase,
           createClient: () =>
             createCommunityFactoryClient({
               publicKey: address ?? "",

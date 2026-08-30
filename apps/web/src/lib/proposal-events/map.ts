@@ -3,6 +3,7 @@ import type {
   ProposalEventRpcMetadata,
   ProposalSummary,
 } from "./types";
+import { parseProposalDescription } from "@/lib/proposal-metadata";
 
 /**
  * Maps a decoded ProposalCreated event and its RPC/indexer metadata into a
@@ -28,6 +29,7 @@ export function mapProposalCreatedEvent(
   event: ProposalCreatedEventData,
   meta: ProposalEventRpcMetadata,
 ): ProposalSummary {
+  const parsed = parseProposalDescription(event.description);
   return {
     proposalId: event.proposalId.toLowerCase(),
     governorContractId,
@@ -38,5 +40,6 @@ export function mapProposalCreatedEvent(
     voteSnapshot: event.voteSnapshot,
     voteEnd: event.voteEnd,
     description: event.description,
+    metadata: parsed.kind === "versioned" ? parsed.metadata : null,
   };
 }
