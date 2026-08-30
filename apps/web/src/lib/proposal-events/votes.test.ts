@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Address, xdr } from "@stellar/stellar-sdk";
 import { Buffer } from "buffer";
-import { fetchVoteTotals } from "./voteAggregation";
+import { fetchVoteTotals } from "./votes";
 
 const GOVERNOR =
   "CDJZ4QTYXZ5YKHRXRBCOXQDZI5TUE5QLODC5IJFYDXQMQJFP5PFRMPHY";
@@ -29,15 +29,16 @@ vi.mock("@stellar/stellar-sdk", async (importOriginal) => {
   };
 });
 
-vi.mock("./stellar", () => ({
+vi.mock("../stellar", () => ({
   config: { rpcUrl: "https://soroban-testnet.stellar.org" },
   contractIds: {
-    governor: "CDJZ4QTYXZ5YKHRXRBCOXQDZI5TUE5QLODC5IJFYDXQMQJFP5PFRMPHY",
+    governor:
+      "CDJZ4QTYXZ5YKHRXRBCOXQDZI5TUE5QLODC5IJFYDXQMQJFP5PFRMPHY",
   },
-  requireGovernorStartLedger: () => 1_500_000,
+  requireGovernorStartLedger: () => 1000,
 }));
 
-vi.mock("./e2eMock", () => ({
+vi.mock("../e2eMock", () => ({
   getE2EBridge: () => undefined,
 }));
 
@@ -93,8 +94,7 @@ describe("fetchVoteTotals", () => {
 
   describe("mixed weighted votes", () => {
     it("aggregates For, Against, and Abstain weights correctly", async () => {
-      const proposalHex =
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+      const proposalHex = DEFAULT_PROPOSAL;
 
       setupPage([
         { id: "1-0", native: [1, BigInt(100), "I support this"] },
@@ -116,8 +116,7 @@ describe("fetchVoteTotals", () => {
     });
 
     it("uses bigint without precision loss for large weights", async () => {
-      const proposalHex =
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+      const proposalHex = DEFAULT_PROPOSAL;
       const hugeWeight = BigInt(340282366920938463463374607431768211455);
 
       setupPage([{ id: "1-0", native: [1, hugeWeight, ""] }]);
@@ -136,9 +135,7 @@ describe("fetchVoteTotals", () => {
         latestLedger: 200,
       });
 
-      const result = await fetchVoteTotals(
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      );
+      const result = await fetchVoteTotals(DEFAULT_PROPOSAL);
 
       expect(result.totals).toEqual({
         for: BigInt(0),
@@ -157,9 +154,7 @@ describe("fetchVoteTotals", () => {
         { id: "1-1", native: [1, BigInt(20), ""] },
       ]);
 
-      const result = await fetchVoteTotals(
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      );
+      const result = await fetchVoteTotals(DEFAULT_PROPOSAL);
 
       expect(result.totals.for).toBe(BigInt(30));
     });
@@ -167,8 +162,7 @@ describe("fetchVoteTotals", () => {
 
   describe("malformed events", () => {
     it("handles events where scValToNative throws by marking incomplete", async () => {
-      const proposalHex =
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+      const proposalHex = DEFAULT_PROPOSAL;
 
       mockScValToNative.mockImplementationOnce(() => {
         throw new Error("XDR decode failed");
@@ -194,9 +188,7 @@ describe("fetchVoteTotals", () => {
         { id: "1-2", native: [99, BigInt(25), ""] },
       ]);
 
-      const result = await fetchVoteTotals(
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      );
+      const result = await fetchVoteTotals(DEFAULT_PROPOSAL);
 
       expect(result.totals.for).toBe(BigInt(100));
       expect(result.totals.against).toBe(BigInt(0));
@@ -207,8 +199,7 @@ describe("fetchVoteTotals", () => {
 
   describe("deduplication", () => {
     it("deduplicates events by event ID", async () => {
-      const proposalHex =
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+      const proposalHex = DEFAULT_PROPOSAL;
 
       // Events: "1-0" appears twice (only first counted), "1-1" is new
       mockScValToNative.mockReturnValueOnce([1, BigInt(100), ""]);
@@ -236,9 +227,7 @@ describe("fetchVoteTotals", () => {
     it("returns incomplete with error message when getEvents throws", async () => {
       mockGetEvents.mockRejectedValueOnce(new Error("Network timeout"));
 
-      const result = await fetchVoteTotals(
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      );
+      const result = await fetchVoteTotals(DEFAULT_PROPOSAL);
 
       expect(result.totals).toEqual({
         for: BigInt(0),
@@ -253,9 +242,7 @@ describe("fetchVoteTotals", () => {
     it("handles non-Error thrown objects", async () => {
       mockGetEvents.mockRejectedValueOnce("string error");
 
-      const result = await fetchVoteTotals(
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      );
+      const result = await fetchVoteTotals(DEFAULT_PROPOSAL);
 
       expect(result.incomplete).toBe(true);
       expect(result.error).toBe("Failed to fetch vote events");
@@ -264,8 +251,7 @@ describe("fetchVoteTotals", () => {
 
   describe("pagination", () => {
     it("aggregates votes across multiple pages", async () => {
-      const proposalHex =
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+      const proposalHex = DEFAULT_PROPOSAL;
 
       // Page 1: 100 For votes
       for (let i = 0; i < 100; i++) {
@@ -301,8 +287,7 @@ describe("fetchVoteTotals", () => {
     });
 
     it("stops pagination when fewer than limit events returned", async () => {
-      const proposalHex =
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+      const proposalHex = DEFAULT_PROPOSAL;
 
       // 30 Abstain votes, weight 2 each
       for (let i = 0; i < 30; i++) {

@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import type { ProposalSummary } from "@/lib/proposal/types";
-import { OnChainIdentifier } from "@/components/ui/OnChainIdentifier";
+import type { ProposalSummary } from "@/lib/proposal-events";
 import { truncateMiddle } from "@/lib/truncate";
+import { parseProposalDescription } from "@/lib/proposal-metadata";
 
 export type ProposalSummaryCardStateStatus =
   | "loading"
@@ -32,6 +32,7 @@ export type ProposalSummaryCardProps = {
   showDescription?: boolean;
   onRetryState?: () => void;
   isRetryingState?: boolean;
+  onCopyId?: () => void;
   href?: string;
 };
 
@@ -64,18 +65,35 @@ function DescriptionText({
 }) {
   const trimmed = description?.trim() ?? "";
   const hasDescription = trimmed.length > 0;
+  const parsed = parseProposalDescription(trimmed);
+  if (parsed.kind === "legacy") {
+    return (
+      <p
+        className={`mt-1 min-w-0 text-xs [overflow-wrap:anywhere] ${
+          hasDescription
+            ? "line-clamp-2 break-words text-slate-400"
+            : "text-slate-600"
+        }`}
+        title={hasDescription ? trimmed : undefined}
+      >
+        {hasDescription ? trimmed : "Description unavailable"}
+      </p>
+    );
+  }
+  const title = parsed.kind === "versioned" ? parsed.metadata.title : null;
+  const display =
+    parsed.kind === "versioned" ? parsed.metadata.summary : trimmed;
 
   return (
-    <p
-      className={`mt-1 min-w-0 text-xs [overflow-wrap:anywhere] ${
-        hasDescription
-          ? "line-clamp-2 break-words text-slate-400"
-          : "text-slate-600"
-      }`}
-      title={hasDescription ? trimmed : undefined}
-    >
-      {hasDescription ? trimmed : "Description unavailable"}
-    </p>
+    <span className="mt-1 min-w-0">
+      {title && <span className="block truncate text-sm font-medium text-slate-200">{title}</span>}
+      <span
+        className={`block text-xs [overflow-wrap:anywhere] ${hasDescription ? "line-clamp-2 break-words text-slate-400" : "text-slate-600"}`}
+        title={hasDescription ? display : undefined}
+      >
+        {hasDescription ? display : "Description unavailable"}
+      </span>
+    </span>
   );
 }
 
@@ -89,6 +107,7 @@ export function ProposalSummaryCard({
   showDescription = false,
   onRetryState,
   isRetryingState = false,
+  onCopyId,
   href,
 }: ProposalSummaryCardProps) {
   const { proposalId } = summary;
@@ -139,7 +158,17 @@ export function ProposalSummaryCard({
             {isRetryingState ? "Retrying…" : "Retry state"}
           </button>
         )}
-        <OnChainIdentifier label="Proposal ID" value={proposalId} kind="opaque" hideValue />
+        {onCopyId && (
+          <button
+            type="button"
+            onClick={onCopyId}
+            className="rounded px-2 py-1 text-xs text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"
+            title="Copy proposal ID"
+            aria-label={`Copy proposal ID ${proposalId}`}
+          >
+            Copy
+          </button>
+        )}
       </div>
     </div>
   );

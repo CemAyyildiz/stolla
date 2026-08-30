@@ -15,12 +15,19 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { ProposalSummaryCard } from "@/components/ProposalSummaryCard";
 import { truncateEnd } from "@/lib/truncate";
 import { LiveStatus } from "@/components/ui/LiveStatus";
-import { AsyncState } from "@/components/ui/AsyncState";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { ErrorState } from "@/components/ui/ErrorState";
-import { FreshnessNotice } from "@/components/ui/FreshnessNotice";
 import { TransactionLifecycleStatus } from "@/components/TransactionLifecycleStatus";
 import { useOperationLifecycle } from "@/hooks/useOperationLifecycle";
+import { ProposalMetadataFields } from "@/components/proposal/ProposalMetadataFields";
+import { ProposalMetadataPreview } from "@/components/proposal/ProposalMetadataPreview";
+import {
+  EMPTY_PROPOSAL_METADATA_DRAFT,
+  hasProposalMetadataErrors,
+  serializeProposalMetadata,
+  validateProposalMetadataDraft,
+  type ProposalMetadataDraft,
+  type ProposalMetadataErrors,
+  type ProposalMetadataField,
+} from "@/lib/proposal-metadata";
 
 type ActionStatus = {
   message: string;
@@ -33,8 +40,11 @@ type StateFilter = typeof ALL_FILTER | ProposalState;
 
 export default function ProposalsPage() {
   const { address, signTransaction } = useWallet();
-  const [description, setDescription] = useState("");
-  const [descriptionError, setDescriptionError] = useState<string | null>(null);
+  const [metadata, setMetadata] = useState<ProposalMetadataDraft>({
+    ...EMPTY_PROPOSAL_METADATA_DRAFT,
+  });
+  const [metadataErrors, setMetadataErrors] =
+    useState<ProposalMetadataErrors>({});
   const [status, setStatus] = useState<ActionStatus | null>(null);
   const proposeLifecycle = useOperationLifecycle();
   const [stateFilter, setStateFilter] = useState<StateFilter>(ALL_FILTER);
@@ -150,9 +160,7 @@ export default function ProposalsPage() {
   );
 
   useEffect(() => {
-    // The async loader owns its request lifecycle and updates state after I/O.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadStates();
+    void Promise.resolve().then(loadStates);
   }, [loadStates]);
 
   const availableStates = useMemo(
@@ -163,19 +171,17 @@ export default function ProposalsPage() {
     [states],
   );
 
-  const activeStateFilter = useMemo(() => {
-    if (stateFilter !== ALL_FILTER && !availableStates.includes(stateFilter)) {
-      return ALL_FILTER;
-    }
-    return stateFilter;
-  }, [availableStates, stateFilter]);
+  const effectiveStateFilter =
+    stateFilter !== ALL_FILTER && !availableStates.includes(stateFilter)
+      ? ALL_FILTER
+      : stateFilter;
 
   const filteredIds = useMemo(
     () =>
-      activeStateFilter === ALL_FILTER
+      effectiveStateFilter === ALL_FILTER
         ? uniqueProposalIds
-        : uniqueProposalIds.filter((id) => states[id] === activeStateFilter),
-    [activeStateFilter, states, uniqueProposalIds],
+        : uniqueProposalIds.filter((id) => states[id] === effectiveStateFilter),
+    [effectiveStateFilter, states, uniqueProposalIds],
   );
 
   const visibleIds = useMemo(
@@ -189,15 +195,17 @@ export default function ProposalsPage() {
       setStatus({ message: "Connect your wallet first.", tone: "error" });
       return;
     }
-    if (!description.trim()) {
-      setDescriptionError("Proposal description is required.");
+    const validationErrors = validateProposalMetadataDraft(metadata);
+    if (hasProposalMetadataErrors(validationErrors)) {
+      setMetadataErrors(validationErrors);
       setStatus(null);
       return;
     }
     if (proposeLifecycle.isInFlight) return;
 
-    const descriptionSnapshot = description.trim();
-    setDescriptionError(null);
+    const metadataSnapshot = { ...metadata };
+    const descriptionSnapshot = serializeProposalMetadata(metadataSnapshot);
+    setMetadataErrors({});
     setStatus(null);
     proposeLifecycle.reset();
 
@@ -216,8 +224,8 @@ export default function ProposalsPage() {
     });
 
     if (!result.ok) {
-      // Preserve entered description on rejection / RPC failure.
-      setDescription(descriptionSnapshot);
+      // Preserve entered metadata on rejection / RPC failure.
+      setMetadata(metadataSnapshot);
       return;
     }
 
@@ -242,7 +250,7 @@ export default function ProposalsPage() {
       });
     }
 
-    setDescription("");
+    setMetadata({ ...EMPTY_PROPOSAL_METADATA_DRAFT });
     // Discovery delay is indexing lag, not a transaction failure.
     const refreshed = await refresh();
     if (!refreshed) {
@@ -255,6 +263,15 @@ export default function ProposalsPage() {
       return;
     }
     await loadStates();
+  }
+
+  function updateMetadata(field: ProposalMetadataField, value: string) {
+    setMetadata((current) => ({ ...current, [field]: value || (field === "discussionUrl" ? null : "") }));
+    setMetadataErrors((current) => ({
+      ...current,
+      [field]: undefined,
+      envelope: undefined,
+    }));
   }
 
   return (
@@ -274,44 +291,15 @@ export default function ProposalsPage() {
       {contractsConfigured && (
         <section className="mt-6 min-w-0 rounded-xl border border-slate-800 bg-[#151b2b] p-4 sm:p-5">
           <h2 className="font-semibold text-slate-100">Create proposal</h2>
-          <label
-            htmlFor="proposal-description"
-            className="mt-3 block text-sm text-slate-400"
-          >
-            Proposal description{" "}
-            <span className="text-slate-500">(required)</span>
-          </label>
-          <textarea
-            id="proposal-description"
-            value={description}
-            onChange={(e) => {
-              setDescription(e.target.value);
-              setDescriptionError(null);
-            }}
-            rows={3}
-            required
-            aria-describedby={`proposal-description-help${
-              descriptionError ? " proposal-description-error" : ""
-            }`}
-            aria-invalid={Boolean(descriptionError)}
-            className="mt-1 box-border w-full min-w-0 resize-y rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600"
-            placeholder="Describe the community decision..."
-          />
-          <p
-            id="proposal-description-help"
-            className="mt-1 text-xs text-slate-500"
-          >
-            Summarize the decision and intended action recorded with the proposal.
+          <p className="mt-1 text-sm text-slate-400">
+            Structured metadata stays inside the Governor&apos;s existing description field.
           </p>
-          {descriptionError && (
-            <p
-              id="proposal-description-error"
-              role="alert"
-              className="mt-1 text-xs text-rose-300"
-            >
-              {descriptionError}
-            </p>
-          )}
+          <ProposalMetadataFields
+            value={metadata}
+            errors={metadataErrors}
+            onChange={updateMetadata}
+          />
+          <ProposalMetadataPreview metadata={metadata} />
           <button
             type="button"
             onClick={() => void handleCreateProposal()}
@@ -378,7 +366,9 @@ export default function ProposalsPage() {
                 id="proposal-state-filter"
                 aria-label="Filter proposals by state"
                 value={
-                  stateFilter === ALL_FILTER ? ALL_FILTER : String(stateFilter)
+                  effectiveStateFilter === ALL_FILTER
+                    ? ALL_FILTER
+                    : String(effectiveStateFilter)
                 }
                 onChange={(e) => {
                   setStateFilter(
@@ -421,29 +411,35 @@ export default function ProposalsPage() {
                 ),
               )}
             </ul>
-            <AsyncState className="sr-only">Loading proposal history...</AsyncState>
+            <LiveStatus className="sr-only">Loading proposal history...</LiveStatus>
           </>
         )}
 
         {!loading && error && (
-          <ErrorState
-            className="mt-3"
-            title={
-              uniqueProposalIds.length > 0
-                ? "More proposal history could not be loaded."
-                : "Proposal history is temporarily unavailable."
-            }
-            onRetry={() => void refresh()}
-            retryLabel="Retry loading proposals"
+          <div
+            className="mt-3 rounded-lg border border-rose-800/70 bg-rose-950/40 p-4"
+            role="alert"
           >
-            {error}
-          </ErrorState>
+            <p className="font-medium text-rose-200">
+              {uniqueProposalIds.length > 0
+                ? "More proposal history could not be loaded."
+                : "Proposal history is temporarily unavailable."}
+            </p>
+            <p className="mt-1 text-sm text-rose-300/80">{error}</p>
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              className="mt-3 min-h-11 touch-manipulation rounded-lg border border-rose-600 px-3 py-2 text-sm font-medium text-rose-100 hover:bg-rose-900/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300"
+            >
+              Retry loading proposals
+            </button>
+          </div>
         )}
 
         {!loading && !error && empty && (
-          <EmptyState className="mt-3">
+          <LiveStatus className="mt-3 rounded-lg border border-dashed border-slate-700 bg-slate-900/40 p-4 text-sm text-slate-400">
             No public proposals have been discovered yet.
-          </EmptyState>
+          </LiveStatus>
         )}
 
         {!loading && uniqueProposalIds.length > 0 && filteredIds.length === 0 && (
@@ -455,10 +451,13 @@ export default function ProposalsPage() {
         {!loading && visibleIds.length > 0 && (
           <>
             {failedProposalIds.length > 0 && (
-              <FreshnessNotice className="mt-3">
+              <p
+                className="mt-3 rounded-lg border border-amber-800/70 bg-amber-950/40 p-4 text-sm text-amber-200"
+                role="status"
+              >
                 Some proposal states could not be loaded. Successful entries
                 remain listed; retry state on an affected entry.
-              </FreshnessNotice>
+              </p>
             )}
             <ul className="mt-3 space-y-2">
               {visibleIds.map((id) => {
@@ -490,6 +489,7 @@ export default function ProposalsPage() {
                           : undefined
                       }
                       isRetryingState={isRetrying}
+                      onCopyId={() => void navigator.clipboard.writeText(id)}
                     />
                   </li>
                 );

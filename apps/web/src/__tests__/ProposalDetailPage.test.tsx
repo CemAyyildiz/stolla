@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   createReadOnlyGovernorClient: vi.fn(),
   createReadOnlyNftClient: vi.fn(),
   fetchVoteTotals: vi.fn(),
+  useProposalDiscovery: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({ useParams: mocks.useParams }));
@@ -18,8 +19,11 @@ vi.mock("@/lib/contracts", () => ({
   createReadOnlyGovernorClient: mocks.createReadOnlyGovernorClient,
   createReadOnlyNftClient: mocks.createReadOnlyNftClient,
 }));
-vi.mock("@/lib/voteAggregation", () => ({
+vi.mock("@/lib/proposal-events", () => ({
   fetchVoteTotals: mocks.fetchVoteTotals,
+}));
+vi.mock("@/hooks/useProposalDiscovery", () => ({
+  useProposalDiscovery: mocks.useProposalDiscovery,
 }));
 vi.mock("@/lib/stellar", () => ({
   contractIds: { nft: "CNFT", governor: "CGOV" },
@@ -115,6 +119,13 @@ beforeEach(() => {
   mockReadOnly();
   mockGovernor();
   mockNft();
+  mocks.useProposalDiscovery.mockReturnValue({
+    proposals: [],
+    loading: false,
+    error: null,
+    empty: true,
+    refresh: vi.fn(),
+  });
 });
 
 

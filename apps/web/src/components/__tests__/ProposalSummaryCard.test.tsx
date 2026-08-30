@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { ProposalSummaryCard } from "@/components/ProposalSummaryCard";
-import type { ProposalSummary } from "@/lib/proposal/types";
+import type { ProposalSummary } from "@/lib/proposal-events";
 
 const FULL_ID = "ab".repeat(32);
 

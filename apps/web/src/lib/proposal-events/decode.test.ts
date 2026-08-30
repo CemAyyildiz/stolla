@@ -4,7 +4,7 @@ import { Buffer } from "buffer";
 import {
   decodeProposalEvent,
   type ProposalEventInput,
-} from "./proposalEvents";
+} from "./decode";
 
 const GOVERNOR_ID = "CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE";
 const PROPOSAL_HEX =

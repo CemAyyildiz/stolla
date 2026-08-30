@@ -1,14 +1,7 @@
 import { Address, Contract, xdr } from "@stellar/stellar-sdk";
 
-export const PROPOSAL_EVENT_KINDS = [
-  "proposal_created",
-  "vote_cast",
-  "proposal_queued",
-  "proposal_executed",
-  "proposal_cancelled",
-] as const;
-
-export type ProposalEventKind = (typeof PROPOSAL_EVENT_KINDS)[number];
+export type { ProposalEventKind } from "./kinds";
+export { PROPOSAL_EVENT_KINDS } from "./kinds";
 
 export interface ProposalEventInput {
   contractId?: unknown;

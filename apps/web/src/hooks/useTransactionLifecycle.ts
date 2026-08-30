@@ -65,7 +65,6 @@ export function useTransactionLifecycle(options?: UseTransactionLifecycleOptions
   });
   const inFlightRef = useRef(false);
   const onConfirmedRef = useRef(options?.onConfirmed);
-
   useEffect(() => {
     onConfirmedRef.current = options?.onConfirmed;
   }, [options?.onConfirmed]);
