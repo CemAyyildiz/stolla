@@ -1,12 +1,15 @@
 import { defineConfig, devices } from "@playwright/test";
-import {
-  FACTORY_ID,
-  GOVERNOR_ID,
-  NFT_ID,
-} from "./e2e/fixtures";
 
 const PORT = process.env.PLAYWRIGHT_PORT ?? "3100";
 const baseURL = `http://127.0.0.1:${PORT}`;
+
+/** Keep in sync with `e2e/fixtures.ts` / `src/test-support/stellar/fixtures.ts`. */
+const FACTORY_ID =
+  "CC67AYTYD52YNMSFXUMGGINQPFIZG5M5YELUA36UOKZK5YMOLNE7Y3EH";
+const NFT_ID =
+  "CBNLN62LU545PM2ECR66E7SSUE6G3LOC5NSWH3SVYPS6J225NS72D2JB";
+const GOVERNOR_ID =
+  "CBCGFEJRIVHLPFXPUNQJ2LSL4YDBNSZVEHIDVYPIQZR2CRDS5EK64QWL";
 
 export default defineConfig({
   testDir: "./e2e",
