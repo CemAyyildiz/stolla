@@ -1,14 +1,20 @@
 import { expect, type Page } from "@playwright/test";
 
 export const TESTNET_PASSPHRASE = "Test SDF Network ; September 2015";
-export const FACTORY_ID = `C${"A".repeat(55)}`;
-export const WALLET_ADDRESS = `G${"A".repeat(55)}`;
+export const FACTORY_ID =
+  "CC67AYTYD52YNMSFXUMGGINQPFIZG5M5YELUA36UOKZK5YMOLNE7Y3EH";
+export const WALLET_ADDRESS =
+  "GD4GQO72YZ6LTEKTLCZRLXB6YKX7WM5NTOJNLXU75PPYRWXWUY23BZ2O";
 export const ALPHA_ID = "aa".repeat(32);
 export const BETA_ID = "bb".repeat(32);
-export const ALPHA_GOVERNOR = `C${"B".repeat(55)}`;
-export const BETA_GOVERNOR = `C${"C".repeat(55)}`;
-export const ALPHA_NFT = `C${"D".repeat(55)}`;
-export const BETA_NFT = `C${"E".repeat(55)}`;
+export const ALPHA_GOVERNOR =
+  "CB75DJBIYCVL6ZTPMRTXJE3Z2E73LQ46KEVKTDPWQ4XGWWIYOACVS6RW";
+export const BETA_GOVERNOR =
+  "CBOWP2XJPV522TIGSRHW67WZGUWSFTS3UFXW4FEW2V2C3NPVEH65FBXF";
+export const ALPHA_NFT =
+  "CDBQG7HP5TRULYLH7ZYIDHM3WFQRQ7E7FYJ3ZWT2O6QBP3T5PKKSLKQ2";
+export const BETA_NFT =
+  "CBUSNWMYV4J2MM6IC6QJHG7EHC6WRUIF22NED3CQVDA4TODYIVJLWUS4";
 export const PROPOSAL_ID = "11".repeat(32);
 
 function community(

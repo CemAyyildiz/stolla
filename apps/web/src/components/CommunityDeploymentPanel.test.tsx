@@ -14,12 +14,19 @@ vi.mock("@/context/WalletProvider", () => ({
 }));
 
 import { CommunityDeploymentPanel } from "./CommunityDeploymentPanel";
+import {
+  MOCK_ACCOUNT_ALICE,
+  MOCK_ACCOUNT_BOB,
+  MOCK_CONTRACT_B,
+  MOCK_FACTORY_CONTRACT_ID,
+  MOCK_GOVERNOR_CONTRACT_ID,
+} from "@/test-support/stellar/fixtures";
 
-const address = `G${"A".repeat(55)}`;
+const address = MOCK_ACCOUNT_ALICE;
 const expectedRecord = {
   id: "ab".repeat(32),
-  nftContract: `C${"B".repeat(55)}`,
-  governorContract: `C${"C".repeat(55)}`,
+  nftContract: MOCK_CONTRACT_B,
+  governorContract: MOCK_GOVERNOR_CONTRACT_ID,
   creator: address,
   communityOwner: address,
   createdAtLedger: 10,
@@ -46,7 +53,7 @@ const props = {
     votingPeriod: "100",
   },
   network: "testnet" as const,
-  factoryId: `C${"D".repeat(55)}`,
+  factoryId: MOCK_FACTORY_CONTRACT_ID,
   confirmed: true,
 };
 
@@ -215,7 +222,7 @@ describe("CommunityDeploymentPanel", () => {
 
   it("blocks the deploy approval action for a non-owner wallet", async () => {
     const deployment = adapter();
-    const other = `G${"B".repeat(55)}`;
+    const other = MOCK_ACCOUNT_BOB;
     mocks.useWallet.mockReturnValue({
       address: other,
       signTransaction: vi.fn(),

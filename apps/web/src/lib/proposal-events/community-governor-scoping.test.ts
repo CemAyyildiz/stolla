@@ -18,9 +18,13 @@ import {
 } from "./dedupe";
 import type { ProposalSummary } from "./types";
 import { fetchVoteTotals } from "./votes";
+import {
+  MOCK_CONTRACT_A,
+  MOCK_CONTRACT_B,
+} from "@/test-support/stellar/fixtures";
 
-const G_A = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM";
-const G_B = "CBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBRTR4";
+const G_A = MOCK_CONTRACT_A;
+const G_B = MOCK_CONTRACT_B;
 const PROPOSAL_HEX =
   "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const VOTER = "GAZSOBEW6H374SOMTQIRC432JXTA4VPSG6P3ADA35TRQIYT3WTVQWFE5";

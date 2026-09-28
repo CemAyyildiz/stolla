@@ -10,6 +10,10 @@ vi.mock("@/context/WalletProvider", () => ({
 }));
 
 import CreateCommunityPage from "@/app/(app)/communities/create/page";
+import {
+  MOCK_CONTRACT_B,
+  MOCK_GOVERNOR_CONTRACT_ID,
+} from "@/test-support/stellar/fixtures";
 
 function enterValidMetadata() {
   fireEvent.change(screen.getByLabelText(/Community name/), {
@@ -275,8 +279,8 @@ describe("CreateCommunityPage", () => {
         transactionHash: "ab".repeat(32),
         expectedRecord: {
           id: "cd".repeat(32),
-          nftContract: `C${"B".repeat(55)}`,
-          governorContract: `C${"C".repeat(55)}`,
+          nftContract: MOCK_CONTRACT_B,
+          governorContract: MOCK_GOVERNOR_CONTRACT_ID,
           creator: "GADMIN",
           communityOwner: "GADMIN",
           createdAtLedger: 1,

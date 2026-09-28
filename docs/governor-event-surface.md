@@ -21,7 +21,7 @@ The current frontend contract configuration is:
 - network: `testnet`
 - RPC URL: `https://soroban-testnet.stellar.org`
 - governor contract ID:
-  `CAHM2MNNRYMS4AMFLDBQYJKPAYQZS24JT2HZRP4NBGFODQ2DPXRYEUOE`
+  `CBCBTZM3NF4EF47LFJLELVTN5KKIZG6LM6JWPCBBMXUGMQJJZRRMLHOK`
 
 ## What Stolla actually emits
 

@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import type { rpc } from "@stellar/stellar-sdk";
 import { fetchGovernorEvents } from "./paginate";
+import { MOCK_CONTRACT_A } from "@/test-support/stellar/fixtures";
 
-const CONTRACT = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM";
+const CONTRACT = MOCK_CONTRACT_A;
 const START_LEDGER = 1000;
 
 function makeEvent(id: string): rpc.Api.EventResponse {

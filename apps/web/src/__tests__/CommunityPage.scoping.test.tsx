@@ -29,6 +29,13 @@ vi.mock("@/app/(app)/community/community-data.mjs", async (importOriginal) => {
 });
 
 import CommunityPage from "@/app/(app)/community/page";
+import {
+  MOCK_ACCOUNT_CAROL,
+  MOCK_ACCOUNT_OWNER,
+  MOCK_CONTRACT_A,
+  MOCK_CONTRACT_B,
+  MOCK_GOVERNOR_CONTRACT_ID,
+} from "@/test-support/stellar/fixtures";
 
 const registry = { list: vi.fn(), get: mocks.getCommunity };
 
@@ -47,9 +54,9 @@ function result(id: string, nftContract: string, name: string): CommunityDetailR
       record: {
         id,
         nftContract,
-        governorContract: `C${"G".repeat(55)}`,
-        creator: `G${"C".repeat(55)}`,
-        communityOwner: `G${"D".repeat(55)}`,
+        governorContract: MOCK_GOVERNOR_CONTRACT_ID,
+        creator: MOCK_ACCOUNT_CAROL,
+        communityOwner: MOCK_ACCOUNT_OWNER,
         createdAtLedger: 1,
         creationIndex: 1,
         metadataUri: "https://example.test/community.json",
@@ -93,8 +100,8 @@ describe("CommunityPage selected-community contract scoping", () => {
   it("binds reads to each NFT address from the canonical registry", async () => {
     const firstId = "ab".repeat(32);
     const secondId = "cd".repeat(32);
-    const firstContract = `C${"A".repeat(55)}`;
-    const secondContract = `C${"B".repeat(55)}`;
+    const firstContract = MOCK_CONTRACT_A;
+    const secondContract = MOCK_CONTRACT_B;
     mocks.getCommunity.mockImplementation((id: string) =>
       Promise.resolve(
         id === firstId

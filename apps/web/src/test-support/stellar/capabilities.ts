@@ -2,10 +2,15 @@ import {
   buildNetworkCapabilities,
   type ActiveNetworkId,
 } from "@/lib/network";
+import {
+  MOCK_FACTORY_CONTRACT_ID,
+  MOCK_GOVERNOR_CONTRACT_ID,
+  MOCK_NFT_CONTRACT_ID,
+} from "./fixtures";
 
-export const TEST_NFT_CONTRACT_ID = `C${"N".repeat(55)}`;
-export const TEST_GOVERNOR_CONTRACT_ID = `C${"G".repeat(55)}`;
-export const TEST_FACTORY_CONTRACT_ID = `C${"F".repeat(55)}`;
+export const TEST_NFT_CONTRACT_ID = MOCK_NFT_CONTRACT_ID;
+export const TEST_GOVERNOR_CONTRACT_ID = MOCK_GOVERNOR_CONTRACT_ID;
+export const TEST_FACTORY_CONTRACT_ID = MOCK_FACTORY_CONTRACT_ID;
 
 export function completeNetworkEnvironment(
   networkId: ActiveNetworkId = "testnet",

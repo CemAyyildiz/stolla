@@ -5,6 +5,10 @@ import {
   buildStellarExplorerTxUrl,
   resolveStellarNetworkId,
 } from "@/lib/stellarExplorer";
+import {
+  MOCK_ACCOUNT_ALICE,
+  MOCK_CONTRACT_A,
+} from "@/test-support/stellar/fixtures";
 
 const VALID_HASH =
   "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0";
@@ -41,7 +45,7 @@ describe("buildStellarExplorerTxUrl", () => {
 });
 
 describe("buildStellarExplorerContractUrl", () => {
-  const contractId = `C${"A".repeat(55)}`;
+  const contractId = MOCK_CONTRACT_A;
 
   it("builds network-specific contract links", () => {
     expect(buildStellarExplorerContractUrl(contractId, "testnet")).toBe(
@@ -58,7 +62,7 @@ describe("buildStellarExplorerContractUrl", () => {
 });
 
 describe("buildStellarExplorerAccountUrl", () => {
-  const accountId = `G${"A".repeat(55)}`;
+  const accountId = MOCK_ACCOUNT_ALICE;
 
   it("builds network-specific account links", () => {
     expect(buildStellarExplorerAccountUrl(accountId, "testnet")).toBe(

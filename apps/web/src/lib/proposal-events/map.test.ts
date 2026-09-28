@@ -25,6 +25,12 @@ import type {
   ProposalEventRpcMetadata,
 } from "./types";
 import { VERSIONED_PROPOSAL_DESCRIPTION } from "@/lib/proposal-metadata/fixtures";
+import {
+  MOCK_ACCOUNT_ALICE,
+  MOCK_CONTRACT_B,
+  MOCK_GOVERNOR_CONTRACT_ID,
+  MOCK_NFT_CONTRACT_ID,
+} from "@/test-support/stellar/fixtures";
 
 // ---------------------------------------------------------------------------
 // Shared test fixtures
@@ -34,16 +40,15 @@ import { VERSIONED_PROPOSAL_DESCRIPTION } from "@/lib/proposal-metadata/fixtures
 const PROPOSAL_ID_HEX =
   "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2";
 
-const GOVERNOR_CONTRACT_ID =
-  "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM";
+const GOVERNOR_CONTRACT_ID = MOCK_GOVERNOR_CONTRACT_ID;
 
-const PROPOSER_ADDRESS = "GBSAMPLEPROPOSERADDRESS000000000000000000000000000000000";
+const PROPOSER_ADDRESS = MOCK_ACCOUNT_ALICE;
 
 /** A fixture that represents a fully decoded ProposalCreated event. */
 const completeEventData: ProposalCreatedEventData = {
   proposalId: PROPOSAL_ID_HEX,
   proposer: PROPOSER_ADDRESS,
-  targets: ["CCCONTRACTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABE"],
+  targets: [MOCK_NFT_CONTRACT_ID],
   functions: ["noop"],
   args: [[]],
   voteSnapshot: 1_000_100,
@@ -142,8 +147,7 @@ describe("mapProposalCreatedEvent", () => {
 
   // 5. Governor contract ID is preserved exactly
   it("preserves governorContractId exactly as provided", () => {
-    const altGovernorId =
-      "CBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+    const altGovernorId = MOCK_CONTRACT_B;
 
     const summary = mapProposalCreatedEvent(
       altGovernorId,

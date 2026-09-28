@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { MOCK_CONTRACT_OTHER } from "@/test-support/stellar/fixtures";
 import { Address, Contract, xdr } from "@stellar/stellar-sdk";
 import { Buffer } from "buffer";
 import {
@@ -347,7 +348,7 @@ describe("decodeProposalEvent", () => {
     });
 
     it("fails when the event contract id does not match the expected governor", () => {
-      const otherContract = "CCGGXPQH4CVPV2XQK2Q2ZQ7ZQ7ZQ7ZQ7ZQ7ZQ7ZQ7ZQ7ZQ7ZQ7ZQ7ZQ7";
+      const otherContract = MOCK_CONTRACT_OTHER;
       const event = contractEvent({
         contractId: otherContract,
         topic: [symbol("proposal_created"), bytes(PROPOSAL_HEX), address(PROPOSER)],

@@ -25,6 +25,13 @@ vi.mock("@/lib/contracts", () => ({
 
 import { ProposalState } from "@/lib/proposalState";
 import CommunityProposalHistoryPage from "@/app/(app)/communities/[id]/proposals/page";
+import {
+  MOCK_ACCOUNT_CAROL,
+  MOCK_ACCOUNT_OWNER,
+  MOCK_CONTRACT_A,
+  MOCK_CONTRACT_B,
+  MOCK_NFT_CONTRACT_ID,
+} from "@/test-support/stellar/fixtures";
 
 const registry = { list: vi.fn(), get: mocks.getCommunity };
 
@@ -39,8 +46,8 @@ function renderPage() {
 const FIRST_ID = "11".repeat(32);
 const SECOND_ID = "22".repeat(32);
 const PROPOSAL_ID = "aa".repeat(32);
-const FIRST_GOVERNOR = `C${"A".repeat(55)}`;
-const SECOND_GOVERNOR = `C${"B".repeat(55)}`;
+const FIRST_GOVERNOR = MOCK_CONTRACT_A;
+const SECOND_GOVERNOR = MOCK_CONTRACT_B;
 
 function communityResult(
   id: string,
@@ -52,10 +59,10 @@ function communityResult(
     community: {
       record: {
         id,
-        nftContract: `C${"N".repeat(55)}`,
+        nftContract: MOCK_NFT_CONTRACT_ID,
         governorContract: governor,
-        creator: `G${"C".repeat(55)}`,
-        communityOwner: `G${"O".repeat(55)}`,
+        creator: MOCK_ACCOUNT_CAROL,
+        communityOwner: MOCK_ACCOUNT_OWNER,
         createdAtLedger: 100,
         creationIndex: 1,
         metadataUri: "https://example.test/community.json",

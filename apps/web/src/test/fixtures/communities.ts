@@ -2,8 +2,15 @@ import type {
   Community,
   CommunityRegistry,
 } from "@/lib/community/types";
-
-const OWNER = `G${"A".repeat(55)}`;
+import {
+  MOCK_ACCOUNT_OWNER,
+  MOCK_ATLAS_GOVERNOR_ID,
+  MOCK_ATLAS_NFT_ID,
+  MOCK_BEACON_GOVERNOR_ID,
+  MOCK_BEACON_NFT_ID,
+  MOCK_DRIFT_GOVERNOR_ID,
+  MOCK_DRIFT_NFT_ID,
+} from "@/test-support/stellar/fixtures";
 
 function community(
   idByte: string,
@@ -18,8 +25,8 @@ function community(
       id,
       nftContract,
       governorContract,
-      creator: OWNER,
-      communityOwner: OWNER,
+      creator: MOCK_ACCOUNT_OWNER,
+      communityOwner: MOCK_ACCOUNT_OWNER,
       createdAtLedger: 100,
       creationIndex: 0,
       metadataUri: `https://metadata.example/${id}.json`,
@@ -46,24 +53,24 @@ function community(
 export const atlasCommunity = community(
   "a",
   "Atlas Collective",
-  "CGOVERNORATLAS00000000000000000000000000000000000000001",
-  "CNFTATLAS000000000000000000000000000000000000000000001",
+  MOCK_ATLAS_GOVERNOR_ID,
+  MOCK_ATLAS_NFT_ID,
   "Funding public goods across the Atlas ecosystem.",
 );
 
 export const beaconCommunity = community(
   "b",
   "Beacon Guild",
-  "CGOVERNORBEACON0000000000000000000000000000000000000002",
-  "CNFTBEACON00000000000000000000000000000000000000000002",
+  MOCK_BEACON_GOVERNOR_ID,
+  MOCK_BEACON_NFT_ID,
   "Coordinating grants for the Beacon Guild.",
 );
 
 export const driftwoodCommunity = community(
   "c",
   "Driftwood Cooperative",
-  "CGOVERNORDRIFTWOOD000000000000000000000000000000000003",
-  "CNFTDRIFTWOOD0000000000000000000000000000000000000000003",
+  MOCK_DRIFT_GOVERNOR_ID,
+  MOCK_DRIFT_NFT_ID,
   "Unavailable metadata fixture.",
 );
 driftwoodCommunity.metadata = null;

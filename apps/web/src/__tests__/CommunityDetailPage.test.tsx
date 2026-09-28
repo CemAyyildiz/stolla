@@ -13,6 +13,12 @@ vi.mock("next/navigation", () => ({
   useParams: mocks.useParams,
 }));
 import CommunityDetailPage from "@/app/(app)/communities/[id]/page";
+import {
+  MOCK_ACCOUNT_CAROL,
+  MOCK_ACCOUNT_OWNER,
+  MOCK_CONTRACT_A,
+  MOCK_CONTRACT_B,
+} from "@/test-support/stellar/fixtures";
 
 const COMMUNITY_ID = "ab".repeat(32);
 const registry = { list: vi.fn(), get: mocks.getCommunity };
@@ -30,10 +36,10 @@ const foundResult: CommunityDetailResult = {
   community: {
     record: {
       id: COMMUNITY_ID,
-      nftContract: `C${"A".repeat(55)}`,
-      governorContract: `C${"B".repeat(55)}`,
-      creator: `G${"C".repeat(55)}`,
-      communityOwner: `G${"D".repeat(55)}`,
+      nftContract: MOCK_CONTRACT_A,
+      governorContract: MOCK_CONTRACT_B,
+      creator: MOCK_ACCOUNT_CAROL,
+      communityOwner: MOCK_ACCOUNT_OWNER,
       createdAtLedger: 123,
       creationIndex: 4,
       metadataUri: "https://example.test/community.json",

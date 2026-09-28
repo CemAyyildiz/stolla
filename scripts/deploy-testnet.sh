@@ -122,7 +122,7 @@ echo "Governor WASM Hash: $GOV_WASM_HASH"
 echo "Deploying CommunityFactory..."
 if [[ "$DRY_RUN" == "true" ]]; then
   echo "[dry-run] Executing: stellar contract deploy --wasm $FACTORY_WASM --source-account $IDENTITY --network $NETWORK -- --owner $DEPLOYER --nft_wasm_hash $NFT_WASM_HASH --governor_wasm_hash $GOV_WASM_HASH"
-  FACTORY_ID="${MOCK_FACTORY_ID:-CFACTORY000000000000000000000000000000000000000000000000000000}"
+  FACTORY_ID="${MOCK_FACTORY_ID:-CC67AYTYD52YNMSFXUMGGINQPFIZG5M5YELUA36UOKZK5YMOLNE7Y3EH}"
 else
   FACTORY_ID="$(stellar contract deploy \
     --wasm "$FACTORY_WASM" \
@@ -139,7 +139,7 @@ echo "CommunityFactory contract: $FACTORY_ID"
 echo "Deploying default community-nft..."
 if [[ "$DRY_RUN" == "true" ]]; then
   echo "[dry-run] Executing: stellar contract deploy --wasm $NFT_WASM --source-account $IDENTITY --network $NETWORK -- --uri ipfs://stolla-collection/ --name 'Stolla Community' --symbol STOLLA --owner $DEPLOYER"
-  NFT_ID="${MOCK_NFT_ID:-CNFT0000000000000000000000000000000000000000000000000000000000}"
+  NFT_ID="${MOCK_NFT_ID:-CBNLN62LU545PM2ECR66E7SSUE6G3LOC5NSWH3SVYPS6J225NS72D2JB}"
 else
   NFT_ID="$(stellar contract deploy \
     --wasm "$NFT_WASM" \
@@ -156,7 +156,7 @@ echo "NFT contract: $NFT_ID"
 echo "Deploying default community-governor..."
 if [[ "$DRY_RUN" == "true" ]]; then
   echo "[dry-run] Executing: stellar contract deploy --wasm $GOV_WASM --source-account $IDENTITY --network $NETWORK -- --token_contract $NFT_ID --voting_delay 1 --voting_period 10000 --proposal_threshold 1 --quorum 1"
-  GOV_ID="${MOCK_GOV_ID:-CGOV0000000000000000000000000000000000000000000000000000000000}"
+  GOV_ID="${MOCK_GOV_ID:-CBCGFEJRIVHLPFXPUNQJ2LSL4YDBNSZVEHIDVYPIQZR2CRDS5EK64QWL}"
 else
   GOV_ID="$(stellar contract deploy \
     --wasm "$GOV_WASM" \
@@ -186,8 +186,10 @@ else
       DEPLOY_LEDGER="$(echo "$RPC_RESP" | grep -o '"sequence":[0-9]*' | head -n1 | cut -d':' -f2 || true)"
     fi
   fi
-  if [[ -z "$DEPLOY_LEDGER" || "$DEPLOY_LEDGER" -le 0 ]] 2>/dev/null; then
-    DEPLOY_LEDGER=1
+  if [[ -z "$DEPLOY_LEDGER" ]] || ! [[ "$DEPLOY_LEDGER" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Error: Could not read a positive deployment ledger from $RPC_URL (getLatestLedger)." >&2
+    echo "Re-run after RPC is reachable, or set MOCK_DEPLOY_LEDGER for dry-run only." >&2
+    exit 1
   fi
   echo "Deployment ledger: $DEPLOY_LEDGER"
 fi

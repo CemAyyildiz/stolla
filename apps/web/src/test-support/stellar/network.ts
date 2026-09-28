@@ -1,6 +1,7 @@
 import { Networks } from "@stellar/stellar-sdk";
 
 import {
+  MOCK_FACTORY_CONTRACT_ID,
   MOCK_GOVERNOR_CONTRACT_ID,
   MOCK_NFT_CONTRACT_ID,
 } from "./fixtures";
@@ -42,7 +43,7 @@ export function createNetworkFixture(options: NetworkFixtureOptions = {}) {
   };
   const networkPassphrase = config.networkPassphrase;
   const communityFactory =
-    options.communityFactoryContractId ?? `C${"F".repeat(55)}`;
+    options.communityFactoryContractId ?? MOCK_FACTORY_CONTRACT_ID;
   const governorStartLedger = options.governorStartLedger ?? 1_500_000;
   const contractIds = {
     nft: options.nftContractId ?? MOCK_NFT_CONTRACT_ID,

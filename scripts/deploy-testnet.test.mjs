@@ -77,15 +77,15 @@ test("dry-run generates complete CLI commands and outputs contract IDs, WASM has
     assert.match(result.stdout, /Stolla Testnet Deployment Complete/);
     assert.match(result.stdout, /NFT WASM Hash:/);
     assert.match(result.stdout, /Governor WASM Hash:/);
-    assert.match(result.stdout, /CommunityFactory:\s+CFACTORY/);
-    assert.match(result.stdout, /Community NFT:\s+CNFT/);
-    assert.match(result.stdout, /Community Governor:\s+CGOV/);
+    assert.match(result.stdout, /CommunityFactory:\s+CC67AYTYD52YNMSFXUMGGINQPFIZG5M5YELUA36UOKZK5YMOLNE7Y3EH/);
+    assert.match(result.stdout, /Community NFT:\s+CBNLN62LU545PM2ECR66E7SSUE6G3LOC5NSWH3SVYPS6J225NS72D2JB/);
+    assert.match(result.stdout, /Community Governor:\s+CBCGFEJRIVHLPFXPUNQJ2LSL4YDBNSZVEHIDVYPIQZR2CRDS5EK64QWL/);
     assert.match(result.stdout, /Deploy Ledger:\s+\d+/);
 
     // Explorer links
-    assert.match(result.stdout, /https:\/\/stellar\.expert\/explorer\/testnet\/contract\/CFACTORY/);
-    assert.match(result.stdout, /https:\/\/stellar\.expert\/explorer\/testnet\/contract\/CNFT/);
-    assert.match(result.stdout, /https:\/\/stellar\.expert\/explorer\/testnet\/contract\/CGOV/);
+    assert.match(result.stdout, /https:\/\/stellar\.expert\/explorer\/testnet\/contract\/CC67AYTYD52YNMSFXUMGGINQPFIZG5M5YELUA36UOKZK5YMOLNE7Y3EH/);
+    assert.match(result.stdout, /https:\/\/stellar\.expert\/explorer\/testnet\/contract\/CBNLN62LU545PM2ECR66E7SSUE6G3LOC5NSWH3SVYPS6J225NS72D2JB/);
+    assert.match(result.stdout, /https:\/\/stellar\.expert\/explorer\/testnet\/contract\/CBCGFEJRIVHLPFXPUNQJ2LSL4YDBNSZVEHIDVYPIQZR2CRDS5EK64QWL/);
     assert.match(result.stdout, /https:\/\/stellar\.expert\/explorer\/testnet\/account\//);
 
     // Environment file written
@@ -93,9 +93,9 @@ test("dry-run generates complete CLI commands and outputs contract IDs, WASM has
     const envContent = fs.readFileSync(tempEnvFile, "utf8");
     assert.match(envContent, /NEXT_PUBLIC_STELLAR_NETWORK=testnet/);
     assert.match(envContent, /NEXT_PUBLIC_STELLAR_RPC_URL=https:\/\/soroban-testnet\.stellar\.org/);
-    assert.match(envContent, /NEXT_PUBLIC_COMMUNITY_FACTORY_CONTRACT_ID=CFACTORY/);
-    assert.match(envContent, /NEXT_PUBLIC_NFT_CONTRACT_ID=CNFT/);
-    assert.match(envContent, /NEXT_PUBLIC_GOVERNOR_CONTRACT_ID=CGOV/);
+    assert.match(envContent, /NEXT_PUBLIC_COMMUNITY_FACTORY_CONTRACT_ID=CC67AYTYD52YNMSFXUMGGINQPFIZG5M5YELUA36UOKZK5YMOLNE7Y3EH/);
+    assert.match(envContent, /NEXT_PUBLIC_NFT_CONTRACT_ID=CBNLN62LU545PM2ECR66E7SSUE6G3LOC5NSWH3SVYPS6J225NS72D2JB/);
+    assert.match(envContent, /NEXT_PUBLIC_GOVERNOR_CONTRACT_ID=CBCGFEJRIVHLPFXPUNQJ2LSL4YDBNSZVEHIDVYPIQZR2CRDS5EK64QWL/);
     assert.match(envContent, /NEXT_PUBLIC_GOVERNOR_START_LEDGER=\d+/);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -147,10 +147,10 @@ test("preserves unrelated existing variables and comments in .env.local", async 
     assert.match(updatedContent, /# End of config/);
 
     // Managed variables updated in-place or added
-    assert.match(updatedContent, /NEXT_PUBLIC_NFT_CONTRACT_ID=CNFT/);
+    assert.match(updatedContent, /NEXT_PUBLIC_NFT_CONTRACT_ID=CBNLN62LU545PM2ECR66E7SSUE6G3LOC5NSWH3SVYPS6J225NS72D2JB/);
     assert.doesNotMatch(updatedContent, /OLD_NFT_ID/);
-    assert.match(updatedContent, /NEXT_PUBLIC_COMMUNITY_FACTORY_CONTRACT_ID=CFACTORY/);
-    assert.match(updatedContent, /NEXT_PUBLIC_GOVERNOR_CONTRACT_ID=CGOV/);
+    assert.match(updatedContent, /NEXT_PUBLIC_COMMUNITY_FACTORY_CONTRACT_ID=CC67AYTYD52YNMSFXUMGGINQPFIZG5M5YELUA36UOKZK5YMOLNE7Y3EH/);
+    assert.match(updatedContent, /NEXT_PUBLIC_GOVERNOR_CONTRACT_ID=CBCGFEJRIVHLPFXPUNQJ2LSL4YDBNSZVEHIDVYPIQZR2CRDS5EK64QWL/);
     assert.match(updatedContent, /NEXT_PUBLIC_GOVERNOR_START_LEDGER=1500000/);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });

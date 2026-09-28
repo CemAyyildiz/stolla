@@ -9,6 +9,14 @@ import type {
   CommunityMetadata,
   CommunityRecord,
 } from "../../lib/communities/types";
+import {
+  MOCK_ATLAS_GOVERNOR_ID,
+  MOCK_ATLAS_NFT_ID,
+  MOCK_BEACON_GOVERNOR_ID,
+  MOCK_BEACON_NFT_ID,
+  MOCK_DRIFT_GOVERNOR_ID,
+  MOCK_DRIFT_NFT_ID,
+} from "./fixtures";
 
 export function createCommunityRecord(
   overrides: Partial<CommunityRecord> = {},
@@ -17,10 +25,8 @@ export function createCommunityRecord(
     id: "atlas-collective",
     name: "Atlas Collective",
     symbol: "ATLAS",
-    governorContractId:
-      "CGOVERNORATLAS00000000000000000000000000000000000000001",
-    nftContractId:
-      "CNFTATLAS000000000000000000000000000000000000000000001",
+    governorContractId: MOCK_ATLAS_GOVERNOR_ID,
+    nftContractId: MOCK_ATLAS_NFT_ID,
     metadataUri: "https://metadata.example.test/atlas.json",
     ...overrides,
   };
@@ -31,20 +37,16 @@ export const beaconCommunity = createCommunityRecord({
   id: "beacon-guild",
   name: "Beacon Guild",
   symbol: "BEACON",
-  governorContractId:
-    "CGOVERNORBEACON0000000000000000000000000000000000000002",
-  nftContractId:
-    "CNFTBEACON00000000000000000000000000000000000000000002",
+  governorContractId: MOCK_BEACON_GOVERNOR_ID,
+  nftContractId: MOCK_BEACON_NFT_ID,
   metadataUri: "https://metadata.example.test/beacon.json",
 });
 export const driftwoodCommunity = createCommunityRecord({
   id: "driftwood-cooperative",
   name: "Driftwood Cooperative",
   symbol: "DRIFT",
-  governorContractId:
-    "CGOVERNORDRIFTWOOD000000000000000000000000000000000003",
-  nftContractId:
-    "CNFTDRIFTWOOD0000000000000000000000000000000000000000003",
+  governorContractId: MOCK_DRIFT_GOVERNOR_ID,
+  nftContractId: MOCK_DRIFT_NFT_ID,
   metadataUri: undefined,
 });
 

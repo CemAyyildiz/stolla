@@ -6,9 +6,14 @@ import {
   parseCommunityDeploymentRecovery,
   serializeCommunityFactoryInvocation,
 } from "./deployment";
+import {
+  MOCK_CONTRACT_A,
+  MOCK_CONTRACT_B,
+  MOCK_GOVERNOR_CONTRACT_ID,
+} from "@/test-support/stellar/fixtures";
 
 const creator = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
-const factoryId = `C${"A".repeat(55)}`;
+const factoryId = MOCK_CONTRACT_A;
 const input = {
   creator,
   communityOwner: creator,
@@ -94,8 +99,8 @@ describe("community deployment serialization", () => {
       submittedAt: 123,
       expectedRecord: {
         id: "cd".repeat(32),
-        nftContract: `C${"B".repeat(55)}`,
-        governorContract: `C${"C".repeat(55)}`,
+        nftContract: MOCK_CONTRACT_B,
+        governorContract: MOCK_GOVERNOR_CONTRACT_ID,
         creator,
         communityOwner: creator,
         createdAtLedger: 10,
