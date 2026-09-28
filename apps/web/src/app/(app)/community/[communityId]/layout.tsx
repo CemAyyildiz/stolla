@@ -5,14 +5,15 @@ import {
 import { getCommunityById } from "@/lib/communities/registry";
 import { stellarNetwork } from "@/lib/stellar";
 
-export default function CommunityDetailLayout({
+export default async function CommunityDetailLayout({
   children,
   params,
 }: {
   children: React.ReactNode;
-  params: { communityId: string };
+  params: Promise<{ communityId: string }>;
 }) {
-  const community = getCommunityById(params.communityId);
+  const { communityId } = await params;
+  const community = getCommunityById(communityId);
 
   const state: CommunityRouteState = community
     ? {

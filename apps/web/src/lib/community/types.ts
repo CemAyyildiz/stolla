@@ -39,6 +39,9 @@ export type Community = {
   governance: GovernanceSnapshot;
 };
 
+/** @deprecated Prefer `Community`. Kept for existing imports. */
+export type CommunityView = Community;
+
 export type CommunityRegistryPage = {
   communities: Community[];
   nextCursor: number | null;

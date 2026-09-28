@@ -1,6 +1,6 @@
 "use client";
 
-import type { FreshnessResult } from "@/lib/proposal/freshness";
+import type { FreshnessResult } from "@/lib/proposal-events";
 
 const STATE_STYLES: Record<
   FreshnessResult["state"],

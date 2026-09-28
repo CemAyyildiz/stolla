@@ -9,6 +9,7 @@ import {
 } from "./schema";
 import type {
   CommunityDetailResult,
+  CommunityRegistry,
   CommunityRegistryPage,
   CommunityRegistryRecord,
   CommunityView,
@@ -321,3 +322,9 @@ export async function getCommunity(
 
   return { status: "found", community: await hydrateRecord(record) };
 }
+
+/** Production CommunityRegistry adapter backed by CommunityFactory. */
+export const communityRegistry: CommunityRegistry = {
+  list: listCommunities,
+  get: getCommunity,
+};

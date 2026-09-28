@@ -369,12 +369,13 @@ export const defaultCommunityDeploymentAdapter: CommunityDeploymentAdapter = {
    * "unauthorized".
    */
   async readFactoryOwner(factoryId, publicKey) {
+    const rpc = requireRpcConfig();
     const transaction = await AssembledTransaction.build<string>({
       contractId: factoryId,
       method: "owner",
       args: [],
-      networkPassphrase: config.networkPassphrase,
-      rpcUrl: config.rpcUrl,
+      networkPassphrase: rpc.networkPassphrase,
+      rpcUrl: rpc.rpcUrl,
       publicKey,
       timeoutInSeconds: COMMUNITY_DEPLOYMENT_TIMEOUT_SECONDS,
       parseResultXdr: (value) => scValToNative(value) as string,

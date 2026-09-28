@@ -68,7 +68,13 @@ export {
 } from "./discovery-merge";
 
 export {
+  evaluateDiscoveryFreshness,
   createClientFreshnessStub,
+  CURRENT_THRESHOLD,
+  STALE_THRESHOLD,
+  type FreshnessState,
+  type FreshnessMetadata,
+  type FreshnessResult,
   type ProposalSyncStatus,
   type ProposalFreshness,
   type ProposalSyncState,

@@ -16,12 +16,11 @@ if (
 }
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["127.0.0.1"],
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
   turbopack: {
     root: repositoryRoot,
   },
   outputFileTracingRoot: repositoryRoot,
-  allowedDevOrigins: ["127.0.0.1", "localhost"],
 };
 
 export default nextConfig;

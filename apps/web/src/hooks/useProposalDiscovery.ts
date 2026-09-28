@@ -4,11 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Server as RpcServer } from "@stellar/stellar-sdk/rpc";
 import type { Api } from "@stellar/stellar-sdk/rpc";
 import { config, requireContractIds, requireGovernorStartLedger } from "@/lib/stellar";
-import { decodeProposalEvent } from "@/lib/proposalEvents";
 import {
+  decodeProposalEvent,
   evaluateDiscoveryFreshness,
   type FreshnessResult,
-} from "@/lib/proposal/freshness";
+} from "@/lib/proposal-events";
 import { getE2EBridge } from "@/lib/e2eMock";
 
 export type DiscoveredProposal = {
