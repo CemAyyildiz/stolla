@@ -66,6 +66,7 @@ test("sends the expected factory invocation, source account and network", async 
     sourceAccount: string;
     networkPassphrase: string;
     metadata: { name: string; symbol: string };
+    payload: { collectionUri: string; metadataUri: string; metadataHash: string };
   };
   expect(invocation.contractId).toBe(FACTORY_ID);
   expect(invocation.method).toBe("create_community");
@@ -73,6 +74,11 @@ test("sends the expected factory invocation, source account and network", async 
   expect(invocation.networkPassphrase).toBe(TESTNET_PASSPHRASE);
   expect(invocation.metadata.name).toBe("Creator Guild");
   expect(invocation.metadata.symbol).toBe("CREATE");
+  // The creator never typed these: they come from the pin pipeline.
+  expect(invocation.payload.collectionUri).toMatch(/^ipfs:\/\/bafyfixture/);
+  expect(invocation.payload.metadataUri).toMatch(/^ipfs:\/\/bafyfixture/);
+  expect(invocation.payload.metadataHash).toMatch(/^[0-9a-f]{64}$/);
+  expect(invocation.payload.metadataHash).not.toBe("0".repeat(64));
 });
 
 test("returns to a recoverable review state when the wallet rejects", async ({
