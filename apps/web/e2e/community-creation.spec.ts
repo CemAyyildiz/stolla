@@ -27,7 +27,7 @@ const successHeading = (page: Page) =>
 async function openReview(page: Page) {
   await completeWizardToReview(page);
   await expect(wizard(page).getByText(WALLET_ADDRESS)).toBeVisible();
-  await expect(wizard(page).getByText("Creator Guild")).toBeVisible();
+  await expect(wizard(page).getByText("Creator Guild", { exact: true })).toBeVisible();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -107,7 +107,7 @@ test("returns to a recoverable review state when the wallet rejects", async ({
     .getByRole("button", { name: "Continue to governance" })
     .click();
   await wizard(page).getByRole("button", { name: "Review community" }).click();
-  await expect(wizard(page).getByText("Creator Guild")).toBeVisible();
+  await expect(wizard(page).getByText("Creator Guild", { exact: true })).toBeVisible();
 });
 
 test("blocks signing when simulation fails", async ({ page }) => {
