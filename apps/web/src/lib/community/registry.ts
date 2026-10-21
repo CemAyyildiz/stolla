@@ -1,7 +1,11 @@
 import { Buffer } from "buffer";
 import { AssembledTransaction } from "@stellar/stellar-sdk/contract";
 import { nativeToScVal, scValToNative, xdr } from "@stellar/stellar-sdk";
-import { requireCommunityFactoryId, requireRpcConfig } from "@/lib/stellar";
+import {
+  contractIds,
+  requireCommunityFactoryId,
+  requireRpcConfig,
+} from "@/lib/stellar";
 import { e2eGetCommunity, e2eListCommunities } from "@/lib/e2eMock";
 import {
   parseCommunityMetadata,
@@ -242,6 +246,11 @@ async function hydrateRecord(
         ? governanceResult.value
         : { ...EMPTY_GOVERNANCE },
   };
+}
+
+/** True when the CommunityFactory contract ID is configured for the network. */
+export function isCommunityFactoryConfigured(): boolean {
+  return Boolean(contractIds.communityFactory);
 }
 
 export async function listCommunities(

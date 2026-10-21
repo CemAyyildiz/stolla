@@ -3,12 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useOptionalWallet } from "@/context/WalletProvider";
 import { AppButton } from "@/components/ui/AppButton";
-import { LiveStatus } from "@/components/ui/LiveStatus";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { truncateMiddle } from "@/lib/truncate";
 import {
   fetchMemberRoster,
-  type MemberRosterEntry,
   type MemberRosterResult,
   type NftRosterClient,
 } from "@/lib/community/roster";
@@ -62,7 +60,12 @@ export function CommunityMemberRoster({
   }, [nftContractId, client]);
 
   useEffect(() => {
-    void loadRoster();
+    // Defer the first fetch so the initial render settles before any state
+    // update, instead of cascading a synchronous setState from the effect body.
+    const timeout = window.setTimeout(() => {
+      void loadRoster();
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [loadRoster]);
 
   const handleCopy = async (address: string) => {

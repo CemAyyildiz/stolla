@@ -83,6 +83,7 @@ describe("ProposalsPage - localStorage not required for proposals", () => {
       proposalIds: [],
       loading: false,
       error: null,
+      errorKind: null,
       empty: true,
       freshness: {
         state: "stale",

@@ -2,6 +2,11 @@
  * Shared transaction lifecycle stages for mint, delegation, proposal, and vote flows.
  * Individual flows may map specialized terminal outcomes onto `success` / `failure`.
  */
+import {
+  CANCELLABLE_PROPOSAL_STATES,
+  type ProposalState,
+} from "@/lib/proposalState";
+
 export const TRANSACTION_LIFECYCLE_STAGES = [
   "idle",
   "simulating",
@@ -75,3 +80,19 @@ export const TRANSACTION_LIFECYCLE_LABELS: Record<
   success: "Transaction confirmed",
   failure: "Transaction failed",
 };
+
+/**
+ * True while the given proposal state permits a cancel action.
+ *
+ * Accepts raw values from event payloads, so an unknown or absent state never
+ * unlocks the destructive action.
+ */
+export function isCancellableProposalState(
+  state: string | number | null | undefined,
+): boolean {
+  if (state === null || state === undefined) return false;
+  const numeric = typeof state === "number" ? state : Number(state);
+  if (!Number.isFinite(numeric)) return false;
+  return CANCELLABLE_PROPOSAL_STATES.has(numeric as ProposalState);
+}
+

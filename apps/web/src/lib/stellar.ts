@@ -51,6 +51,7 @@ export const contractIds = {
   governor: activeCapabilities.contracts.legacyGovernor,
   communityFactory: activeCapabilities.contracts.communityFactory,
   factory: activeCapabilities.contracts.communityFactory,
+  governorStartLedger: activeCapabilities.proposalDiscovery.startLedger,
 };
 
 export class GovernorStartLedgerConfigurationError extends Error {

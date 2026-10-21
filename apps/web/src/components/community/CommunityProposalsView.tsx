@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
 import type { Community, CommunityRegistry } from "@/lib/community/types";
 import { useRegistryCommunity } from "@/lib/community/useRegistryCommunity";
 import { getStoredProposalIdsFor } from "@/lib/contracts";
@@ -179,9 +178,7 @@ function CommunityProposalsPanel({
                   >
                     {entry.status === "ready"
                       ? stateLabels[entry.state]
-                      : entry.status === "error"
-                        ? describeProposalDiscoveryError(entry.error).shortLabel
-                        : "Unavailable"}
+                      : "Unavailable"}
                   </span>
                 </Link>
               </li>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { StrKey } from "@stellar/stellar-sdk";
 import { Server as RpcServer } from "@stellar/stellar-sdk/rpc";
 import type { Api } from "@stellar/stellar-sdk/rpc";
 import { config, requireContractIds, requireGovernorStartLedger } from "@/lib/stellar";
@@ -48,7 +47,12 @@ export function mapDiscoveryError(err: unknown): DiscoveryError {
       ? err.message
       : typeof err === "string"
         ? err
-        : "";
+        : typeof err === "object" &&
+            err !== null &&
+            "message" in err &&
+            typeof err.message === "string"
+          ? err.message
+          : "";
   const message = rawMessage.trim();
   const lower = message.toLowerCase();
 
@@ -59,11 +63,19 @@ export function mapDiscoveryError(err: unknown): DiscoveryError {
     lower.includes("retention") ||
     lower.includes("oldest ledger")
   ) {
+    const guidance =
+      "The configured NEXT_PUBLIC_GOVERNOR_START_LEDGER is outside the RPC retention window. Adjust it or use a provider with wider history.";
     return {
       kind: "retention",
-      message:
-        message ||
-        "The configured start ledger is outside the RPC retention window.",
+      message: message ? `${message} ${guidance}` : guidance,
+      cause: err,
+    };
+  }
+
+  if (lower.includes(GOVERNOR_START_LEDGER_ENV.toLowerCase())) {
+    return {
+      kind: "config",
+      message: message || mapStartLedgerConfigError(err).message,
       cause: err,
     };
   }

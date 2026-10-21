@@ -37,7 +37,7 @@ const STAGE_COLORS: Record<TransactionStage, string> = {
   duplicate_vote: "bg-amber-500",
 };
 
-const FAILURE_STAGES = new Set<TransactionStage>(['
+const FAILURE_STAGES = new Set<TransactionStage>([
   "wallet_rejected",
   "simulation_failed",
   "submission_failed",
@@ -49,6 +49,18 @@ const ACTION_LABELS: Record<TransactionAction, string> = {
   cancel: "Cancel",
   execute: "Execute",
 };
+
+/**
+ * Visible stage label.
+ *
+ * The confirmed copy names the action that was confirmed ("Vote confirmed!")
+ * so a generic "Transaction confirmed!" never leaves the reader guessing
+ * which write actually succeeded.
+ */
+function stageLabel(stage: TransactionStage, action: TransactionAction) {
+  if (stage === "confirmed") return `${ACTION_LABELS[action]} confirmed!`;
+  return STAGE_LABELS[stage];
+}
 
 function lifecycleAnnouncement(
   stage: TransactionStage,
@@ -179,7 +191,7 @@ export function TransactionLifecycleDisplay({
   if (stage === "idle") return null;
 
   const colorClass = STAGE_COLORS[stage];
-  const label = STAGE_LABELS[stage];
+  const label = stageLabel(stage, action);
   const isActive = !isTerminal;
   const isFailure = FAILURE_STAGES.has(stage);
   const showVoteDetails = action === "vote" && voteType !== null;
