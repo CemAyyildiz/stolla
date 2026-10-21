@@ -59,6 +59,6 @@ describe("showcase illustrative labeling", () => {
     expect(
       screen.getByText("Showcase · Illustrative demo"),
     ).toBeInTheDocument();
-    expect(screen.getByText(/not live on-chain data/)).toBeInTheDocument();
+    expect(screen.getByText(/stay labeled Demo/)).toBeInTheDocument();
   });
 });

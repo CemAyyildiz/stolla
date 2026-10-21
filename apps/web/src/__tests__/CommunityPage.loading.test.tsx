@@ -104,6 +104,49 @@ describe("CommunityPage loading and RPC failures", () => {
     expect(await screen.findByText("Stolla")).toBeInTheDocument();
   });
 
+  it("renders labeled shimmer skeleton rows while the collection loads", async () => {
+    const gate = deferred<{
+      name: string;
+      symbol: string;
+      balance: number | null;
+      votes: string | null;
+    }>();
+    mocks.loadCommunityData.mockReturnValue(gate.promise);
+
+    render(<CommunityPage />);
+
+    // Labels stay visible so the layout does not jump into unlabeled blocks.
+    expect(screen.getByText("Name")).toBeInTheDocument();
+    expect(screen.getByText("Symbol")).toBeInTheDocument();
+    expect(screen.getByText("Your balance")).toBeInTheDocument();
+    expect(screen.getByText("Your votes")).toBeInTheDocument();
+
+    // Every placeholder is part of the shared shimmer pattern.
+    const skeletons = screen.getAllByTestId("skeleton");
+    expect(skeletons.length).toBeGreaterThan(0);
+    for (const skeleton of skeletons) {
+      expect(skeleton).toHaveAttribute("data-variant", "shimmer");
+      expect(skeleton.className).toContain("motion-safe:animate-shimmer");
+    }
+
+    // Exactly one status announces the collection load (#300).
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+
+    await act(async () => {
+      gate.resolve({
+        name: "Stolla",
+        symbol: "STL",
+        balance: null,
+        votes: null,
+      });
+    });
+
+    expect(await screen.findByText("Stolla")).toBeInTheDocument();
+    // The loaded panel leaves no skeleton blocks behind.
+    expect(screen.queryByTestId("skeleton")).not.toBeInTheDocument();
+    expect(screen.queryAllByRole("status")).toHaveLength(0);
+  });
+
   it("renders balance and votes only when a wallet is connected", async () => {
     mocks.useWallet.mockReturnValue({
       address: "GWALLET",

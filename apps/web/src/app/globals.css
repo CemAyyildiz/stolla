@@ -3,6 +3,38 @@
 @theme inline {
   --font-sans: var(--font-ibm-plex), system-ui, sans-serif;
   --font-mono: ui-monospace, monospace;
+  --animate-shimmer: skeleton-shimmer 1.6s linear infinite;
+}
+
+/*
+ * Loading skeleton treatment.
+ *
+ * The placeholder fill is lighter than the card surface on purpose: a
+ * skeleton must read as "content is arriving", never as a disabled form
+ * field, which is always darker than the surface it sits on. The shimmer
+ * sweep adds a moving highlight on top of that fill so an active load is
+ * obvious at a glance.
+ */
+.skeleton-fill {
+  background-color: color-mix(in srgb, var(--skeleton-fill) 72%, transparent);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(148 163 184 / 0.22) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
 }
 
 :root {
@@ -22,6 +54,8 @@
   --radius: 0;
   --font-display: var(--font-syne), sans-serif;
   --font-body: var(--font-ibm-plex), sans-serif;
+  /* Placeholder fill: slate-700, mixed over the surface by `.skeleton-fill`. */
+  --skeleton-fill: #334155;
 
   /*
    * Form-control contrast tokens (WCAG AA targets)

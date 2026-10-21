@@ -5,8 +5,9 @@ import { isCommunityFactoryConfigured } from "@/lib/community/registry";
 import { CommunityCard } from "@/components/CommunityCard";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppLinkButton } from "@/components/ui/AppLinkButton";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { LiveStatus } from "@/components/ui/LiveStatus";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { SkeletonCommunityRow } from "@/components/ui/Skeleton";
 import { listCommunities } from "@/lib/community/registry";
 import type { CommunityView } from "@/lib/community/types";
 
@@ -167,13 +168,6 @@ export default function CommunitiesPage() {
     };
   }, [loadPage]);
 
-  useEffect(() => {
-    if (!factoryConfigured) {
-      setLoading(false);
-      setError(FACTORY_UNAVAILABLE_MESSAGE);
-    }
-  }, [factoryConfigured]);
-
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const visibleCommunities = useMemo(
     () =>
@@ -186,6 +180,20 @@ export default function CommunitiesPage() {
         : communities,
     [communities, normalizedQuery],
   );
+  const isRegistryEmpty =
+    hasLoaded &&
+    !loading &&
+    !error &&
+    communities.length === 0 &&
+    nextCursor === null &&
+    normalizedQuery.length === 0;
+  const isFilteredEmpty =
+    hasLoaded &&
+    !loading &&
+    !error &&
+    visibleCommunities.length === 0 &&
+    !isRegistryEmpty &&
+    (communities.length > 0 || normalizedQuery.length > 0);
 
   function updateQuery(value: string) {
     const nextQuery = value.slice(0, MAX_QUERY_LENGTH);
@@ -228,31 +236,33 @@ export default function CommunitiesPage() {
         </AppLinkButton>
       </div>
 
-      <div className="mt-6 max-w-xl">
-        <label htmlFor="community-search" className="text-sm font-medium text-slate-300">
-          Search communities by name
-        </label>
-        <div className="mt-2 flex min-w-0 gap-2">
-          <input
-            id="community-search"
-            type="search"
-            value={query}
-            maxLength={MAX_QUERY_LENGTH}
-            onChange={(event) => updateQuery(event.target.value)}
-            placeholder="Search community names"
-            className="min-h-11 min-w-0 flex-1 rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400"
-          />
-          {query && (
-            <AppButton
-              tone="secondary"
-              onClick={() => updateQuery("")}
-              className="shrink-0"
-            >
-              Clear
-            </AppButton>
-          )}
+      {!isRegistryEmpty && (
+        <div className="mt-6 max-w-xl">
+          <label htmlFor="community-search" className="text-sm font-medium text-slate-300">
+            Search communities by name
+          </label>
+          <div className="mt-2 flex min-w-0 gap-2">
+            <input
+              id="community-search"
+              type="search"
+              value={query}
+              maxLength={MAX_QUERY_LENGTH}
+              onChange={(event) => updateQuery(event.target.value)}
+              placeholder="Search community names"
+              className="min-h-11 min-w-0 flex-1 rounded-lg border border-slate-700 bg-[#0b0f19] px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400"
+            />
+            {query && (
+              <AppButton
+                tone="secondary"
+                onClick={() => updateQuery("")}
+                className="shrink-0"
+              >
+                Clear
+              </AppButton>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {hasPartialData && (
         <LiveStatus className="mt-6 rounded-lg border border-amber-800/70 bg-amber-950/40 p-4 text-sm text-amber-200">
@@ -279,19 +289,8 @@ export default function CommunitiesPage() {
             aria-hidden="true"
           >
             {Array.from({ length: 3 }, (_, index) => (
-              <li
-                key={index}
-                className="rounded-xl border border-slate-800 bg-[#151b2b] p-5"
-              >
-                <div className="flex gap-3">
-                  <Skeleton className="h-12 w-12" />
-                  <div className="flex-1">
-                    <Skeleton className="h-5 w-2/3" />
-                    <Skeleton className="mt-2 h-3 w-1/2" />
-                  </div>
-                </div>
-                <Skeleton className="mt-5 h-16 w-full" />
-                <Skeleton className="mt-5 h-20 w-full" />
+              <li key={index} className="min-w-0">
+                <SkeletonCommunityRow />
               </li>
             ))}
           </ul>
@@ -326,21 +325,24 @@ export default function CommunitiesPage() {
         </section>
       )}
 
-      {!loading &&
-        !error &&
-        hasLoaded &&
-        communities.length === 0 &&
-        nextCursor === null && (
-          <LiveStatus className="mt-6 rounded-xl border border-dashed border-slate-700 bg-slate-900/40 p-6 text-center text-sm text-slate-400">
-            No communities are registered yet. You can prepare the first
-            community without connecting a wallet.
-          </LiveStatus>
-        )}
+      {isRegistryEmpty && (
+        <EmptyState
+          className="mt-6 p-6 text-center"
+          title="No communities yet"
+          action={
+            <AppLinkButton href="/communities/create" tone="primary">
+              Create a community
+            </AppLinkButton>
+          }
+        >
+          <p>
+            Communities will appear here once registered. Create the first one
+            to get started.
+          </p>
+        </EmptyState>
+      )}
 
-      {!loading &&
-        !error &&
-        communities.length > 0 &&
-        visibleCommunities.length === 0 && (
+      {isFilteredEmpty && (
           <LiveStatus className="mt-6 rounded-xl border border-dashed border-slate-700 bg-slate-900/40 p-6 text-center text-sm text-slate-400">
             No communities match “{query.trim()}”.
             <AppButton

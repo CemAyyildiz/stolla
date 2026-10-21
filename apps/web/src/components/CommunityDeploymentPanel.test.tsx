@@ -118,7 +118,7 @@ describe("CommunityDeploymentPanel", () => {
 
     await awaitReady();
     fireEvent.click(screen.getByRole("button", { name: "Simulate deployment" }));
-    expect(await screen.findByText(/12345678 stroops/)).toHaveTextContent(
+    expect(await screen.findByText(/12345678 stroops \(/)).toHaveTextContent(
       "1.2345678 XLM",
     );
     fireEvent.click(screen.getByRole("button", { name: "Approve and deploy" }));
@@ -161,7 +161,7 @@ describe("CommunityDeploymentPanel", () => {
 
     await awaitReady();
     fireEvent.click(screen.getByRole("button", { name: "Simulate deployment" }));
-    await screen.findByText(/12345678 stroops/);
+    await screen.findByText(/12345678 stroops \(/);
     fireEvent.click(screen.getByRole("button", { name: "Approve and deploy" }));
     expect(
       (await screen.findAllByText(/fresh sequence, timeout/))[0],

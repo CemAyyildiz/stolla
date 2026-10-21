@@ -55,7 +55,7 @@ function ContractAddress({
             type="button"
             onClick={() => onCopy(label, contractId)}
             className="min-h-11 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800"
-            aria-label={`Copy ${label}`}
+            aria-label={`Copy full ${label} address`}
           >
             Copy address
           </button>
@@ -65,9 +65,9 @@ function ContractAddress({
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex min-h-11 items-center rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800"
-              aria-label={`Open ${label} in explorer`}
+              aria-label={`View ${label} on Stellar Expert`}
             >
-              Open explorer
+              View on Stellar Expert
             </a>
           )}
         </span>
@@ -144,11 +144,11 @@ export default function CommunityDetailPage() {
     return (
       <div className="mx-auto w-full min-w-0 max-w-4xl px-4 py-10">
         <LiveStatus className="sr-only">Loading community details…</LiveStatus>
-        <Skeleton className="h-8 w-56" />
-        <Skeleton className="mt-3 h-5 w-full max-w-xl" />
+        <Skeleton variant="shimmer" className="h-8 w-56" />
+        <Skeleton variant="shimmer" className="mt-3 h-5 w-full max-w-xl" />
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <Skeleton className="h-44 w-full" />
-          <Skeleton className="h-44 w-full" />
+          <Skeleton variant="shimmer" className="h-44 w-full" />
+          <Skeleton variant="shimmer" className="h-44 w-full" />
         </div>
       </div>
     );

@@ -33,6 +33,38 @@ from `lib/community/registry.ts`; tests inject deterministic adapters through
 - `@stellar/stellar-sdk` + `@creit.tech/stellar-wallets-kit`
 - Contract IDs in `NEXT_PUBLIC_*` env vars — see `lib/stellar.ts`
 
+## Loading states
+
+Every data region uses the shared skeleton pattern in
+`components/ui/Skeleton.tsx`:
+
+- `Skeleton` — the base placeholder. `variant="shimmer"` marks an active
+  load; `variant="pulse"` is the calmer default. Both are `motion-safe:`, so
+  reduced-motion users keep a static, still-visible placeholder.
+- `SkeletonStat` — a labeled row for `<dl>` stats. Keep the label visible
+  ("Name", "Symbol", …) so the loaded layout does not jump into unlabeled
+  blocks.
+- `SkeletonCommunityRow` / `SkeletonProposalRow` — list row chrome that
+  mirrors `CommunityCard` / `ProposalSummaryCard`.
+
+The skeleton fill (`.skeleton-fill` in `globals.css`) is lighter than the
+card surface on purpose: a placeholder must never be mistaken for a disabled
+form field, which is always darker than its surface.
+
+Each loading panel owns exactly **one** `role="status"` region (use
+`LiveStatus`). Two live regions announcing the same load make screen readers
+repeat themselves and read as broken.
+
 ## Next.js note
 
 This project may use a newer Next.js than your training data. Check `node_modules/next/dist/docs/` for API changes if builds fail.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

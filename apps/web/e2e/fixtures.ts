@@ -17,6 +17,31 @@ export const BETA_NFT =
   "CBUSNWMYV4J2MM6IC6QJHG7EHC6WRUIF22NED3CQVDA4TODYIVJLWUS4";
 export const PROPOSAL_ID = "11".repeat(32);
 
+/**
+ * Structured Proposal Metadata v1 envelope.
+ *
+ * The proposal surfaces (list, detail, export) read the versioned envelope
+ * instead of plain text, so the fixture has to provide the same shape the
+ * app writes on-chain.
+ */
+const ALPHA_PROPOSAL_DESCRIPTION = `STOLLA_PROPOSAL_METADATA_V1
+${JSON.stringify({
+  version: 1,
+  title: "Fund Alpha treasury observability",
+  summary: "Publish public dashboards for community treasury.",
+  body: "Fund a shared observability stack for community treasuries.",
+  discussionUrl: "https://forum.example.org/t/alpha-observability",
+})}`;
+
+const BETA_PROPOSAL_DESCRIPTION = `STOLLA_PROPOSAL_METADATA_V1
+${JSON.stringify({
+  version: 1,
+  title: "Beta grants proposal",
+  summary: "Publish public dashboards for community grants.",
+  body: "Fund shared reporting for community grants.",
+  discussionUrl: null,
+})}`;
+
 function community(
   id: string,
   name: string,
@@ -70,10 +95,10 @@ export async function installPublicFixtures(page: Page) {
       ],
       proposals: {
         [ALPHA_GOVERNOR]: [
-          { id: PROPOSAL_ID, description: "Alpha treasury proposal", state: 1 },
+          { id: PROPOSAL_ID, description: ALPHA_PROPOSAL_DESCRIPTION, state: 1 },
         ],
         [BETA_GOVERNOR]: [
-          { id: PROPOSAL_ID, description: "Beta grants proposal", state: 1 },
+          { id: PROPOSAL_ID, description: BETA_PROPOSAL_DESCRIPTION, state: 1 },
         ],
       },
     },

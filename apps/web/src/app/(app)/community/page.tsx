@@ -34,7 +34,7 @@ import {
 import { useCommunityRegistry } from "@/lib/community/CommunityRegistryProvider";
 import type { Community } from "@/lib/community/types";
 import { contractIds } from "@/lib/stellar";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { Skeleton, SkeletonStat } from "@/components/ui/Skeleton";
 import { AppButton } from "@/components/ui/AppButton";
 import { LiveStatus } from "@/components/ui/LiveStatus";
 import { TransactionLifecycleStatus } from "@/components/TransactionLifecycleStatus";
@@ -453,40 +453,32 @@ export default function CommunityPage() {
             </section>
           )}
 
-          {refreshing && !initialLoading && (
-            <LiveStatus className="text-sm text-slate-400">
-              Loading community data…
-            </LiveStatus>
-          )}
-
           {initialLoading ? (
             <section className="rounded-xl border border-slate-800 bg-[#151b2b] p-5">
+              {/* Single loading announcement for the collection panel (#300). */}
               <LiveStatus className="sr-only">
                 Loading community data…
               </LiveStatus>
               <h2 className="font-semibold text-slate-100">Collection</h2>
               <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                <div>
-                  <dt className="text-slate-500">Name</dt>
-                  <dd><Skeleton className="mt-0.5 h-5 w-32" /></dd>
-                </div>
-                <div>
-                  <dt className="text-slate-500">Symbol</dt>
-                  <dd><Skeleton className="mt-0.5 h-5 w-20" /></dd>
-                </div>
-                <div>
-                  <dt className="text-slate-500">Your balance</dt>
-                  <dd><Skeleton className="mt-0.5 h-5 w-16" /></dd>
-                </div>
-                <div>
-                  <dt className="text-slate-500">Your votes</dt>
-                  <dd><Skeleton className="mt-0.5 h-5 w-24" /></dd>
-                </div>
+                <SkeletonStat label="Name" valueWidth="w-32" />
+                <SkeletonStat label="Symbol" valueWidth="w-20" />
+                <SkeletonStat label="Your balance" valueWidth="w-16" />
+                <SkeletonStat label="Your votes" valueWidth="w-24" />
               </dl>
-              <Skeleton className="mt-4 h-9 w-36 rounded-lg" />
+              <Skeleton
+                variant="shimmer"
+                className="mt-4 h-9 w-36 rounded-lg"
+              />
             </section>
           ) : (
             <section className="rounded-xl border border-slate-800 bg-[#151b2b] p-5">
+              {/* Same single status region, now announcing a background refresh. */}
+              {refreshing && (
+                <LiveStatus className="text-sm text-slate-400">
+                  Loading community data…
+                </LiveStatus>
+              )}
               <h2 className="font-semibold text-slate-100">Collection</h2>
               <SelfDelegateCallout
                 balance={balance}

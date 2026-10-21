@@ -26,7 +26,7 @@ export type ProposalEntry =
 export type ProposalListResolution =
   | { status: "loading" }
   | { status: "error"; error: string }
-  | { status: "ready"; entries: ProposalEntry[] };
+  | { status: "ready"; entries: ProposalEntry[]; error?: string | null };
 
 export function useCommunityProposals(
   governorContractId: string,

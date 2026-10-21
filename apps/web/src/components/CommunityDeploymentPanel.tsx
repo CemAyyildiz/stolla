@@ -117,7 +117,7 @@ export function CommunityDeploymentPanel({
     | null
   >(null);
   const [authorizationCheck, setAuthorizationCheck] = useState(0);
-  const preflightInFlight = useRef(false);
+  const preflightRequest = useRef(0);
   const inFlight = useRef(false);
   const previousInput = useRef("");
   const simulationGeneration = useRef(0);
@@ -204,25 +204,21 @@ export function CommunityDeploymentPanel({
 
   useEffect(() => {
     if (transactionHash || staticAuthorization !== null) return;
-    let cancelled = false;
-    if (preflightInFlight.current) return;
-    preflightInFlight.current = true;
+    // Sequence the reads instead of blocking on an in-flight flag: React's
+    // Strict Mode mounts, unmounts and remounts effects in development, and a
+    // "one read at a time" guard would cancel the first read and never start
+    // a replacement, leaving the panel stuck on "checking" forever.
+    const request = ++preflightRequest.current;
     void adapter
       .readFactoryOwner(factoryId, address ?? "")
       .then((owner) => {
-        if (cancelled) return;
+        if (request !== preflightRequest.current) return;
         setOwnerRead({ status: "ok", owner });
       })
       .catch(() => {
-        if (cancelled) return;
+        if (request !== preflightRequest.current) return;
         setOwnerRead({ status: "error" });
-      })
-      .finally(() => {
-        preflightInFlight.current = false;
       });
-    return () => {
-      cancelled = true;
-    };
   }, [
     adapter,
     address,

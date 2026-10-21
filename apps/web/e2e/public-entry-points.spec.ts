@@ -30,11 +30,14 @@ test("guides a walletless visitor from the landing page to Browse and Create com
   // The hero and the closing CTA both offer this link; take the first one.
   await page.getByRole("link", { name: "Browse communities" }).first().click();
   await expect(page).toHaveURL(/\/communities\/?$/);
-  await expect(page.getByRole("heading", { name: "Communities" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Communities", exact: true }),
+  ).toBeVisible();
   // The registry is configured but reports zero communities: this is the
   // known empty state, not a blank crash or an unhandled error boundary.
+  await expect(page.getByRole("heading", { name: "No communities yet" })).toBeVisible();
   await expect(
-    page.getByText("No communities are registered yet."),
+    page.getByText(/Communities will appear here once registered/),
   ).toBeVisible();
   // Scoped to <main>: the route announcer outside it also carries role="alert".
   await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
@@ -43,7 +46,7 @@ test("guides a walletless visitor from the landing page to Browse and Create com
   await page.getByRole("link", { name: "Create a community" }).first().click();
   await expect(page).toHaveURL(/\/communities\/create\/?$/);
   await expect(
-    page.getByRole("heading", { name: "Describe your community" }),
+    page.getByRole("heading", { name: "Name your community" }),
   ).toBeVisible();
   await expect(page.getByLabel("Community name (required)")).toBeVisible();
   // Scoped to <main>: the route announcer outside it also carries role="alert".
