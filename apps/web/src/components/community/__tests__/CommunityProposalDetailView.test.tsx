@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import { ProposalState } from "@/lib/bindings/community-governor/src";
 import { CommunityProposalDetailView } from "@/components/community/CommunityProposalDetailView";
+import { SIGNALING_ONLY_MESSAGE } from "@/lib/timelock/proposalExecution";
 import {
   atlasCommunity,
   beaconCommunity,
@@ -97,5 +98,55 @@ describe("CommunityProposalDetailView", () => {
     );
 
     expect(await screen.findByText("Community not found")).toBeInTheDocument();
+  });
+
+  it("keeps signaling copy on a succeeded proposal when Timelock is not configured", async () => {
+    const getReader = createGovernorReaderFactory([
+      {
+        contractId: atlasCommunity.record.governorContract,
+        proposals: { "01": ProposalState.Succeeded },
+      },
+    ]);
+
+    render(
+      <CommunityProposalDetailView
+        communityId={atlasCommunity.record.id}
+        proposalId="01"
+        registry={multiCommunityRegistry}
+        getReader={getReader}
+        timelockContractId={null}
+      />,
+    );
+
+    expect(await screen.findByText("Succeeded")).toBeInTheDocument();
+    expect(screen.getByText(SIGNALING_ONLY_MESSAGE)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Queue" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Execute" })).not.toBeInTheDocument();
+  });
+
+  it("shows a queue action for a succeeded proposal when Timelock is configured", async () => {
+    const getReader = createGovernorReaderFactory([
+      {
+        contractId: atlasCommunity.record.governorContract,
+        proposals: { "01": ProposalState.Succeeded },
+      },
+    ]);
+
+    render(
+      <CommunityProposalDetailView
+        communityId={atlasCommunity.record.id}
+        proposalId="01"
+        registry={multiCommunityRegistry}
+        getReader={getReader}
+        timelockContractId="CTIMELOCK0000000000000000000000000000000000000000000000001"
+        executionWindow={{ etaLedger: null, expiresAtLedger: null, currentLedger: 10 }}
+        walletConnected
+        correctNetwork
+        onTimelockAction={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole("button", { name: "Queue" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Execute" })).not.toBeInTheDocument();
   });
 });
