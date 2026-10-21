@@ -81,12 +81,15 @@ function WalletActivity({ address }: { address: string }) {
 
 export default function ActivityPage() {
   const { address, connect, isConnecting } = useWallet();
-  return <main className="mx-auto w-full max-w-3xl px-4 py-10">
+  // The (app) route group's layout already renders the page's single
+  // <main id="main-content">, so this is a <div>, not a second <main> — see
+  // #405.
+  return <div className="mx-auto w-full max-w-3xl px-4 py-10">
     <h1 className="text-2xl font-bold text-slate-100">Your activity</h1>
     <p className="mt-2 text-slate-400">Open votes and recent actions across your communities.</p>
     {!address ? <div className="mt-6 rounded-xl border border-slate-800 bg-[#151b2b] p-5">
       <p className="text-slate-300">Connect your wallet to see activity in your communities.</p>
       <AppButton tone="primary" className="mt-3" onClick={() => void connect()} disabled={isConnecting}>{isConnecting ? "Connecting…" : "Connect wallet"}</AppButton>
     </div> : <WalletActivity key={address} address={address} />}
-  </main>;
+  </div>;
 }

@@ -91,13 +91,17 @@ export default function CommunitySettingsPage() {
     }
   }
 
+  // The (app) route group's layout already renders the page's single
+  // <main id="main-content">, so every branch below returns a <div>, not a
+  // second <main> — see #405.
+
   if (!community) {
-    return <main className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-400">Loading settings…</main>;
+    return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-400">Loading settings…</div>;
   }
 
   if (!allowed) {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-10">
+      <div className="mx-auto max-w-3xl px-4 py-10">
         <h1 className="text-2xl font-semibold text-slate-100">Community settings</h1>
         <p role="alert" className="mt-3 text-sm text-amber-200">
           Only the community owner can update metadata.
@@ -105,12 +109,12 @@ export default function CommunitySettingsPage() {
         <Link href={`/communities/${community.record.id}`} className="mt-4 inline-block text-sm text-indigo-300">
           Back to community
         </Link>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="mx-auto w-full min-w-0 max-w-3xl px-4 py-10">
+    <div className="mx-auto w-full min-w-0 max-w-3xl px-4 py-10">
       <h1 className="text-2xl font-semibold text-slate-100">Community settings</h1>
       <p className="mt-2 text-sm text-slate-400">
         Pin updated metadata and review the hash. The factory does not expose a post-launch URI writer yet, so this page stores the prepared URI and hash for the community detail view without redeploying WASM.
@@ -154,6 +158,6 @@ export default function CommunitySettingsPage() {
       <AppButton type="button" className="mt-4" disabled={pinning} onClick={() => void save()}>
         {pinning ? "Pinning…" : "Update metadata"}
       </AppButton>
-    </main>
+    </div>
   );
 }
