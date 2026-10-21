@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TransactionLifecycleStatus } from "@/components/TransactionLifecycleStatus";
 import { PreSubmitSummary } from "@/components/PreSubmitSummary";
+import { CommunityInviteLinkBuilder } from "@/components/community/CommunityInviteLinkBuilder";
 import { AppButton } from "@/components/ui/AppButton";
 import { MainnetWriteGate, mainnetWritesBlocked } from "@/components/MainnetWriteGate";
 import { AppLinkButton } from "@/components/ui/AppLinkButton";
@@ -678,6 +679,9 @@ export function CommunityDeploymentPanel({
             >
               Browse community proposals
             </AppLinkButton>
+          </div>
+          <div className="mt-4">
+            <CommunityInviteLinkBuilder communityId={expected.id} />
           </div>
         </section>
       )}

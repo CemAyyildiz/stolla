@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { AppButton } from "@/components/ui/AppButton";
+import { CommunityInviteLinkBuilder } from "@/components/community/CommunityInviteLinkBuilder";
 import { useWallet } from "@/context/WalletProvider";
 import { useCommunityRegistry } from "@/lib/community/CommunityRegistryProvider";
 import { previewCommunityMetadata, publishCommunityMetadata } from "@/lib/community/publishMetadata";
@@ -154,6 +155,10 @@ export default function CommunitySettingsPage() {
       <AppButton type="button" className="mt-4" disabled={pinning} onClick={() => void save()}>
         {pinning ? "Pinning…" : "Update metadata"}
       </AppButton>
+
+      <div className="mt-6">
+        <CommunityInviteLinkBuilder communityId={community.record.id} />
+      </div>
     </main>
   );
 }
