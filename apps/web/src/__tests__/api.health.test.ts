@@ -70,6 +70,14 @@ describe("GET /api/health", () => {
         privilegedWrites: true,
       },
       unavailableCapabilities: [],
+      gates: [
+        { name: "rpc", label: "RPC endpoint", available: true, reason: null, requiredEnvironment: [], runbookAnchor: "network-safety-shell" },
+        { name: "explorer", label: "Explorer", available: true, reason: null, requiredEnvironment: [], runbookAnchor: "network-safety-shell" },
+        { name: "communityFactory", label: "CommunityFactory contract", available: true, reason: null, requiredEnvironment: [], runbookAnchor: "3-deploy-in-dependency-order" },
+        { name: "legacyContracts", label: "Legacy NFT/Governor contracts", available: true, reason: null, requiredEnvironment: [], runbookAnchor: "3-deploy-in-dependency-order" },
+        { name: "proposalDiscovery", label: "Proposal discovery", available: true, reason: null, requiredEnvironment: [], runbookAnchor: "5-verify-on-chain-state-independently" },
+        { name: "privilegedWrites", label: "Mainnet writes", available: true, reason: null, requiredEnvironment: [], runbookAnchor: "final-activation-gate" },
+      ],
     });
   });
 
@@ -155,5 +163,10 @@ describe("GET /api/health", () => {
     expect(body.contracts.allConfigured).toBe(false);
     expect(body.capabilities.communityFactory).toBe(false);
     expect(body.unavailableCapabilities).toContain("communityFactory");
+
+    const factoryGate = body.gates.find((gate: { name: string }) => gate.name === "communityFactory");
+    expect(factoryGate.available).toBe(false);
+    expect(factoryGate.reason).toMatch(/CommunityFactory/);
+    expect(factoryGate.requiredEnvironment).toContain("NEXT_PUBLIC_COMMUNITY_FACTORY_CONTRACT_ID");
   });
 });

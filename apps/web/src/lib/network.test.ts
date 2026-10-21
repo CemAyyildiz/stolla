@@ -4,6 +4,7 @@ import {
   NETWORKS,
   NetworkCapabilityError,
   NetworkMismatchError,
+  buildHealthGates,
   buildNetworkCapabilities,
   compareNetworks,
   contractUrl,
@@ -161,5 +162,54 @@ describe("network capability matrix", () => {
         NEXT_PUBLIC_ALLOW_MAINNET_WRITES: "true",
       }).privilegedWrites.available,
     ).toBe(true);
+  });
+});
+
+describe("buildHealthGates", () => {
+  it("reports every gate available with no reason when the environment is complete", () => {
+    const gates = buildHealthGates(createNetworkCapabilitiesFixture("testnet"));
+    expect(gates).toHaveLength(6);
+    expect(gates.every((gate) => gate.available)).toBe(true);
+    expect(gates.every((gate) => gate.reason === null)).toBe(true);
+    expect(gates.every((gate) => gate.requiredEnvironment.length === 0)).toBe(true);
+    expect(gates.find((gate) => gate.name === "privilegedWrites")?.label).toBe("Mainnet writes");
+  });
+
+  it("names the missing capability clearly when mainnet writes are blocked", () => {
+    const capabilities = createNetworkCapabilitiesFixture("mainnet", {
+      NEXT_PUBLIC_STELLAR_MAINNET_RPC_URL: "https://rpc.mainnet.example",
+    });
+    const gates = buildHealthGates(capabilities);
+    const writesGate = gates.find((gate) => gate.name === "privilegedWrites");
+    expect(writesGate?.available).toBe(false);
+    expect(writesGate?.reason).toContain("Mainnet writes are off");
+    expect(writesGate?.requiredEnvironment).toContain("NEXT_PUBLIC_ALLOW_MAINNET_WRITES");
+
+    // Every other gate stays independently reported — one failure doesn't
+    // blank out the rest of the checklist.
+    const rpcGate = gates.find((gate) => gate.name === "rpc");
+    expect(rpcGate?.available).toBe(true);
+    expect(rpcGate?.reason).toBeNull();
+  });
+
+  it("links each gate to its runbook anchor", () => {
+    const gates = buildHealthGates(createNetworkCapabilitiesFixture("testnet"));
+    for (const gate of gates) {
+      expect(gate.runbookAnchor.length).toBeGreaterThan(0);
+    }
+    expect(gates.find((gate) => gate.name === "privilegedWrites")?.runbookAnchor).toBe(
+      "final-activation-gate",
+    );
+  });
+
+  it("surfaces an unconfigured contract as its own named gate, independent of mainnet writes", () => {
+    const capabilities = createNetworkCapabilitiesFixture("testnet", {
+      NEXT_PUBLIC_COMMUNITY_FACTORY_CONTRACT_ID: "",
+    });
+    const gates = buildHealthGates(capabilities);
+    const factoryGate = gates.find((gate) => gate.name === "communityFactory");
+    expect(factoryGate?.available).toBe(false);
+    expect(factoryGate?.reason).toMatch(/CommunityFactory/);
+    expect(gates.find((gate) => gate.name === "privilegedWrites")?.available).toBe(true);
   });
 });

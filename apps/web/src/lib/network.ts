@@ -267,3 +267,45 @@ export function listUnavailableCapabilities(capabilities: NetworkCapabilities) {
   const names: NetworkCapabilityName[] = ["rpc", "explorer", "communityFactory", "legacyContracts", "proposalDiscovery", "privilegedWrites"];
   return names.filter((name) => !capabilities[name].available);
 }
+
+/**
+ * One row of the mainnet-readiness gate checklist (issue #405/#408). Mirrors
+ * `docs/testnet-to-mainnet-runbook.md`'s gates at the granularity this app
+ * actually tracks (`NetworkCapabilityName`), not a literal 1:1 heading
+ * match — the runbook groups several of these under shared sections, so a
+ * few gates intentionally point at the same anchor.
+ */
+export type HealthGate = {
+  name: NetworkCapabilityName;
+  label: string;
+  available: boolean;
+  /** Present only when `available` is false — names the missing capability clearly. */
+  reason: string | null;
+  requiredEnvironment: readonly string[];
+  /** Anchor within MAINNET_RUNBOOK_PATH for this gate's procedure. */
+  runbookAnchor: string;
+};
+
+const GATE_DEFINITIONS: { name: NetworkCapabilityName; label: string; runbookAnchor: string }[] = [
+  { name: "rpc", label: "RPC endpoint", runbookAnchor: "network-safety-shell" },
+  { name: "explorer", label: "Explorer", runbookAnchor: "network-safety-shell" },
+  { name: "communityFactory", label: "CommunityFactory contract", runbookAnchor: "3-deploy-in-dependency-order" },
+  { name: "legacyContracts", label: "Legacy NFT/Governor contracts", runbookAnchor: "3-deploy-in-dependency-order" },
+  { name: "proposalDiscovery", label: "Proposal discovery", runbookAnchor: "5-verify-on-chain-state-independently" },
+  { name: "privilegedWrites", label: "Mainnet writes", runbookAnchor: "final-activation-gate" },
+];
+
+/** Builds the readiness checklist from a capability matrix. Pure — safe to unit test without any live RPC. */
+export function buildHealthGates(capabilities: NetworkCapabilities): HealthGate[] {
+  return GATE_DEFINITIONS.map(({ name, label, runbookAnchor }) => {
+    const capability = capabilities[name];
+    return {
+      name,
+      label,
+      available: capability.available,
+      reason: capability.available ? null : capability.reason,
+      requiredEnvironment: capability.available ? [] : capability.requiredEnvironment,
+      runbookAnchor,
+    };
+  });
+}

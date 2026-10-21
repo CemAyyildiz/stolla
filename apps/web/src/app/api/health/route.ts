@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { activeCapabilities } from "@/lib/stellar";
 import {
+  buildHealthGates,
   listUnavailableCapabilities,
+  type HealthGate,
   type NetworkCapabilityName,
 } from "@/lib/network";
 
@@ -19,6 +21,8 @@ type HealthResponse = {
   };
   capabilities: Record<NetworkCapabilityName, boolean>;
   unavailableCapabilities: NetworkCapabilityName[];
+  /** Full readiness checklist (issue #408) — one row per capability, with the reason text for failures. */
+  gates: HealthGate[];
 };
 
 function buildResponse(): { response: HealthResponse; statusCode: number } {
@@ -53,6 +57,7 @@ function buildResponse(): { response: HealthResponse; statusCode: number } {
         privilegedWrites: capabilities.privilegedWrites.available,
       },
       unavailableCapabilities,
+      gates: buildHealthGates(capabilities),
     },
     statusCode: isReady ? 200 : 503,
   };
