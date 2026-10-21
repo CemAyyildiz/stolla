@@ -1,7 +1,7 @@
 "use client";
 
 import { Buffer } from "buffer";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ProposalState } from "@/lib/bindings/community-governor/src";
 import { createReadOnlyGovernorClientFor } from "@/lib/contracts";
 
@@ -9,6 +9,9 @@ export type ProposalReader = {
   proposal_state: (args: {
     proposal_id: Buffer;
   }) => Promise<{ result: ProposalState }>;
+  proposal_proposer?: (args: {
+    proposal_id: Buffer;
+  }) => Promise<{ result: string | null }>;
 };
 
 export type ProposalReaderFactory = (governorContractId: string) => ProposalReader;
@@ -101,7 +104,7 @@ export function useCommunityProposals(
 
 export type ProposalResolution =
   | { status: "loading" }
-  | { status: "ready"; state: ProposalState }
+  | { status: "ready"; state: ProposalState; proposer: string | null; refresh: () => void }
   | { status: "error"; error: string };
 
 export function useCommunityProposal(
@@ -111,39 +114,61 @@ export function useCommunityProposal(
 ): ProposalResolution {
   const scopeKey = `${governorContractId}|${proposalId}`;
 
-  const [state, setState] = useState<ProposalResolution>({ status: "loading" });
+  const [state, setState] = useState<ProposalState | null>(null);
+  const [proposer, setProposer] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [trackedScopeKey, setTrackedScopeKey] = useState(scopeKey);
+  const [refreshNonce, setRefreshNonce] = useState(0);
 
   if (trackedScopeKey !== scopeKey) {
     setTrackedScopeKey(scopeKey);
-    setState({ status: "loading" });
+    setState(null);
+    setProposer(null);
+    setError(null);
   }
 
   const fetchIdRef = useRef(0);
+  const refresh = useCallback(() => {
+    setRefreshNonce((nonce) => nonce + 1);
+  }, []);
 
   useEffect(() => {
     const fetchId = ++fetchIdRef.current;
     let cancelled = false;
     const reader = getReader(governorContractId);
+    const proposalKey = { proposal_id: Buffer.from(proposalId, "hex") };
 
     reader
-      .proposal_state({ proposal_id: Buffer.from(proposalId, "hex") })
-      .then((tx) => {
+      .proposal_state(proposalKey)
+      .then(async (tx) => {
         if (cancelled || fetchIdRef.current !== fetchId) return;
-        setState({ status: "ready", state: tx.result });
+        let nextProposer: string | null = null;
+        if (typeof reader.proposal_proposer === "function") {
+          try {
+            const proposerTx = await reader.proposal_proposer(proposalKey);
+            nextProposer = proposerTx.result ?? null;
+          } catch {
+            nextProposer = null;
+          }
+        }
+        if (cancelled || fetchIdRef.current !== fetchId) return;
+        setProposer(nextProposer);
+        setState(tx.result);
+        setError(null);
       })
-      .catch((error: unknown) => {
+      .catch((loadError: unknown) => {
         if (cancelled || fetchIdRef.current !== fetchId) return;
-        setState({
-          status: "error",
-          error: error instanceof Error ? error.message : "Failed to load proposal",
-        });
+        setError(
+          loadError instanceof Error ? loadError.message : "Failed to load proposal",
+        );
       });
 
     return () => {
       cancelled = true;
     };
-  }, [governorContractId, proposalId, getReader]);
+  }, [governorContractId, proposalId, getReader, refreshNonce]);
 
-  return state;
+  if (error) return { status: "error", error };
+  if (state === null) return { status: "loading" };
+  return { status: "ready", state, proposer, refresh };
 }

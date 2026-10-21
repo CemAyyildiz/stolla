@@ -25,7 +25,7 @@ export function formatLedgerDuration(ledgers: number | null): string | null {
   if (minutes) parts.push(`${minutes}m`);
   if (seconds && parts.length === 0) parts.push(`${seconds}s`);
   // Keep to at most 2 most significant parts for brevity.
-  return `|~${parts.slice(0, 2).join(" ")}`;
+  return `~${parts.slice(0, 2).join(" ")}`;
 }
 
 export const GOVERNANCE_HELPERS: Record<string, string> = {
@@ -80,13 +80,13 @@ export interface ProposalActionAvailability {
   blockedByAuthorization: boolean;
 }
 
-const CANCELLABLE_STATES: Readonly Set<ProposalActionState> = new Set([
+const CANCELLABLE_STATES: ReadonlySet<ProposalActionState> = new Set([
   "Pending",
   "Active",
   "Queued",
 ]);
 
-const EXECUTABLE_STATES: Readonly Set<ProposalActionState> = new Set(["Succeeded"]);
+const EXECUTABLE_STATES: ReadonlySet<ProposalActionState> = new Set(["Succeeded"]);
 
 export function isCancellableState(state: ProposalActionState): boolean {
   return CANCELLABLE_STATES.has(state);
