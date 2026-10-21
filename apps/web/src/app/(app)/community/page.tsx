@@ -102,6 +102,7 @@ export default function CommunityPage() {
   const [dataLoadError, setDataLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [mintOwner, setMintOwner] = useState<string | null>(null);
   const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(
     null,
   );
@@ -123,6 +124,15 @@ export default function CommunityPage() {
 
   useEffect(() => {
     let active = true;
+    if (!contractsConfigured) return;
+    createReadOnlyNftClient(activeNftContract).get_owner()
+      .then((result) => { if (active) setMintOwner(result.result ?? null); })
+      .catch(() => { if (active) setMintOwner(null); });
+    return () => { active = false; };
+  }, [activeNftContract, contractsConfigured]);
+
+  useEffect(() => {
+    let active = true;
     const timeout = window.setTimeout(() => {
       const communityId = new URLSearchParams(window.location.search).get(
         "community",
@@ -131,6 +141,7 @@ export default function CommunityPage() {
       setRouteResolved(false);
       setCommunitySelectionError("");
       setActiveCommunity(null);
+      setMintOwner(null);
       setName("");
       setSymbol("");
       setBalance(null);
@@ -296,8 +307,8 @@ export default function CommunityPage() {
   }
 
   async function handleMint() {
-    if (!address) {
-      setStatus({ message: "Connect your wallet first.", tone: "error" });
+    if (!address || mintOwner !== address) {
+      setStatus({ message: "Only the current NFT owner can mint. Refresh the page if ownership changed.", tone: "error" });
       return;
     }
     const nextTokenErrors = validateTokenMetadataDraft(tokenDraft);
@@ -552,7 +563,7 @@ export default function CommunityPage() {
             </section>
           )}
 
-          <section className="min-w-0 rounded-xl border border-slate-800 bg-[#151b2b] p-4 sm:p-5">
+          {address && mintOwner === address ? <section className="min-w-0 rounded-xl border border-slate-800 bg-[#151b2b] p-4 sm:p-5">
             <h2 className="font-semibold text-slate-100">Mint NFT (owner only)</h2>
             <PreSubmitSummary simulation={null} onConfirm={() => void handleMint()} />
             <div className="mt-4 min-w-0 space-y-4">
@@ -784,7 +795,7 @@ export default function CommunityPage() {
                 }}
               />
             </div>
-          </section>
+          </section> : <section className="rounded-xl border border-slate-800 bg-[#151b2b] p-4 sm:p-5 text-sm text-slate-400">Minting is available to the current NFT owner. Connect that wallet to mint.</section>}
         </div>
       )}
 

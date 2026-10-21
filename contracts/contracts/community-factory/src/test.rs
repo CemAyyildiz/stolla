@@ -354,3 +354,51 @@ fn ownership_transfer_changes_creation_authority_only_after_acceptance() {
     client.create_community(&new_owner, &fixture.request(b"new-owner"));
     assert_eq!(client.community_count(), 1);
 }
+
+#[test]
+fn community_owner_sync_follows_accepted_nft_owner() {
+    let fixture = Fixture::new();
+    fixture.e.mock_all_auths();
+    let client = fixture.client();
+    let request = fixture.request(b"ownership-sync");
+    let record = client.create_community(&fixture.owner, &request);
+    let nft = CommunityNftClient::new(&fixture.e, &record.nft_contract);
+    let next_owner = Address::generate(&fixture.e);
+    let deadline = fixture.e.ledger().sequence() + 100;
+
+    nft.transfer_ownership(&next_owner, &deadline);
+    assert_eq!(
+        client
+            .sync_community_owner(&record.community_id)
+            .community_owner,
+        request.community_owner
+    );
+    nft.accept_ownership();
+    assert_eq!(
+        client
+            .get_community(&record.community_id)
+            .unwrap()
+            .community_owner,
+        request.community_owner
+    );
+    assert_eq!(
+        client
+            .sync_community_owner(&record.community_id)
+            .community_owner,
+        next_owner
+    );
+    assert_eq!(
+        client
+            .list_communities(&None, &10)
+            .records
+            .get(0)
+            .unwrap()
+            .community_owner,
+        next_owner
+    );
+    assert_eq!(nft.get_owner(), Some(next_owner));
+    assert_eq!(
+        client.try_sync_community_owner(&BytesN::from_array(&fixture.e, &[0; 32])),
+        Err(Ok(FactoryError::CommunityNotFound))
+    );
+}
