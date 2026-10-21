@@ -10,6 +10,7 @@ import { CommunitySwitcher } from "@/components/CommunitySwitcher";
 
 const navItems = [
   { href: "/communities", label: "Communities" },
+  { href: "/activity", label: "Your activity" },
   { href: "/community", label: "Legacy collection" },
   { href: "/proposals", label: "Proposals" },
 ];
