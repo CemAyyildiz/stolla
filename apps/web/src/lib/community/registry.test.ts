@@ -58,4 +58,21 @@ describe("community registry decoding", () => {
     expect(isCommunityId("ab".repeat(31))).toBe(false);
     expect(isCommunityId("z".repeat(64))).toBe(false);
   });
+
+  it("retains an optional Timelock address without requiring it on legacy records", () => {
+    const timelock = "C" + "A".repeat(55);
+    expect(parseRegistryRecord({
+      community_id: bytes(1),
+      nft_contract: "CNFT",
+      governor_contract: "CGOV",
+      timelock_contract: timelock,
+      creator: "GCREATOR",
+      community_owner: "GOWNER",
+      created_at_ledger: 123,
+      creation_index: 4,
+      metadata_uri: "ipfs://bafy/community.json",
+      metadata_hash: bytes(2),
+      metadata_schema_version: 1,
+    })?.timelockContract).toBe(timelock);
+  });
 });

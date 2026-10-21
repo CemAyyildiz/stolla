@@ -2,18 +2,22 @@
 
 import { AppLinkButton } from "@/components/ui/AppLinkButton";
 import type { Community, CommunityRegistry } from "@/lib/community/types";
+import type { GuardianAdapter } from "@/lib/community/guardian";
 import { useRegistryCommunity } from "@/lib/community/useRegistryCommunity";
 import { CommunityBreadcrumbs } from "./CommunityBreadcrumbs";
 import { CommunityNotFound } from "./CommunityNotFound";
+import { GuardianControls } from "./GuardianControls";
 
 export type CommunityDetailViewProps = {
   communityId: string;
   registry?: CommunityRegistry;
+  guardianAdapter?: GuardianAdapter;
 };
 
 export function CommunityDetailView({
   communityId,
   registry,
+  guardianAdapter,
 }: CommunityDetailViewProps) {
   const resolution = useRegistryCommunity(communityId, registry);
 
@@ -31,10 +35,10 @@ export function CommunityDetailView({
     return <CommunityNotFound communityId={communityId} />;
   }
 
-  return <CommunityDetailPanel community={resolution.result.community} />;
+  return <CommunityDetailPanel community={resolution.result.community} guardianAdapter={guardianAdapter} />;
 }
 
-function CommunityDetailPanel({ community }: { community: Community }) {
+function CommunityDetailPanel({ community, guardianAdapter }: { community: Community; guardianAdapter?: GuardianAdapter }) {
   const displayName =
     community.metadata?.name ??
     `Community ${community.record.id.slice(0, 8)}`;
@@ -47,6 +51,10 @@ function CommunityDetailPanel({ community }: { community: Community }) {
       />
 
       <h1 className="mt-4 text-2xl font-bold text-slate-100">{displayName}</h1>
+
+      {community.record.timelockContract && (
+        <GuardianControls timelockId={community.record.timelockContract} adapter={guardianAdapter} />
+      )}
 
       {community.metadata && (
         <p className="mt-2 text-slate-400">{community.metadata.description}</p>
