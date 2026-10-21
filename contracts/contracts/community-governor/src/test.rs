@@ -23,6 +23,57 @@ use crate::{
     CommunityGovernor, CommunityGovernorClient, STORAGE_EXTEND_AMOUNT, STORAGE_TTL_THRESHOLD,
 };
 
+const GOVERNOR_WASM: &[u8] =
+    include_bytes!("../../community-factory/test_wasm/community_governor.wasm");
+
+#[test]
+fn upgrade_tracks_nft_owner_and_rejects_bootstrap_owner_after_transfer() {
+    let e = Env::default();
+    let fixture = setup_governance(&e);
+    let upgrade_client = CommunityGovernorClient::new(&e, &fixture.governor_id);
+    let successor = Address::generate(&e);
+    let hash = e.deployer().upload_contract_wasm(GOVERNOR_WASM);
+    assert!(upgrade_client.bootstrap_authority_remaining());
+
+    e.mock_auths(&[MockAuth {
+        address: &successor,
+        invoke: &MockAuthInvoke {
+            contract: &fixture.governor_id,
+            fn_name: "upgrade",
+            args: (&hash,).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+    assert!(upgrade_client.try_upgrade(&hash).is_err());
+
+    e.mock_all_auths();
+    fixture.nft.transfer_ownership(&successor, &100);
+    fixture.nft.accept_ownership();
+    assert!(!upgrade_client.bootstrap_authority_remaining());
+
+    e.mock_auths(&[MockAuth {
+        address: &fixture.owner,
+        invoke: &MockAuthInvoke {
+            contract: &fixture.governor_id,
+            fn_name: "upgrade",
+            args: (&hash,).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+    assert!(upgrade_client.try_upgrade(&hash).is_err());
+
+    e.mock_auths(&[MockAuth {
+        address: &successor,
+        invoke: &MockAuthInvoke {
+            contract: &fixture.governor_id,
+            fn_name: "upgrade",
+            args: (&hash,).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+    upgrade_client.upgrade(&hash);
+}
+
 #[contract]
 struct GovernorExecutionTarget;
 

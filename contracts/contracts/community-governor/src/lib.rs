@@ -2,7 +2,9 @@
 
 mod test;
 
-use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, String, Symbol, Val, Vec};
+use soroban_sdk::{
+    contract, contractimpl, symbol_short, vec, Address, BytesN, Env, String, Symbol, Val, Vec,
+};
 use stellar_governance::governor::{self as governor, Governor, ProposalState};
 
 const DAY_IN_LEDGERS: u32 = 17_280;
@@ -36,6 +38,27 @@ impl CommunityGovernor {
         governor::set_proposal_threshold(e, proposal_threshold);
         governor::set_quorum(e, quorum);
         bump_instance_ttl(e);
+    }
+
+    /// The NFT owner is the upgrade authority for this community. Its owner
+    /// must be transferred to the Timelock during activation.
+    pub fn upgrade(e: &Env, new_wasm_hash: BytesN<32>) {
+        let token = Self::get_token_contract(e);
+        let owner: Option<Address> =
+            e.invoke_contract(&token, &symbol_short!("get_owner"), vec![e]);
+        owner.expect("NFT has no owner").require_auth();
+        bump_instance_ttl(e);
+        e.deployer().update_current_contract_wasm(new_wasm_hash);
+    }
+
+    /// Mirrors the NFT bootstrap-owner proof used by this upgrade hook.
+    pub fn bootstrap_authority_remaining(e: &Env) -> bool {
+        let token = Self::get_token_contract(e);
+        e.invoke_contract(
+            &token,
+            &Symbol::new(e, "bootstrap_authority_remaining"),
+            vec![e],
+        )
     }
 
     /// Permissionlessly renew the contract instance and governance configuration.

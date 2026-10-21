@@ -4,7 +4,8 @@
 mod test;
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, panic_with_error, Address, Env, String,
+    contract, contracterror, contractimpl, contracttype, panic_with_error, Address, BytesN, Env,
+    String,
 };
 use stellar_access::ownable::{set_owner, Ownable};
 use stellar_governance::votes::Votes;
@@ -14,6 +15,7 @@ use stellar_tokens::non_fungible::{votes::NonFungibleVotes, Base, NonFungibleTok
 #[contracttype]
 pub enum DataKey {
     TokenUri(u32),
+    BootstrapOwner,
 }
 
 /// Stable errors returned by the Community NFT contract.
@@ -43,7 +45,23 @@ impl CommunityNft {
     pub fn __constructor(e: &Env, uri: String, name: String, symbol: String, owner: Address) {
         Base::set_metadata(e, uri, name, symbol);
         set_owner(e, &owner);
+        e.storage().instance().set(&DataKey::BootstrapOwner, &owner);
         bump_instance_ttl(e);
+    }
+
+    /// The current OZ owner is the sole upgrade authority. Transfer ownership
+    /// to the community Timelock before enabling executable governance.
+    #[only_owner]
+    pub fn upgrade(e: &Env, new_wasm_hash: BytesN<32>) {
+        bump_instance_ttl(e);
+        e.deployer().update_current_contract_wasm(new_wasm_hash);
+    }
+
+    /// Public evidence that the constructor's bootstrap owner no longer owns
+    /// this instance. Only the current owner can transfer ownership again.
+    pub fn bootstrap_authority_remaining(e: &Env) -> bool {
+        let bootstrap: Option<Address> = e.storage().instance().get(&DataKey::BootstrapOwner);
+        bootstrap.is_some() && Self::get_owner(e) == bootstrap
     }
 
     /// Mint an NFT with an unchanged, non-empty metadata URI.
