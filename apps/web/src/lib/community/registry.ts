@@ -104,6 +104,11 @@ export function parseRegistryRecord(
     typeof record.governor_contract === "string"
       ? record.governor_contract
       : null;
+  const timelockContract =
+    typeof record.timelock_contract === "string" &&
+    /^C[A-Z2-7]{55}$/.test(record.timelock_contract)
+      ? record.timelock_contract
+      : undefined;
   const creator = typeof record.creator === "string" ? record.creator : null;
   const communityOwner =
     typeof record.community_owner === "string"
@@ -131,6 +136,7 @@ export function parseRegistryRecord(
     id,
     nftContract,
     governorContract,
+    ...(timelockContract ? { timelockContract } : {}),
     creator,
     communityOwner,
     createdAtLedger,

@@ -19,6 +19,7 @@ import {
 } from "@/lib/stellarExplorer";
 import { truncateMiddle } from "@/lib/truncate";
 import { CommunityMemberRoster } from "@/components/community/CommunityMemberRoster";
+import { GuardianControls } from "@/components/community/GuardianControls";
 
 function ContractAddress({
   label,
@@ -274,6 +275,10 @@ export default function CommunityDetailPage() {
           </div>
         </div>
       </header>
+
+      {record.timelockContract && (
+        <GuardianControls timelockId={record.timelockContract} />
+      )}
 
       <LiveStatus className="mt-3 text-sm text-slate-400">
         {copyStatus}

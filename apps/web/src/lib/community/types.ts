@@ -15,6 +15,8 @@ export type CommunityRegistryRecord = {
   id: string;
   nftContract: string;
   governorContract: string;
+  /** Present only for communities deployed with emergency Timelock support. */
+  timelockContract?: string;
   creator: string;
   communityOwner: string;
   createdAtLedger: number;

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CommunityDetailView } from "@/components/community/CommunityDetailView";
@@ -8,6 +8,15 @@ import {
   driftwoodCommunity,
   multiCommunityRegistry,
 } from "@/test/fixtures/communities";
+
+vi.mock("@/context/WalletProvider", async () => {
+  const React = await import("react");
+  const WalletContext = React.createContext<unknown>(null);
+  return {
+    WalletContext,
+    useOptionalWallet: () => React.useContext(WalletContext),
+  };
+});
 
 const atlasName = atlasCommunity.metadata!.name;
 const beaconName = beaconCommunity.metadata!.name;
@@ -142,5 +151,33 @@ describe("CommunityDetailView route resolution", () => {
     expect(screen.getByRole("link", { name: "Home" })).toHaveFocus();
     await user.tab();
     expect(screen.getByRole("link", { name: "Communities" })).toHaveFocus();
+  });
+
+  it("shows a Timelock pause banner on the community detail route", async () => {
+    const community = {
+      ...atlasCommunity,
+      record: { ...atlasCommunity.record, timelockContract: "C" + "A".repeat(55) },
+    };
+    const registry = {
+      ...multiCommunityRegistry,
+      get: async () => ({ status: "found" as const, community }),
+    };
+    render(
+      <CommunityDetailView
+        communityId={community.record.id}
+        registry={registry}
+        guardianAdapter={{
+          read: async () => ({
+            paused: true,
+            guardian: null,
+            canPause: false,
+            canUnpause: false,
+            canCancel: false,
+          }),
+          submit: async () => { throw new Error("Unexpected submission"); },
+        }}
+      />,
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("Community paused");
   });
 });
