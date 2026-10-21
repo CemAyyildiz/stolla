@@ -17,7 +17,9 @@ test("browses canonical scoped routes and switches communities without stale pro
   page,
 }) => {
   await page.goto("/communities");
-  await expect(page.getByRole("heading", { name: "Communities" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Communities", exact: true }),
+  ).toBeVisible();
   await page.getByLabel("Search communities by name").fill(" alpha ");
   await expect(page).toHaveURL(/\/communities\?q=alpha$/i);
   await page

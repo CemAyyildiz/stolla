@@ -40,7 +40,7 @@ test("creates a community and ends on a registry-verified success screen", async
   await openReview(page);
 
   await simulateButton(page).click();
-  await expect(wizard(page).getByText(/12345678 stroops/)).toBeVisible();
+  await expect(wizard(page).getByText(/12345678 stroops \(/)).toBeVisible();
 
   await deployButton(page).click();
   await expect(successHeading(page)).toBeVisible();
@@ -53,7 +53,7 @@ test("sends the expected factory invocation, source account and network", async 
 }) => {
   await openReview(page);
   await simulateButton(page).click();
-  await expect(wizard(page).getByText(/12345678 stroops/)).toBeVisible();
+  await expect(wizard(page).getByText(/12345678 stroops \(/)).toBeVisible();
   await deployButton(page).click();
   await expect(successHeading(page)).toBeVisible();
 
@@ -87,7 +87,7 @@ test("returns to a recoverable review state when the wallet rejects", async ({
   await installCreationFixtures(page, "wallet-rejection");
   await openReview(page);
   await simulateButton(page).click();
-  await expect(wizard(page).getByText(/12345678 stroops/)).toBeVisible();
+  await expect(wizard(page).getByText(/12345678 stroops \(/)).toBeVisible();
 
   await deployButton(page).click();
   await expect(
@@ -131,7 +131,7 @@ test("submits once when the deploy button is clicked repeatedly", async ({
 }) => {
   await openReview(page);
   await simulateButton(page).click();
-  await expect(wizard(page).getByText(/12345678 stroops/)).toBeVisible();
+  await expect(wizard(page).getByText(/12345678 stroops \(/)).toBeVisible();
 
   /**
    * Three clicks in one tick, before React can re-render the button as
