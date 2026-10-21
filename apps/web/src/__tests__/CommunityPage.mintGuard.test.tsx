@@ -66,6 +66,9 @@ function deferred<T>() {
 describe("CommunityPage mint lifecycle", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.createReadOnlyNftClient.mockReturnValue({
+      get_owner: vi.fn().mockResolvedValue({ result: "GWALLET" }),
+    });
     window.history.replaceState({}, "", "/community");
     mocks.pinFile.mockImplementation(async (file: File) => ({
       cid: "bafyimage",
@@ -204,9 +207,8 @@ describe("CommunityPage mint lifecycle", () => {
     });
 
     render(<CommunityPage />);
-    expect(
-      await screen.findByRole("button", { name: "Mint NFT" }),
-    ).toBeDisabled();
+    expect(await screen.findByText(/Minting is available to the current NFT owner/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Mint NFT" })).not.toBeInTheDocument();
     expect(mint).not.toHaveBeenCalled();
   });
 

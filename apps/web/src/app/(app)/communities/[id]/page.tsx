@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { CommunityAvatar } from "@/components/CommunityAvatar";
+import { CommunityOwnershipSettings } from "@/components/community/CommunityOwnershipSettings";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppLinkButton } from "@/components/ui/AppLinkButton";
 import { LiveStatus } from "@/components/ui/LiveStatus";
@@ -457,6 +458,8 @@ export default function CommunityDetailPage() {
           </div>
         </dl>
       </section>
+
+      <CommunityOwnershipSettings record={record} refresh={load} />
     </div>
   );
 }

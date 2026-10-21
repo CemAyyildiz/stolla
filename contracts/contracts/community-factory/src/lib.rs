@@ -4,8 +4,8 @@
 mod test;
 
 use soroban_sdk::{
-    contract, contracterror, contractevent, contractimpl, contracttype, panic_with_error,
-    xdr::ToXdr, Address, Bytes, BytesN, Env, String, Vec,
+    contract, contractclient, contracterror, contractevent, contractimpl, contracttype,
+    panic_with_error, xdr::ToXdr, Address, Bytes, BytesN, Env, String, Vec,
 };
 
 const DAY_IN_LEDGERS: u32 = 17_280;
@@ -109,6 +109,13 @@ pub enum FactoryError {
     InvalidOwnershipTransfer = 14,
     NoPendingOwner = 15,
     PendingOwnerExpired = 16,
+    CommunityNotFound = 17,
+    CommunityOwnerNotSet = 18,
+}
+
+#[contractclient(name = "NftOwnershipClient")]
+pub trait NftOwnership {
+    fn get_owner(e: &Env) -> Option<Address>;
 }
 
 #[contractevent]
@@ -154,6 +161,15 @@ pub struct OwnershipTransferStarted {
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OwnershipTransferred {
+    pub old_owner: Address,
+    pub new_owner: Address,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CommunityOwnerSynced {
+    #[topic]
+    pub community_id: BytesN<32>,
     pub old_owner: Address,
     pub new_owner: Address,
 }
@@ -330,6 +346,39 @@ impl CommunityFactory {
                 .extend_ttl(&key, FACTORY_TTL_THRESHOLD, FACTORY_TTL_EXTEND);
         }
         record
+    }
+
+    /// Reflect the NFT's accepted owner in the registry. The NFT enforces its
+    /// own two-step transfer; no caller can choose the address stored here.
+    pub fn sync_community_owner(
+        e: &Env,
+        community_id: BytesN<32>,
+    ) -> Result<CommunityRecord, FactoryError> {
+        let key = DataKey::Community(community_id.clone());
+        let mut record: CommunityRecord = e
+            .storage()
+            .persistent()
+            .get(&key)
+            .ok_or(FactoryError::CommunityNotFound)?;
+        let new_owner = NftOwnershipClient::new(e, &record.nft_contract)
+            .get_owner()
+            .ok_or(FactoryError::CommunityOwnerNotSet)?;
+        if record.community_owner != new_owner {
+            let old_owner = record.community_owner.clone();
+            record.community_owner = new_owner.clone();
+            e.storage().persistent().set(&key, &record);
+            CommunityOwnerSynced {
+                community_id,
+                old_owner,
+                new_owner,
+            }
+            .publish(e);
+        }
+        e.storage()
+            .persistent()
+            .extend_ttl(&key, FACTORY_TTL_THRESHOLD, FACTORY_TTL_EXTEND);
+        extend_instance_ttl(e);
+        Ok(record)
     }
 
     pub fn list_communities(
