@@ -8,6 +8,7 @@ Soroban smart contracts for NFT-gated community governance.
 |----------|-------------|
 | `community-nft` | SEP-0050 NFT with `NonFungibleVotes` + per-token IPFS URI storage |
 | `community-governor` | OpenZeppelin Governor wired to the NFT votes token |
+| `community-treasury` | Community asset custody; only the configured Timelock can spend, subject to per-asset caps |
 
 ## Commands
 
