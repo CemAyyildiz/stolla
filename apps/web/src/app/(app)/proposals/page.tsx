@@ -13,7 +13,7 @@ import {
   PROPOSAL_STATE_ORDER,
 } from "@/lib/proposalState";
 import { contractIds } from "@/lib/stellar";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { SkeletonProposalRow } from "@/components/ui/Skeleton";
 import { ProposalSummaryCard } from "@/components/ProposalSummaryCard";
 import { ProposalMetadataFields } from "@/components/proposal/ProposalMetadataFields";
 import { PreSubmitSummary } from "@/components/PreSubmitSummary";
@@ -488,14 +488,11 @@ export default function ProposalsPage() {
 
         {loading && (
           <>
-            <ul className="mt-3 space-y-2">
+            <ul className="mt-3 space-y-2" aria-hidden="true">
               {Array.from({ length: Math.max(uniqueProposalIds.length || 3, 1) }).map(
                 (_, i) => (
                   <li key={i}>
-                    <div className="flex items-center justify-between rounded-lg border border-slate-800 bg-[#151b2b] px-4 py-3">
-                      <Skeleton className="h-5 w-48" />
-                      <Skeleton className="h-5 w-16" />
-                    </div>
+                    <SkeletonProposalRow />
                   </li>
                 ),
               )}

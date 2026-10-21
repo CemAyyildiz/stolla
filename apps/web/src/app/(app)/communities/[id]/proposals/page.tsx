@@ -8,7 +8,7 @@ import { ProposalSummaryCard } from "@/components/ProposalSummaryCard";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppLinkButton } from "@/components/ui/AppLinkButton";
 import { LiveStatus } from "@/components/ui/LiveStatus";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { SkeletonProposalRow } from "@/components/ui/Skeleton";
 import { ScopedProposalEmptyState } from "@/components/community/ScopedProposalEmptyState";
 import { useProposalDiscovery } from "@/hooks/useProposalDiscovery";
 import { getCommunity } from "@/lib/community/registry";
@@ -157,8 +157,8 @@ function ScopedProposalHistory({ community }: { community: CommunityView }) {
               Loading community proposal history…
             </LiveStatus>
             <div className="mt-3 space-y-2" aria-hidden="true">
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-16 w-full" />
+              <SkeletonProposalRow />
+              <SkeletonProposalRow />
             </div>
           </>
         )}

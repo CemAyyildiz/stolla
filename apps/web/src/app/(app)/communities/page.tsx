@@ -7,7 +7,7 @@ import { AppButton } from "@/components/ui/AppButton";
 import { AppLinkButton } from "@/components/ui/AppLinkButton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LiveStatus } from "@/components/ui/LiveStatus";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { SkeletonCommunityRow } from "@/components/ui/Skeleton";
 import { listCommunities } from "@/lib/community/registry";
 import type { CommunityView } from "@/lib/community/types";
 
@@ -289,19 +289,8 @@ export default function CommunitiesPage() {
             aria-hidden="true"
           >
             {Array.from({ length: 3 }, (_, index) => (
-              <li
-                key={index}
-                className="rounded-xl border border-slate-800 bg-[#151b2b] p-5"
-              >
-                <div className="flex gap-3">
-                  <Skeleton className="h-12 w-12" />
-                  <div className="flex-1">
-                    <Skeleton className="h-5 w-2/3" />
-                    <Skeleton className="mt-2 h-3 w-1/2" />
-                  </div>
-                </div>
-                <Skeleton className="mt-5 h-16 w-full" />
-                <Skeleton className="mt-5 h-20 w-full" />
+              <li key={index} className="min-w-0">
+                <SkeletonCommunityRow />
               </li>
             ))}
           </ul>

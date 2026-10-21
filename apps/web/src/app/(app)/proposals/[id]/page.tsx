@@ -16,7 +16,7 @@ import {
 import { ProposalState } from "@/lib/bindings/community-governor/src";
 import { PROPOSAL_STATE_LABELS } from "@/lib/proposalState";
 import { contractIds } from "@/lib/stellar";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { Skeleton, SkeletonStat } from "@/components/ui/Skeleton";
 import { parseProposalId } from "@/lib/proposals";
 import { useTransactionLifecycle } from "@/hooks/useTransactionLifecycle";
 import { TransactionLifecycleDisplay } from "@/components/TransactionLifecycleDisplay";
@@ -401,16 +401,10 @@ export default function ProposalDetailPage({
             {truncateMiddle(proposalIdHex)}
           </p>
         </div>
-        <div className="mt-6 grid gap-3 rounded-xl border border-slate-800 bg-[#151b2b] p-5 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-slate-500">State</dt>
-            <dd><Skeleton className="mt-0.5 h-5 w-24" /></dd>
-          </div>
-          <div>
-            <dt className="text-slate-500">You voted</dt>
-            <dd><Skeleton className="mt-0.5 h-5 w-16" /></dd>
-          </div>
-        </div>
+        <dl className="mt-6 grid gap-3 rounded-xl border border-slate-800 bg-[#151b2b] p-5 text-sm sm:grid-cols-2">
+          <SkeletonStat label="State" valueWidth="w-24" />
+          <SkeletonStat label="You voted" valueWidth="w-16" />
+        </dl>
       </div>
     );
   }
@@ -523,7 +517,7 @@ export default function ProposalDetailPage({
               </span>
             )}
             {votingPowerStatus === "loading" && (
-              <Skeleton className="mt-0.5 h-5 w-24" />
+              <Skeleton variant="shimmer" className="mt-0.5 h-5 w-24" />
             )}
             {votingPowerStatus === "unavailable" && (
               <span className="text-amber-300">Unavailable</span>

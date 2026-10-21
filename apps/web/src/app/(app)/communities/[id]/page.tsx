@@ -142,11 +142,11 @@ export default function CommunityDetailPage() {
     return (
       <div className="mx-auto w-full min-w-0 max-w-4xl px-4 py-10">
         <LiveStatus className="sr-only">Loading community details…</LiveStatus>
-        <Skeleton className="h-8 w-56" />
-        <Skeleton className="mt-3 h-5 w-full max-w-xl" />
+        <Skeleton variant="shimmer" className="h-8 w-56" />
+        <Skeleton variant="shimmer" className="mt-3 h-5 w-full max-w-xl" />
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <Skeleton className="h-44 w-full" />
-          <Skeleton className="h-44 w-full" />
+          <Skeleton variant="shimmer" className="h-44 w-full" />
+          <Skeleton variant="shimmer" className="h-44 w-full" />
         </div>
       </div>
     );

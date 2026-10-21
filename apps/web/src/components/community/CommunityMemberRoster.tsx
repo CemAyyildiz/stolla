@@ -122,9 +122,9 @@ export function CommunityMemberRoster({
 
       {loading && (
         <div className="mt-4 space-y-2" aria-busy="true">
-          <Skeleton className="h-10 w-full rounded-lg" />
-          <Skeleton className="h-10 w-full rounded-lg" />
-          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton variant="shimmer" className="h-10 w-full rounded-lg" />
+          <Skeleton variant="shimmer" className="h-10 w-full rounded-lg" />
+          <Skeleton variant="shimmer" className="h-10 w-full rounded-lg" />
         </div>
       )}
 

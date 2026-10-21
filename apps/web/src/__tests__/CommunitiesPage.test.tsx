@@ -106,6 +106,17 @@ describe("CommunitiesPage", () => {
     expect(
       screen.getByText("Loading registered communities…"),
     ).toBeInTheDocument();
+    // Exactly one status announces the registry load.
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    // The list uses the shared skeleton pattern while the registry resolves.
+    const skeletons = screen.getAllByTestId("skeleton");
+    expect(skeletons.length).toBeGreaterThan(0);
+    for (const skeleton of skeletons) {
+      expect(skeleton).toHaveAttribute("data-variant", "shimmer");
+    }
+    // Stat labels stay visible so the grid does not jump into unlabeled rows.
+    expect(screen.getAllByText("Proposal threshold")).toHaveLength(3);
+    expect(screen.getAllByText("Quorum")).toHaveLength(3);
 
     await act(async () => {
       request.resolve({
@@ -116,6 +127,8 @@ describe("CommunitiesPage", () => {
     });
 
     expect(await screen.findByText("Builders Guild")).toBeInTheDocument();
+    // The loaded list leaves no skeleton blocks behind.
+    expect(screen.queryByTestId("skeleton")).not.toBeInTheDocument();
     expect(screen.getByText(/17280 ledgers/)).toBeInTheDocument();
     // Non-empty registry keeps search as secondary filter.
     expect(
@@ -176,6 +189,8 @@ describe("CommunitiesPage", () => {
     expect(
       screen.queryByLabelText("Search communities by name"),
     ).toBeInTheDocument();
+    // The shared skeleton pattern marks the list as loading.
+    expect(screen.getAllByTestId("skeleton").length).toBeGreaterThan(0);
 
     await act(async () => {
       request.resolve({
@@ -189,6 +204,8 @@ describe("CommunitiesPage", () => {
     expect(
       screen.queryByLabelText("Search communities by name"),
     ).not.toBeInTheDocument();
+    // The empty state replaces the skeleton chrome.
+    expect(screen.queryByTestId("skeleton")).not.toBeInTheDocument();
   });
 
   it("shows an RPC error and can retry", async () => {
