@@ -16,6 +16,55 @@ use crate::{
     CommunityNft, CommunityNftClient, DataKey, STORAGE_EXTEND_AMOUNT, STORAGE_TTL_THRESHOLD,
 };
 
+const NFT_WASM: &[u8] = include_bytes!("../../community-factory/test_wasm/community_nft.wasm");
+
+#[test]
+fn upgrade_requires_current_owner_and_bootstrap_authority_can_be_revoked() {
+    let e = Env::default();
+    let (owner, successor, client) = setup(&e);
+    let hash = e.deployer().upload_contract_wasm(NFT_WASM);
+    assert!(client.bootstrap_authority_remaining());
+
+    e.mock_auths(&[MockAuth {
+        address: &successor,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "upgrade",
+            args: (&hash,).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+    assert!(client.try_upgrade(&hash).is_err());
+
+    e.mock_all_auths();
+    client.transfer_ownership(&successor, &100);
+    client.accept_ownership();
+    assert_eq!(client.get_owner(), Some(successor.clone()));
+    assert!(!client.bootstrap_authority_remaining());
+
+    e.mock_auths(&[MockAuth {
+        address: &owner,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "upgrade",
+            args: (&hash,).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+    assert!(client.try_upgrade(&hash).is_err());
+
+    e.mock_auths(&[MockAuth {
+        address: &successor,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "upgrade",
+            args: (&hash,).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+    client.upgrade(&hash);
+}
+
 fn setup(e: &Env) -> (Address, Address, CommunityNftClient<'_>) {
     let owner = Address::generate(e);
     let member = Address::generate(e);

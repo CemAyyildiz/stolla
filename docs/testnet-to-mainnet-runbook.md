@@ -1,5 +1,9 @@
 # Testnet-to-Mainnet Deployment and Monitoring Runbook
 
+The current NFT and Governor upgrade authority, entry points, and bootstrap
+proofs are documented in [Community upgrade entry points](./community-upgrade-entry-points.md).
+Timelock and Treasury upgrades remain gated until those contracts exist.
+
 ## Purpose and release policy
 
 This runbook defines the evidence, approvals, commands, and operational checks
