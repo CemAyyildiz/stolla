@@ -2,7 +2,12 @@
 
 ## Status
 
-Proposed
+Proposed for the full timelocked execution model.
+
+`CommunityTreasury` spend policy is partially implemented. The contract stores a
+Timelock address and enforces asset, recipient, per-call, and period limits.
+`CommunityTimelock` itself is not implemented here, and Governor queueing
+defaults are unchanged. See [Treasury implementation status](#treasury-implementation-status).
 
 This ADR defines the architecture required before Stolla enables privileged or
 treasury-bearing proposals. The current deployment remains a signaling-oriented
@@ -274,6 +279,58 @@ a cap, or removing a recipient is also delayed in v1 to keep one simple,
 auditable authority path; the Guardian can cancel an unsafe queued payment
 during the delay.
 
+### Treasury implementation status
+
+`CommunityTreasury` in `contracts/contracts/community-treasury` is **partially
+implemented**. It does not depend on Timelock source. Spend and policy
+administration require authorization from the Timelock `Address` stored at
+construction.
+
+Implemented:
+
+- The stored Timelock is the only address that can call `pay`,
+  `set_asset_policy`, `set_recipient`, or `remove_asset`.
+- Per-asset policy stores `max_per_call`, `max_per_period`, a tumbling
+  `period_ledgers` window, and an optional recipient allowlist of at most 32
+  addresses. A missing asset, or a zero cap on either limit, rejects spends.
+  Zero never means unlimited.
+- `deposit(from, asset, amount)` pulls a SEP-41 transfer from an authorized
+  depositor and emits `deposited`.
+- `pay(asset, recipient, amount, reference)` matches the v1 treasury action
+  shape in this ADR. It rejects a non-positive amount, a recipient equal to
+  the treasury, an unknown asset, a disabled cap, a per-call overrun, a period
+  overrun, a recipient outside an enabled allowlist, and an insufficient
+  balance. A successful spend emits `treasury_payment`.
+- The period counter resets when
+  `current_ledger >= window_start + period_ledgers`. The expected mainnet
+  value remains `17,280` ledgers (`DEFAULT_PERIOD_LEDGERS`); the stored policy
+  carries the actual length.
+- Unit tests cover the allow/deny matrix and callers that do not authorize the
+  stored Timelock address.
+
+Remaining gaps:
+
+- `CommunityTimelock` is not in this change. The treasury does not decode a
+  queued action, verify an action id, or sum several `pay` calls before the
+  first invocation. Each `pay` is capped on its own. Later calls in the same
+  window share the period counter.
+- `treasury_payment` records the caller-supplied `reference` bytes. It does
+  not independently attest an action id from Timelock storage.
+- The window is tumbling, not a sliding sum of each earlier payment.
+- The contract does not prove that an allowlisted address is a Stellar Asset
+  Contract. The Timelock must store a SEP-41 token.
+- A direct token transfer that skips `deposit` changes the balance and does
+  not emit `deposited`.
+- Policy administration is Timelock-authorized, but the delay that should
+  precede a policy change lives in the Timelock, which is still absent.
+- No upgrade entry point, bootstrap-role revocation, Guardian pause,
+  `storage_health`, streaming payments, swaps, bridges, yield, or frontend
+  dashboard.
+- Spend-counter TTL uses the same 30-day extension as the other contracts.
+  Archival restoration is not implemented.
+- `CommunityGovernor` still uses immediate execution. Its queueing default was
+  not changed.
+
 ### Other target calls
 
 An allowlist entry is an exact `(target_contract, function_symbol)` pair.
@@ -479,8 +536,10 @@ communities, and RPC event decoding.
 
 1. Implement `CommunityTimelock`, canonical action records, lifecycle reads,
    events, and exact auth checks.
-2. Implement `CommunityTreasury`, Stellar Asset Contract validation, caps,
-   rolling spend accounting, and payment events.
+2. Finish `CommunityTreasury`. Spend policy, deposit and payment events, and
+   the allow/deny tests are in place. Still open: Timelock-verified action
+   ids, batch sums, SAC code checks, direct-transfer deposits, upgrade and
+   bootstrap revocation, and `storage_health`.
 3. Update `CommunityGovernor` to require queueing and expose exact approved
    action data for Timelock verification.
 4. Add per-community deployment/registry integration after the
